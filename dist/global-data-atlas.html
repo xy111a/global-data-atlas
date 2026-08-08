@@ -67,6 +67,7 @@
   .seg button:hover{color:var(--text);background:var(--hover);}
   .seg button:active{background:var(--pressed);}
   .seg button.active{color:var(--cyan);font-weight:500;text-shadow:0 0 12px rgba(0,240,255,.35);}
+  .seg button.disabled{opacity:.3;cursor:not-allowed;pointer-events:none;}   /* 当前层级不可用的指标 */
   .seg button.active::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:2px;
     background:var(--cyan);box-shadow:0 0 8px rgba(0,240,255,.4);}   /* active 发光条 */
   .btn{background:var(--panel);border:1px solid var(--line);color:var(--muted);
@@ -174,7 +175,8 @@
   #metricSeg button{padding:4px 8px; font-size:11px;}
   #search{max-width:120px;}
 }
-  #rank{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;}
+  #rank{margin-top:16px;border-top:1px dashed var(--line-soft);padding-top:12px;max-height:340px;overflow-y:auto;}   /* 全量排行可滚动（默认顶部） */
+  .trend-scroll{max-height:380px;overflow-y:auto;}   /* 洞察增长图全量可滚动 */
   .rank-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;font-weight:600;}
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
     cursor:pointer;font-size:13px;transition:background var(--t-fast);}
@@ -709,6 +711,27 @@ function setCrumbPath(paths){
   }).join(" / "));
   updateBackBtn();   // 层级变化时同步返回按钮文字
   document.getElementById("resetView").style.display="none";   // 切层后视图自动重置，隐藏恢复按钮
+  updateMetricButtons();   // 层级变化时刷新指标按钮可用性（scope=world 仅世界层）
+}
+/* 按当前层级刷新指标按钮可用性：scope=world 的指标仅在 world 层可用，其余层禁用弱化 */
+function updateMetricButtons(){
+  const seg=document.getElementById("metricSeg"); if(!seg) return;
+  const worldOnly = currentLevel!=="world" && currentLevel!=="";
+  seg.querySelectorAll("button").forEach(b=>{
+    const m=b.dataset.m;
+    const unusable = worldOnly && metricScope(m)==="world";
+    b.disabled = unusable;
+    b.classList.toggle("disabled", unusable);
+    if(unusable && b.classList.contains("active")){
+      // 当前指标不可用 → 自动切回 gdp
+      metric="gdp"; b.classList.remove("active");
+      const gdpBtn=seg.querySelector('button[data-m="gdp"]');
+      if(gdpBtn){ gdpBtn.classList.add("active"); gdpBtn.disabled=false; gdpBtn.classList.remove("disabled"); }
+      const level=currentLevel;
+      if(level==="china") loadChina(); else if(level==="province") loadProvince(currentProvName,currentProvAdcode);
+      else if(level==="us") loadUS(); else if(level==="japan") loadJapan();
+    }
+  });
 }
 /* 返回按钮动态文字：显示上一级名称 */
 function updateBackBtn(){
@@ -741,15 +764,15 @@ function showCountry(c){
   ];
   const insight=[];
   if(metric==="gdp"){
-    insight.push({label:"较2000 实际增长（不变价）", value:gKd!=null?fmtGrowth(gKd):"—", cls:gKd!=null?(gKd>=0?"pos":"neg"):""});
-    insight.push({label:"较2000 实际增长（PPP不变价）", value:gPp!=null?fmtGrowth(gPp):"—", cls:gPp!=null?(gPp>=0?"pos":"neg"):""});
+    insight.push({label:"较2000年 实际增长（不变价）", value:gKd!=null?fmtGrowth(gKd):"—", cls:gKd!=null?(gKd>=0?"pos":"neg"):""});
+    insight.push({label:"较2000年 实际增长（PPP不变价）", value:gPp!=null?fmtGrowth(gPp):"—", cls:gPp!=null?(gPp>=0?"pos":"neg"):""});
   } else {
     const mv=regGet(reg,metric,y);
     const ey=reg.extYear?reg.extYear(metric,y):null;
     const label = metricScope(metric)==="world" && ey && ey!==+y ? `${metricLabel(metric)} (${ey})` : metricLabel(metric);
     const mg=reg.growth(metric,2000);
     stats.unshift({label, value:metricFmt(metric,mv), delta:mg!=null?delta(mg,v=>fmtGrowthFor(metric,v)):null});
-    insight.push({label:"较2000 "+(metric==="life"?"变化":"增长"), value:mg!=null?fmtGrowthFor(metric,mg):"—", cls:mg!=null?(mg>=0?"pos":"neg"):""});
+    insight.push({label:"较2000年 "+(metric==="life"?"变化":"增长"), value:mg!=null?fmtGrowthFor(metric,mg):"—", cls:mg!=null?(mg>=0?"pos":"neg"):""});
   }
   const tr=countryTrend(iso2);
   renderDashboard({
@@ -842,8 +865,8 @@ function renderTrendCompare(entries, title, fmt){
   const box=document.getElementById("trend"); if(!box) return;
   if(!entries || !entries.length){ box.innerHTML=""; return; }
   const isGrowth = !fmt;                 // 默认按增长率渲染；传 fmt 则按绝对值（如 GDP 对比）
-  const sorted=entries.slice().sort((a,b)=>b.val-a.val).slice(0,8);
-  box.innerHTML=`<div class="rank-title">${title||"增长对比"}</div><div id="trendChart" style="height:${Math.max(120,sorted.length*26)}px;width:100%;"></div>`;
+  const sorted=entries.slice().sort((a,b)=>b.val-a.val);   // 全量（不再 TOP8，容器可滚动）
+  box.innerHTML=`<div class="rank-title">${title||"增长对比"}</div><div class="trend-scroll"><div id="trendChart" style="height:${Math.max(120,sorted.length*22)}px;width:100%;"></div></div>`;
   const tc=echarts.init(document.getElementById("trendChart"));
   const fmtV = isGrowth ? (v=>fmtGrowth(v/100)) : (v=>fmt(v));
   tc.setOption({
@@ -867,13 +890,6 @@ function sourceTag(src){
   const t=map[src]||"公开整理";
   const color=src==="wb"?"#00F0FF":(src==="bea"?"#00F0FF":(src==="wiki"?"#ffd166":(src==="city"?"#FF2E93":"#7f93a8")));
   return `<span class="tag" style="color:${color};border-color:${color}33;">来源：${t}</span>`;
-}
-function showMetrics(name,en,rows,src,year){
-  document.getElementById("pName").textContent=name;
-  document.getElementById("pSub").textContent=en||"";
-  document.getElementById("pHint").innerHTML=`${currencyTag(metric)}${src?sourceTag(src):""}<span class="tag">年份：${year||dataYear}</span>`;
-  document.getElementById("pMetrics").innerHTML=rows.map(r=>
-    `<div class="metric"><div class="k">${r[0]}</div><div class="v ${r[2]?'pink':''}${r[3]?' '+r[3]:''}">${r[1]}</div></div>`).join("");
 }
 /* ===== 区域仪表盘统一渲染（V3） =====
    cfg = {name, en, level, tags[], stats[], insight[], trendHTML, actionsHTML}
@@ -919,22 +935,22 @@ function renderWorld2D(){
     backgroundColor:"#05060a",
     tooltip:{trigger:"item", formatter:p=>{ const c=p.data&&p.data.cn, reg=p.data&&p.data.reg; if(!c)return p.name+"<br/><span style='color:#7f93a8'>暂无数据（未纳入 World Bank 序列）</span>";
       const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=reg.growth(metric,2000);
-      const grFmt = metric==="gdp" ? ("较2000实际增长 <b style=\"color:"+((gr||0)>=0?'#00F0FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
-        : (`较2000${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
+      const grFmt = metric==="gdp" ? ("较2000年实际增长 <b style=\"color:"+((gr||0)>=0?'#00F0FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
+        : (`较2000年${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
       return `<b>${c[0]}</b> ${c[1]} · ${cYear(c[2])}<br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>${grFmt}`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>F(metric,v)}:{show:false},
-    series:[{type:"map",map:"world",roam:true,data,
+    series:[{type:"map",map:"world",roam:true,scaleLimit:{min:0.7,max:8},data,
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"}]);
   showGeneric("世界地图","单击国家查看数据；双击中国/美国/日本下钻",
     "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
   renderRank();
-  /* 洞察：各国较2000实际增长对比（不变价 GDP） */
-  /* 洞察：各国较2000增长/变化对比（跟随当前维度） */
+  /* 洞察：各国较2000年实际增长对比（不变价 GDP） */
+  /* 洞察：各国较2000年增长/变化对比（跟随当前维度） */
   const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
-  renderTrendCompare(comp, "较2000 "+(metric==="gdp"?"实际增长":(metric==="life"?"变化":metricLabel(metric)+"增长"))+" · TOP 8", v=>fmtGrowthFor(metric,v));
+  renderTrendCompare(comp, "较2000年 "+(metric==="gdp"?"实际增长":(metric==="life"?"变化":metricLabel(metric)+"增长"))+"", v=>fmtGrowthFor(metric,v));
 }
 
 /* ============== 中国（2D 省→市 下钻） ============== */
@@ -960,15 +976,15 @@ async function loadChina(){
         return `<b>${d.name}</b> · ${dataYear}<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
       visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · "+dataYear,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
         textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-      series:[{type:"map",map:"china",roam:true,data:provData,
+      series:[{type:"map",map:"china",roam:true,scaleLimit:{min:0.7,max:8},data:provData,
         label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"}]);
     showGeneric("中国","单击省份查看数据；双击省份下钻到地级市","颜色按当前指标着色，GDP 随上方年份切换（2000–2024 维基序列，2025 为初步核算）。货币统一为人民币(CNY)。");
-    /* 洞察：各省较2000名义增长（仅 GDP 有多年序列；pop/area 为单年常量无增长） */
+    /* 洞察：各省较2000年名义增长（仅 GDP 有多年序列；pop/area 为单年常量无增长） */
     if(metric==="gdp"){
       const comp=Object.keys(CN).map(k=>({name:k, val:cnNominalGrowth(k,2000)})).filter(e=>e.val!=null);
-      renderTrendCompare(comp, "各省较2000 名义增长 · TOP 8");
+      renderTrendCompare(comp, "各省较2000年 名义增长");
     } else document.getElementById("trend").innerHTML="";   // 省级 pop/area 无序列，不显示洞察
   }catch(e){ showGeneric("加载失败",String(e),"请检查网络（需可访问 DataV）。"); }
   renderRank();
@@ -1022,7 +1038,7 @@ async function loadProvince(short, adcode){
       currentProvData=data;
       chart.clear(); chart.setOption({backgroundColor:"#05060a",
         tooltip:{trigger:"item", formatter:p=>`<b>${p.name}</b><br/><span style="color:#7f93a8">暂无 GDP 数据（港澳未纳入维基省级序列）</span>`},
-        series:[{type:"map",map:mapName,roam:true,data,
+        series:[{type:"map",map:mapName,roam:true,scaleLimit:{min:0.7,max:8},data,
           label:{show:true,color:"#9fb3c8",fontSize:10},
           itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
           emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]});
@@ -1058,7 +1074,7 @@ async function loadProvince(short, adcode){
         return `<b>${d.name}</b><br/>GDP ${fmtGDP(cm.gdp)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;}},
       visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 约2023",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
         textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>fmtBy(v)}:{show:false},
-      series:[{type:"map",map:mapName,roam:true,data,
+      series:[{type:"map",map:mapName,roam:true,scaleLimit:{min:0.7,max:8},data,
         label:{show:false},itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
         emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
     });
@@ -1110,16 +1126,16 @@ async function loadUS(){
         +`<br/><span style="color:#7f93a8">美元现价约 ${(ut!=null?ut:(US_STATES_GDP[p.name].gdp/RATE23/1e12)).toFixed(2)} 万亿</span>`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"us",roam:true,data,label:{show:false},
+    series:[{type:"map",map:"us",roam:true,scaleLimit:{min:0.7,max:8},data,label:{show:false},
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
   showGeneric("美国 · 州", "共 "+gj.features.length+" 个州/特区；单击州查看三项指标",
     `美国各州：GDP 为 BEA 现价序列（SAGDP2, 2000–2024，按逐年平均汇率折算人民币），切换年份可看变迁；人口为 Census 2023 估计、面积为总面积（含水域）。切换上方指标可重新着色。点返回按钮回到世界。`);
-  /* 洞察：各州较2000名义增长（仅 GDP 有多年序列；pop/area 单年常量） */
+  /* 洞察：各州较2000年名义增长（仅 GDP 有多年序列；pop/area 单年常量） */
   if(metric==="gdp"){
     const comp=Object.keys(US_STATES_GDP).map(k=>({name:k, val:usNominalGrowth(k,2000)})).filter(e=>e.val!=null);
-    renderTrendCompare(comp, "各州较2000 名义增长(现价) · TOP 8");
+    renderTrendCompare(comp, "各州较2000年 名义增长(现价)");
   } else document.getElementById("trend").innerHTML="";
   renderRank();
 }
@@ -1144,7 +1160,7 @@ async function loadJapan(){
       return `<b>${p.name}</b> · 2021<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 2021",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"japan",roam:true,data,label:{show:false},
+    series:[{type:"map",map:"japan",roam:true,scaleLimit:{min:0.7,max:8},data,label:{show:false},
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"日本", level:"japan"}]);
@@ -1181,7 +1197,7 @@ function showUSStatePanel(nm){
       {label:"人口 ("+popY+")", value:fmtPop(s.pop)},
       {label:"面积", value:fmtArea(s.area)}
     ],
-    insight:[{label:"较2000 名义增长(现价)", value:ng!=null?fmtGrowth(ng):"—", cls:ng!=null?(ng>=0?"pos":"neg"):""}],
+    insight:[{label:"较2000年 名义增长(现价)", value:ng!=null?fmtGrowth(ng):"—", cls:ng!=null?(ng>=0?"pos":"neg"):""}],
     trendHTML:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('usstate','${nm}','${nm}')">＋ 加入对比</button>`
   });
@@ -1205,7 +1221,7 @@ function showProvincePanel(short){
   stats.push({label:"人口 (2023)", value:fmtPop(pop)});
   stats.push({label:"面积", value:fmtArea(area)});
   const insight=[];
-  if(ng!=null && dataYear!=="2000") insight.push({label:"较2000 名义增长", value:fmtGrowth(ng), cls:ng>=0?"pos":"neg"});
+  if(ng!=null && dataYear!=="2000") insight.push({label:"较2000年 名义增长", value:fmtGrowth(ng), cls:ng>=0?"pos":"neg"});
   if(rg25!=null) insight.push({label:"2025 实际增幅", value:(rg25*100).toFixed(1)+"%", cls:rg25>=0?"pos":"neg"});
   renderDashboard({
     name:short, en:"中国省份 · "+dataYear, level:"省级",
@@ -1228,30 +1244,30 @@ function renderRank(){
     items=Object.keys(US_STATES_GDP).map(k=>{
       const r=regUSState(k);
       return [k,k,regGet(r,metric,dataYear),"usstate"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="japan"){
     items=Object.keys(window.JP_METRICS||{}).map(k=>{
       const r=regJapanPref(k);
       return [k,k,regGet(r,metric,dataYear),"jppref"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="province"){
     items=currentProvData.filter(d=>d.cm)
       .map(d=>{ const cm=d.cm; const r=regCity(cm); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
-      .sort((a,b)=>b[2]-a[2]).slice(0,10);
+      .sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="china"){
     items=Object.keys(CN).map(k=>{
       const r=regProv(k), v=regGet(r,metric,dataYear);
       return [k+"省",k,v,"prov"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="world"){
     items=COUNTRIES.map(c=>{
       const r=regCountry(c[2]);
       return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
   } else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
   const fmt=v=> metricFmt(metric,v);
-  box.innerHTML=`<div class="rank-title">${unit} · TOP 10</div>`+items.map((it,i)=>
+  box.innerHTML=`<div class="rank-title">${unit} · 排行（全量，可滚动）</div>`+items.map((it,i)=>
     `<div class="rank-item" data-type="${it[3]}" data-key="${it[1]}">
        <span class="rk">${i+1}</span><span class="rn">${it[0]}</span><span class="rv">${fmt(it[2])}</span></div>`).join("");
   box.querySelectorAll(".rank-item").forEach(el=>{
@@ -1442,6 +1458,7 @@ window.addEventListener("load", ()=>{
 
   document.getElementById("metricSeg").addEventListener("click", e=>{
     const b=e.target.closest("button"); if(!b)return;
+    if(b.disabled) return;   // 当前层级不可用的指标不可点击
     metric=b.dataset.m; [...e.currentTarget.children].forEach(x=>x.classList.toggle("active",x===b));
     if(currentLevel==="world"){ renderWorld2D(); }
     else if(currentLevel==="china") loadChina();
