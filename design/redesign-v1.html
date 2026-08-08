@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>全球数据图谱 · 视觉再设计稿</title>
+<style>
+/* ============================================================================
+   01 · 设计令牌 :root
+   ----------------------------------------------------------------------------
+   设计决策：令牌分三组 ——
+   ① 品牌令牌（沿用现有语义，不可变）：数据语义色只用于数据，绝不作装饰
+   ② 质感/光效令牌（本次新增）：统一"顶部光源"系统 —— 所有表面顶部一条 1px
+      发丝高光渐变（cyan→pink，≤50% 透明度），配合阴影/辉光，形成
+      背景(第1层)→面板(第2层)→悬浮层(第3层) 的纵向层次
+   ③ 结构令牌：圆角、动效时长、数值字体特性
+   ============================================================================ */
+:root{
+  /* —— ① 品牌令牌（语义不变，沿用） —— */
+  --bg:        #05060a;                  /* 深空底 */
+  --panel:     rgba(12,18,28,.82);       /* 面板层（半透明，露出背景层次） */
+  --line:      #13314a;                  /* 分隔线/描边 */
+  --cyan:      #00F0FF;                  /* 强调 / 正值 / 高亮 —— 唯一主强调 */
+  --pink:      #FF2E93;                  /* 色带高值（地图 ramp 高端） */
+  --gold:      #FFD166;                  /* 负增长 / 警告 */
+  --muted:     #7f93a8;                  /* 弱化文字 / 图标 */
+  --text:      #dfeaf5;                  /* 主文字 */
+
+  /* —— ② 质感/光效令牌（新增） —— */
+  --panel-solid:  #0c121c;               /* 输入框实底（聚焦态提升对比） */
+  --panel-float:  rgba(13,20,31,.92);    /* 悬浮层（tooltip/banner/dropdown）——第3层 */
+  --line-soft:    rgba(19,49,74,.45);    /* 更弱的分隔线（面板内部） */
+  --line-bright:  rgba(0,240,255,.35);   /* hover 态描边微亮 */
+  --line-top:     linear-gradient(90deg, transparent, rgba(0,240,255,.5), rgba(255,46,147,.28), transparent);
+                                          /* 顶部发丝高光：统一"顶部光源"，1px，不承载数据 */
+  --hover:        rgba(0,240,255,.06);   /* 可点元素 hover 遮罩 */
+  --hover-strong: rgba(0,240,255,.10);   /* 选中/更强 hover 遮罩 */
+  --pressed:      rgba(0,240,255,.14);   /* :active 按压遮罩（比 hover 更深一档） */
+  --glow-sm:      0 0 10px rgba(0,240,255,.14);   /* 微光：焦点环/小元素 */
+  --glow-md:      0 0 22px rgba(0,240,255,.22);   /* 中光：选中态/强调数字 */
+  --shadow-panel: 0 14px 40px rgba(0,0,0,.45);    /* 面板投影（第2层） */
+  --shadow-float: 0 18px 50px rgba(0,0,0,.55);    /* 悬浮层投影（第3层，更沉） */
+
+  /* —— ③ 结构令牌 —— */
+  --font: -apple-system,'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  --num:  tabular-nums;                 /* 大数字/排行/对比一律 tabular，列对齐 */
+  --r-sm: 6px;  --r-md: 10px;  --r-lg: 14px;
+  --t-fast: .14s ease;                  /* hover 用：快 */
+  --t-med:  .22s ease;                  /* 阴影/展开用：稍慢 */
+}
+
+/* ============================================================================
+   02 · 基础层 —— 三层层次的第 1 层（背景）
+   ----------------------------------------------------------------------------
+   设计决策：底色之上叠两个 4-5% 的 radial 环境光（左上 cyan、右下 pink），
+   仅作"深空纵深"氛围，透明度压到 5% 以下，绝不让 UI 感觉花哨。
+   ============================================================================ */
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0 }
+html,body{ height:100% }
+body{
+  font-family:var(--font);
+  font-size:14px; line-height:1.5;
+  color:var(--text);
+  background:
+    radial-gradient(1100px 700px at 12% -8%, rgba(0,240,255,.05), transparent 60%),
+    radial-gradient(900px 600px at 108% 112%, rgba(255,46,147,.04), transparent 60%),
+    var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+::selection{ background:rgba(0,240,255,.25) }
+/* 全站统一键盘焦点：细 cyan 描边，替代浏览器默认 */
+:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; border-radius:4px }
+/* 面板内部滚动条：细、暗、融入面板 */
+*::-webkit-scrollbar{ width:8px; height:8px }
+*::-webkit-scrollbar-thumb{ background:rgba(19,49,74,.7); border-radius:4px }
+*::-webkit-scrollbar-track{ background:transparent }
+
+button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer }
+input,select{ font:inherit; color:inherit }
+
+/* ============================================================================
+   03 · Header 控制栏（sticky，两层）
+   ----------------------------------------------------------------------------
+   设计决策：吸顶 + 毛玻璃（bg 72% + blur），底部 1px 发丝 + 顶部渐变高光，
+   保证下钻滚动时地图仍在其"指挥位"。两行结构：
+   行1 = 品牌区（标题+面包屑）｜搜索+年份+对比+返回
+   行2 = 指标按钮组（全宽分段控件）—— 与主操作分离，层次清晰
+   ============================================================================ */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  display:flex; flex-direction:column; gap:10px;
+  padding:12px 20px 12px;
+  background:color-mix(in oklab, var(--bg) 72%, transparent);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+.topbar::before{                        /* 顶部发丝高光：统一光源 */
+  content:""; position:absolute; inset:0 0 auto 0; height:1px;
+  background:var(--line-top); opacity:.55; pointer-events:none;
+}
+.tb-main{ display:flex; align-items:center; gap:18px; flex-wrap:wrap }
+
+/* —— 品牌区：标题 + 面包屑（层级导航） —— */
+.brand{ display:flex; flex-direction:column; gap:2px; min-width:0 }
+.logo{
+  display:flex; align-items:center; gap:9px;
+  font-size:16px; font-weight:600; letter-spacing:.02em; white-space:nowrap;
+}
+.logo::before{                          /* 8px cyan 圆点 = "实时数据源"信号（数据语义，非装饰） */
+  content:""; width:8px; height:8px; border-radius:50%;
+  background:var(--cyan); box-shadow:var(--glow-sm);
+}
+.crumb{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted) }
+.crumb-sep{ color:rgba(127,147,168,.4); user-select:none }
+.crumb-link{ color:var(--muted); text-decoration:none; padding:1px 2px; border-radius:4px;
+  transition:color var(--t-fast) }
+.crumb-link:hover{ color:var(--text); background:var(--hover) }
+.crumb-link:active{ color:var(--cyan) }
+/* 下钻反馈：当前层级 = cyan + 底部 1px 发光下划线，一眼看到"现在在哪" */
+.crumb-current{ color:var(--cyan); font-weight:500; position:relative }
+.crumb-current::after{
+  content:""; position:absolute; left:0; right:0; bottom:-2px; height:1px;
+  background:var(--cyan); box-shadow:var(--glow-sm);
+}
+
+/* —— 主操作区 —— */
+.tb-actions{ display:flex; align-items:center; gap:10px; margin-left:auto; flex-wrap:wrap; justify-content:flex-end }
+
+/* 搜索框 */
+.search{ position:relative; width:200px; flex:none }
+.search svg{ position:absolute; left:10px; top:50%; translate:0 -50%;
+  width:14px; height:14px; color:var(--muted); pointer-events:none }
+.search input{
+  width:100%; padding:8px 12px 8px 32px;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r-md);
+  font-size:13px; caret-color:var(--cyan);
+  transition:border-color var(--t-fast), box-shadow var(--t-med), background var(--t-fast);
+}
+.search input::placeholder{ color:color-mix(in oklab, var(--muted) 70%, transparent) }
+.search input:hover{ border-color:var(--line-bright) }
+/* focus：实底 + cyan 边框 + 微光环 —— 三态里唯一的"发光"输入态 */
+.search input:focus{ outline:none; border-color:var(--cyan); background:var(--panel-solid);
+  box-shadow:var(--glow-sm), inset 0 0 0 1px var(--line-bright) }
+
+/* 年份下拉 */
+.year{ position:relative; flex:none }
+.year select{
+  appearance:none; -webkit-appearance:none;
+  padding:8px 30px 8px 12px;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r-md);
+  font-size:13px; cursor:pointer; font-variant-numeric:var(--num);
+  transition:border-color var(--t-fast), box-shadow var(--t-med), background var(--t-fast);
+}
+.year select:hover{ border-color:var(--line-bright) }
+.year select:focus{ outline:none; border-color:var(--cyan); box-shadow:var(--glow-sm); background:var(--panel-solid) }
+.year::after{ /* 自绘 chevron，避免原生外观 */
+  content:""; position:absolute; right:12px; top:50%; width:6px; height:6px;
+  border-right:1.5px solid var(--muted); border-bottom:1.5px solid var(--muted);
+  transform:translateY(-65%) rotate(45deg); pointer-events:none;
+}
+
+/* 通用幽灵按钮（对比/返回/重置）—— 四态齐全 */
+.btn{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 12px; font-size:13px; white-space:nowrap;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r-md);
+  color:var(--muted);
+  transition:color var(--t-fast), background var(--t-fast),
+             border-color var(--t-fast), box-shadow var(--t-med);
+}
+.btn svg{ width:14px; height:14px; flex:none }
+.btn:hover{ color:var(--text); border-color:var(--line-bright); background:var(--hover) }
+.btn:active{ background:var(--pressed); translate:0 .5px }
+/* 对比按钮 active：cyan 文字 + 提亮描边 + 浅底 + 微光（区别于普通 hover） */
+.btn.active{ color:var(--cyan); border-color:var(--line-bright);
+  background:var(--hover-strong); box-shadow:var(--glow-sm) }
+.btn[aria-disabled="true"]{ opacity:.35; pointer-events:none }
+
+/* —— 指标按钮组（分段控件）—— */
+.tb-metrics{ display:flex }
+.metricseg{
+  display:flex; flex-wrap:wrap; gap:2px; padding:3px;
+  background:rgba(10,16,26,.55); border:1px solid var(--line); border-radius:var(--r-lg);
+}
+.metricseg button{
+  position:relative; padding:6px 11px; font-size:12.5px; white-space:nowrap;
+  border-radius:var(--r-sm); color:var(--muted);
+  transition:color var(--t-fast), background var(--t-fast);
+}
+.metricseg button:hover{ color:var(--text); background:var(--hover) }
+.metricseg button:active{ background:var(--pressed) }
+/* 选中：cyan 文字 + 底部 2px 纯 cyan 发光条（不用渐变色，克制，单强调） */
+.metricseg button.active{ color:var(--cyan); font-weight:500; text-shadow:0 0 12px rgba(0,240,255,.35) }
+.metricseg button.active::after{
+  content:""; position:absolute; left:12px; right:12px; bottom:3px; height:2px;
+  border-radius:2px; background:var(--cyan); box-shadow:0 0 8px rgba(0,240,255,.4);
+}
+
+/* ============================================================================
+   04 · 主区布局
+   ----------------------------------------------------------------------------
+   设计决策：grid 左 1fr（地图占满）+ 右侧面板 300-380px（clamp 随视口）。
+   面板与地图同高（stretch），面板内部超高则自身滚动，地图始终完整。
+   ============================================================================ */
+.layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) clamp(300px,24vw,380px);
+  gap:16px; align-items:stretch;
+  padding:16px 20px 24px;
+}
+
+/* ============================================================================
+   05 · 地图区 #chart（主角）
+   ----------------------------------------------------------------------------
+   设计决策：地图是英雄 —— 面板只给最轻的描边 + 内阴影"沉入"背景，
+   顶部 1px 高光维持光源一致性。SVG meet 居中，留白即海，不裁切大陆。
+   ============================================================================ */
+.map{
+  position:relative; min-height:560px;
+  border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden;
+  background:linear-gradient(180deg, rgba(10,15,24,.6), rgba(5,6,10,.92));
+  box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--shadow-panel);
+}
+.map::before{ content:""; position:absolute; inset:0 0 auto 0; height:1px; z-index:3;
+  background:var(--line-top); opacity:.5; pointer-events:none }
+.map svg{ position:absolute; inset:0; width:100%; height:100%; display:block }
+/* 示意地形：大陆用低饱和蓝灰（区分于海），不抢数据光晕 */
+.land{ fill:rgba(31,50,74,.5); stroke:rgba(31,50,74,.85); stroke-width:1 }
+.grat{ stroke:rgba(19,49,74,.32); stroke-width:1 }
+.dot-city{ fill:rgba(127,147,168,.5) }
+.map-label{ fill:rgba(127,147,168,.75); font-size:13px; font-family:var(--font) }
+
+/* 广东脉冲点 = 唯一的有生命力的动效（restraint：全页仅此一处动画） */
+.pulse-dot{ fill:var(--cyan); filter:drop-shadow(0 0 6px rgba(0,240,255,.8)) }
+@keyframes pulseRing{ 0%{ r:7; opacity:.65 } 100%{ r:26; opacity:0 } }
+.ring{ fill:none; stroke:var(--cyan); stroke-width:1.5; animation:pulseRing 2.6s ease-out infinite }
+
+/* 地图 hover 提示（SVG 内绘制，随地图坐标系缩放，断点下不错位） */
+.maptip{ opacity:0; transition:opacity var(--t-med); pointer-events:none }
+.maptip rect{ fill:var(--panel-float); stroke:var(--line-bright); rx:6 }
+.maptip text{ fill:var(--text); font-size:13px; font-family:var(--font) }
+.map:hover .maptip{ opacity:1 }
+
+/* 右上：重置视图（ghost 图标钮 + 自绘 tooltip） */
+.reset{
+  position:absolute; top:12px; right:12px; z-index:4;
+  display:flex; align-items:center; gap:6px;
+  padding:6px 10px; font-size:12px; color:var(--muted);
+  background:var(--panel-float); border:1px solid var(--line); border-radius:var(--r-md);
+  backdrop-filter:blur(8px);
+  transition:color var(--t-fast), border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-med);
+}
+.reset svg{ width:13px; height:13px }
+.reset:hover{ color:var(--text); border-color:var(--line-bright); background:var(--hover-strong) }
+.reset:active{ background:var(--pressed) }
+.reset:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px }
+/* 重置演示反馈：点击后图标旋转半圈 */
+.reset.spin svg{ animation:spin .4s ease }
+@keyframes spin{ to{ transform:rotate(180deg) } }
+
+/* 右下：色带 banner（悬浮层第3层）—— ramp 即数据语义（低→高 = cyan→pink） */
+.banner{
+  position:absolute; right:16px; bottom:16px; z-index:4;
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; font-size:12px; color:var(--muted);
+  background:var(--panel-float); border:1px solid var(--line); border-radius:var(--r-md);
+  backdrop-filter:blur(8px); box-shadow:var(--shadow-float), var(--glow-sm);
+}
+.banner .ramp{ width:84px; height:6px; border-radius:3px;
+  background:linear-gradient(90deg, var(--cyan), var(--pink)) }
+.banner b{ color:var(--text); font-weight:500; font-variant-numeric:var(--num) }
+
+/* ============================================================================
+   06 · 数据面板 #panel（第2层面板）
+   ----------------------------------------------------------------------------
+   设计决策：半透明面板 + 毛玻璃 + 顶部发丝高光 + 投影；
+   内部用 line-soft 细线分区（头部/数字/趋势/排行），信息密度与呼吸感平衡：
+   区块间距 18px，行高 5px 档位，数字与标签永远不成对拥挤。
+   ============================================================================ */
+.panel{
+  position:relative; min-width:0;
+  display:flex; flex-direction:column; gap:18px;
+  padding:18px 18px 20px;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:var(--shadow-panel);
+}
+.panel::before{ content:""; position:absolute; inset:0 0 auto 0; height:1px; z-index:1;
+  background:var(--line-top); opacity:.5; pointer-events:none }
+
+/* —— 区域名 —— */
+.region-head{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap }
+.region-name{ font-size:22px; font-weight:600; letter-spacing:.01em }
+.region-tag{ font-size:11px; color:var(--muted); border:1px solid var(--line);
+  border-radius:999px; padding:1px 8px; background:rgba(255,255,255,.02) }
+.region-time{ margin-left:auto; font-size:11px; color:var(--muted); font-variant-numeric:var(--num) }
+
+/* —— 三项指标大数字 —— */
+.stats{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:12px;
+  padding:14px 0; border-top:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft);
+}
+.stat-label{ font-size:12px; color:var(--muted) }
+.stat-value{ font-size:27px; font-weight:600; letter-spacing:-.01em;
+  font-variant-numeric:var(--num); margin-top:2px }
+.stat-delta{ display:inline-flex; align-items:center; gap:3px; margin-top:4px;
+  font-size:11.5px; font-variant-numeric:var(--num) }
+/* 语义色只进数据：↑cyan = 正值 / ↓gold = 负增长 / — 灰 = 无变化 */
+.stat-delta.up{ color:var(--cyan) }
+.stat-delta.down{ color:var(--gold) }
+.stat-delta.flat{ color:var(--muted) }
+
+/* —— 来源标签 —— */
+.source{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted) }
+.source svg{ width:12px; height:12px; opacity:.7; flex:none }
+.source b{ font-weight:500; color:color-mix(in oklab, var(--muted) 70%, var(--text) 30%) }
+
+/* —— 趋势图 #trend —— */
+.trend-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px }
+.trend-title{ font-size:13px; font-weight:500 }
+.trend-meta{ font-size:11px; color:var(--muted); font-variant-numeric:var(--num) }
+.trend svg{ display:block; width:100%; height:150px; --tc:var(--cyan) }
+.trend .grid{ stroke:rgba(19,49,74,.28); stroke-width:1 }
+.trend .tick{ fill:var(--muted); font-size:9.5px; font-family:var(--font) }
+/* 趋势线色 = 指标语义：正增长指标 cyan，负向指标（失业率）gold。
+   JS 只把色值写入 --tc（CSS 变量），stroke/stop 经 CSS 解析，避免
+   SVG 属性无法识别 var() 的问题 */
+.trend .area{ fill:url(#areaFill); opacity:.5 }
+.trend .line{ fill:none; stroke-width:2; stroke-linecap:round; stroke:var(--tc) }
+.trend .dot{ fill:var(--text); stroke:#05060a; stroke-width:1.5; color:var(--tc);
+  filter:drop-shadow(0 0 4px currentColor) }
+.trend .a0{ stop-color:var(--tc) }
+.trend .a1{ stop-color:var(--tc) }
+.trend.refresh{ animation:fadeIn .28s ease }
+@keyframes fadeIn{ from{ opacity:.35 } to{ opacity:1 } }
+
+/* —— TOP10 排行 #rank（三列对齐） —— */
+.rank{ display:flex; flex-direction:column }
+.rank-head, .rank-row{
+  display:grid; grid-template-columns:30px minmax(0,1fr) 84px; gap:8px; align-items:center;
+}
+.rank-head{ padding:0 8px 6px; font-size:11px; color:var(--muted);
+  border-bottom:1px solid var(--line-soft); letter-spacing:.02em }
+.rank-row{ padding:5px 8px; font-size:13px; border-radius:var(--r-sm);
+  border-bottom:1px solid rgba(19,49,74,.28); transition:background var(--t-fast) }
+.rank-row:last-child{ border-bottom:0 }
+.rank-row:hover{ background:var(--hover) }
+.rank-no{ font-size:12px; color:var(--muted); font-variant-numeric:var(--num); text-align:center }
+.rank-name-cell{ display:flex; align-items:center; gap:6px; min-width:0 }
+.rank-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.rank-val{ text-align:right; font-variant-numeric:var(--num); color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.rank-tag{ flex:none; font-size:10px; color:var(--cyan); border:1px solid var(--line-bright);
+  border-radius:999px; padding:0 6px; background:var(--hover-strong) }
+/* 当前区域行：cyan 左侧 2px 指示条 + 浅底 —— 数据选中态，非装饰 */
+.rank-row.current{ background:var(--hover-strong); box-shadow:inset 2px 0 0 var(--cyan) }
+.rank-row.current .rank-no{ color:var(--cyan) }
+.rank-row.current .rank-val{ color:var(--cyan); font-weight:600 }
+
+/* ============================================================================
+   07 · 对比模式 #compareBox（面板顶部）
+   ----------------------------------------------------------------------------
+   设计决策：五列对齐网格（区域｜当前指标｜GDP｜人口｜面积），
+   数值只留数字、单位进表头（(万亿)(亿)(万km²)）—— 可扫读、可逐行比对。
+   选中行浅 cyan 底 + 数值 cyan，与排行一致。
+   ============================================================================ */
+.compare{ display:none; border:1px solid var(--line-bright); border-radius:var(--r-md);
+  background:rgba(0,240,255,.03); overflow:hidden }
+.compare.open{ display:block; animation:fadeIn .25s ease }
+.compare-head{ display:flex; align-items:center; gap:8px; padding:9px 12px;
+  border-bottom:1px solid var(--line-soft); font-size:12.5px }
+.compare-head .n{ color:var(--muted); font-variant-numeric:var(--num); font-size:11px }
+.compare-close{ margin-left:auto; display:flex; padding:2px; color:var(--muted); border-radius:4px }
+.compare-close svg{ width:13px; height:13px }
+.compare-close:hover{ color:var(--text); background:var(--hover) }
+.compare-close:active{ background:var(--pressed) }
+.compare-cols, .compare-row{
+  display:grid; grid-template-columns:minmax(0,1fr) 46px 54px 44px 50px; gap:8px; align-items:center;
+}
+.compare-cols{ padding:6px 12px; font-size:10.5px; color:var(--muted);
+  border-bottom:1px solid var(--line-soft); letter-spacing:.02em }
+.compare-cols span{ text-align:right }
+.compare-cols span:first-child{ text-align:left }
+.compare-row{ padding:6px 12px; font-size:12px; font-variant-numeric:var(--num);
+  border-bottom:1px solid rgba(19,49,74,.28); transition:background var(--t-fast) }
+.compare-row:last-child{ border-bottom:0 }
+.compare-row:hover{ background:var(--hover) }
+.compare-row.sel{ background:var(--hover-strong) }
+.compare-name{ font-size:13px; font-weight:500; font-variant-numeric:normal;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.compare-val{ text-align:right; font-weight:600; color:var(--text) }
+.compare-row.sel .compare-val{ color:var(--cyan) }
+.compare-mini{ text-align:right; color:var(--muted) }
+
+/* ============================================================================
+   08 · Footer 数据来源汇总
+   ============================================================================ */
+footer.site{
+  margin:0 20px 24px; padding:14px 2px 2px;
+  border-top:1px solid var(--line-soft);
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 18px;
+  font-size:12px; color:var(--muted);
+}
+footer.site b{ font-weight:500; color:color-mix(in oklab, var(--muted) 65%, var(--text) 35%) }
+footer.site .sep{ color:rgba(127,147,168,.4) }
+footer.site .note{ margin-left:auto; font-size:11px; opacity:.8 }
+
+/* ============================================================================
+   09 · 响应式
+   ----------------------------------------------------------------------------
+   1440（默认）: 左地图 + 右 300-380px 面板，顶栏两行
+   ≤1024        : 面板全宽（下沉到地图下方），顶栏操作区换行
+   ≤768         : 纵向堆叠；顶栏两行合一；对比表砍掉"面积"列保可读
+   ============================================================================ */
+@media (max-width:1024px){
+  .layout{ grid-template-columns:1fr }      /* 面板全宽 */
+  .map{ min-height:460px }
+  .tb-actions{ justify-content:flex-start }
+}
+@media (max-width:768px){
+  .topbar{ padding:10px 14px; gap:8px }
+  .tb-main{ gap:10px }
+  .search{ width:100%; flex:1 1 100% }
+  .tb-actions{ justify-content:stretch }
+  .tb-actions .search{ order:-1 }
+  .metricseg{ width:100% }
+  .metricseg button{ flex:1 1 auto; text-align:center }
+  .layout{ padding:12px 14px 18px; gap:12px }
+  .map{ min-height:300px; border-radius:var(--r-md) }
+  .banner{ left:12px; right:12px; bottom:12px; justify-content:center }  /* 移动端色带横贯底部，便于拇指区域 */
+  .panel{ padding:14px; gap:16px }
+  .stats{ gap:8px }
+  .stat-value{ font-size:22px }
+  .rank-head, .rank-row{ grid-template-columns:26px minmax(0,1fr) 78px }
+  /* 对比表：小屏砍"面积"列，4 列仍可扫读 */
+  .compare-cols, .compare-row{ grid-template-columns:minmax(0,1fr) 44px 52px 42px }
+  .compare .c-area{ display:none }
+  .maptip{ display:none }                   /* 触屏无 hover，隐藏提示 */
+  footer.site{ margin:0 14px 20px }
+}
+@media (prefers-reduced-motion:reduce){
+  *{ animation:none!important; transition:none!important }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== 01 · Header 控制栏 ===================== -->
+<header class="topbar">
+  <div class="tb-main">
+    <div class="brand">
+      <h1 class="logo">全球数据图谱</h1>
+      <nav class="crumb" id="crumb" aria-label="面包屑">
+        <a class="crumb-link" href="#">世界</a><span class="crumb-sep">›</span>
+        <a class="crumb-link" href="#">中国</a><span class="crumb-sep">›</span>
+        <span class="crumb-current">广东</span>
+      </nav>
+    </div>
+    <div class="tb-actions">
+      <!-- 搜索 -->
+      <div class="search" id="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3" stroke-linecap="round"/></svg>
+        <input type="search" placeholder="搜索国家 / 地区 / 省份" aria-label="搜索区域">
+      </div>
+      <!-- 年份下拉 -->
+      <label class="year">
+        <select id="yearSel" aria-label="选择年份"></select>
+      </label>
+      <!-- 对比按钮（active 态开启对比模式） -->
+      <button class="btn" id="cmpBtn" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="5" width="7" height="14" rx="1.5"/><rect x="13.5" y="5" width="7" height="14" rx="1.5"/></svg>
+        对比
+      </button>
+      <!-- 返回按钮（下钻态可用；世界级时禁用） -->
+      <button class="btn" id="backBtn" aria-label="返回上一级">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4l-8 8 8 8"/></svg>
+        返回
+      </button>
+    </div>
+  </div>
+  <!-- 指标按钮组：11 项 -->
+  <div class="tb-metrics">
+    <div class="metricseg" id="metricSeg" role="tablist" aria-label="指标切换">
+      <button data-metric="gdp"    class="active" role="tab" aria-selected="true">GDP</button>
+      <button data-metric="pop"    role="tab">人口</button>
+      <button data-metric="area"   role="tab">面积</button>
+      <button data-metric="trade"  role="tab">贸易占GDP</button>
+      <button data-metric="health" role="tab">医疗支出</button>
+      <button data-metric="edu"    role="tab">教育支出</button>
+      <button data-metric="life"   role="tab">预期寿命</button>
+      <button data-metric="gdpCap" role="tab">人均GDP</button>
+      <button data-metric="unemp"  role="tab">失业率</button>
+      <button data-metric="net"    role="tab">互联网普及</button>
+      <button data-metric="mil"    role="tab">军费</button>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== 02 · 主区 ===================== -->
+<main class="layout">
+
+  <!-- 左侧：数据地图（主角） -->
+  <section class="map" id="chart" aria-label="数据地图">
+    <svg viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid meet" role="img" aria-label="世界地图示意，中国广东高亮">
+      <defs>
+        <!-- 数据光晕：cyan 核心 → pink 边缘（即色带 ramp 的径向版，数据语义） -->
+        <radialGradient id="heat" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stop-color="#00F0FF" stop-opacity=".5"/>
+          <stop offset="42%" stop-color="#00F0FF" stop-opacity=".2"/>
+          <stop offset="72%" stop-color="#FF2E93" stop-opacity=".16"/>
+          <stop offset="100%" stop-color="#FF2E93" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <!-- 经纬网（JS 生成） -->
+      <g class="grat" id="grat"></g>
+      <!-- 示意大陆（粗糙几何，仅演示层次；真实渲染由 echarts 接管） -->
+      <g>
+        <path class="land" d="M140,90 C200,58 300,68 342,108 C384,148 402,180 362,230 C330,272 300,302 268,312 C240,300 208,278 188,248 C158,208 128,168 118,138 C114,118 120,100 140,90 Z"/><!-- 北美 -->
+        <path class="land" d="M242,332 C272,320 302,330 312,362 C322,402 332,452 322,502 C312,542 282,562 262,547 C242,532 227,502 224,462 C220,422 222,362 242,332 Z"/><!-- 南美 -->
+        <path class="land" d="M558,122 C598,106 660,110 692,140 C722,170 732,202 712,226 C692,250 650,256 620,242 C590,226 560,210 546,186 C536,162 542,138 558,122 Z"/><!-- 欧洲 -->
+        <path class="land" d="M600,256 C640,246 690,256 712,292 C732,332 742,392 722,442 C702,492 662,522 637,507 C612,492 597,452 590,412 C582,372 576,300 600,256 Z"/><!-- 非洲 -->
+        <path class="land" d="M722,122 C782,92 880,96 942,132 C1002,168 1032,212 1022,262 C1012,312 972,342 922,346 C872,350 820,340 782,330 C742,320 682,300 662,270 C642,242 668,162 722,122 Z"/><!-- 亚洲 -->
+        <path class="land" d="M882,458 C920,444 962,454 972,486 C982,516 952,542 916,540 C880,538 856,512 860,486 C862,472 866,466 882,458 Z"/><!-- 澳洲 -->
+        <path class="land" d="M432,68 C456,58 482,64 486,86 C490,106 470,122 450,116 C430,110 420,94 426,78 Z"/><!-- 格陵兰 -->
+        <path class="land" d="M544,102 c6,-4 14,0 15,6 c1,6 -4,10 -9,9 c-5,-1 -8,-6 -6,-11 Z"/><!-- 英伦 -->
+        <circle class="land" cx="968" cy="196" r="7"/><!-- 日本 -->
+        <circle class="land" cx="748" cy="424" r="5"/><!-- 马达加斯加 -->
+        <circle class="land" cx="1012" cy="400" r="9"/><!-- 印尼 -->
+        <circle class="land" cx="1060" cy="470" r="6"/><!-- 新西兰 -->
+      </g>
+      <!-- 中国区域数据光晕（华南/广东） -->
+      <ellipse cx="862" cy="252" rx="150" ry="112" fill="url(#heat)" opacity=".75" filter="blur(16px)"/>
+      <!-- 广东脉冲点 -->
+      <g>
+        <circle class="pulse-dot" cx="872" cy="250" r="5"/>
+        <circle class="ring"      cx="872" cy="250" r="7"/>
+      </g>
+      <text class="map-label" x="884" y="238">广东</text>
+      <!-- 示意城市点 -->
+      <g fill="rgba(127,147,168,.5)">
+        <circle class="dot-city" cx="890" cy="210" r="2.5"/><circle class="dot-city" cx="950" cy="180" r="2.5"/>
+        <circle class="dot-city" cx="800" cy="170" r="2.5"/><circle class="dot-city" cx="640" cy="150" r="2.5"/>
+        <circle class="dot-city" cx="150" cy="150" r="2.5"/><circle class="dot-city" cx="280" cy="380" r="2.5"/>
+      </g>
+      <!-- hover 提示（SVG 内，随坐标系缩放不错位） -->
+      <g class="maptip">
+        <rect x="848" y="196" width="248" height="26"/>
+        <text id="tipText" x="858" y="213">广东 · GDP 12.91万亿元</text>
+      </g>
+    </svg>
+
+    <!-- 右上：重置视图 -->
+    <button class="reset" id="resetView" data-tip="重置视图">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 12h8M12 8l4 4-4 4"/></svg>
+    </button>
+    <!-- 右下：色带 banner（低→高 = cyan→pink） -->
+    <div class="banner" id="banner">
+      <span class="ramp" aria-hidden="true"></span>
+      <span>低 → 高</span>
+      <span class="sep" style="opacity:.4">·</span>
+      <span id="bannerMeta"><b>2023</b> · GDP</span>
+    </div>
+  </section>
+
+  <!-- 右侧：数据面板 -->
+  <aside class="panel" id="panel">
+
+    <!-- 对比模式列表（面板顶部） -->
+    <div class="compare open" id="compareBox" aria-label="对比模式">
+      <div class="compare-head">
+        <span class="t">对比模式</span>
+        <span class="n">3 个区域</span>
+        <button class="compare-close" id="cmpClose" aria-label="关闭对比">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="compare-cols">
+        <span>区域</span><span id="cmpCurLabel">GDP(万亿)</span><span>GDP(万亿)</span><span>人口(亿)</span><span class="c-area">面积(万km²)</span>
+      </div>
+      <!-- 行数据由 JS 按当前指标填充当前值列 -->
+      <div class="compare-row sel" data-region="广东"><span class="compare-name">广东</span><span class="compare-val">12.91</span><span class="compare-mini">12.91</span><span class="compare-mini">1.27</span><span class="compare-mini c-area">17.97</span></div>
+      <div class="compare-row" data-region="江苏"><span class="compare-name">江苏</span><span class="compare-val">12.82</span><span class="compare-mini">12.82</span><span class="compare-mini">0.85</span><span class="compare-mini c-area">10.72</span></div>
+      <div class="compare-row" data-region="浙江"><span class="compare-name">浙江</span><span class="compare-val">8.26</span><span class="compare-mini">8.26</span><span class="compare-mini">0.66</span><span class="compare-mini c-area">10.55</span></div>
+    </div>
+
+    <!-- 区域名 -->
+    <div class="region-head">
+      <h2 class="region-name">广东省</h2>
+      <span class="region-tag">省级 · 第 3 层</span>
+      <span class="region-time" id="regionTime">更新于 2023</span>
+    </div>
+
+    <!-- 三项指标大数字 -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">GDP</div>
+        <div class="stat-value">12.91<small style="font-size:14px;color:var(--muted)"> 万亿元</small></div>
+        <div class="stat-delta up">▲ 4.8%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">人口</div>
+        <div class="stat-value">1.27<small style="font-size:14px;color:var(--muted)"> 亿</small></div>
+        <div class="stat-delta up">▲ 0.3%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">面积</div>
+        <div class="stat-value">17.97<small style="font-size:14px;color:var(--muted)"> 万km²</small></div>
+        <div class="stat-delta flat">—</div>
+      </div>
+    </div>
+
+    <!-- 来源标签 -->
+    <div class="source">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="8" ry="2.8"/><path d="M4 5.5V18c0 1.5 3.6 2.8 8 2.8s8-1.3 8-2.8V5.5"/><path d="M4 12c0 1.5 3.6 2.8 8 2.8s8-1.3 8-2.8"/></svg>
+      <span>来源 <b>国家统计局</b> · <b>World Bank</b></span>
+    </div>
+
+    <!-- 趋势图（JS 按指标重绘） -->
+    <div class="trend">
+      <div class="trend-head">
+        <div class="trend-title" id="trendTitle">GDP · 趋势</div>
+        <div class="trend-meta" id="trendMeta">2013–2023 · 万亿元</div>
+      </div>
+      <div id="trend" style="position:relative"><svg viewBox="0 0 320 150" role="img" aria-label="趋势图"></svg></div>
+    </div>
+
+    <!-- TOP10 排行 -->
+    <div class="rank">
+      <div class="rank-head">
+        <span style="text-align:center">#</span><span>地区</span><span style="text-align:right">数值</span>
+      </div>
+      <div id="rank"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- ===================== 03 · Footer 数据来源 ===================== -->
+<footer class="site">
+  <b>数据来源</b>
+  <span>World Bank</span><span class="sep">·</span><span>国家统计局</span><span class="sep">·</span>
+  <span>维基百科</span><span class="sep">·</span><span>美国经济分析局 (BEA)</span><span class="sep">·</span><span>日本内阁府</span>
+  <span class="note">数据年度 2023 · 本稿为示意数据</span>
+</footer>
+
+<script>
+/* ============================================================================
+   10 · 交互层
+   ----------------------------------------------------------------------------
+   设计决策：示意数据分两档 —— 5 个指标（gdp/gdpCap/unemp/pop/area）用手写
+   近似真实值；其余 6 个由 gen() 确定性生成（保证每次刷新一致）。
+   所有数值展示位一律 tabular-nums，列对齐由 CSS grid 完成。
+   ============================================================================ */
+'use strict';
+
+/* —— 示意数据 —— */
+const REGIONS = ['广东','江苏','山东','浙江','四川','河南','湖北','福建','湖南','上海'];
+const YEARS = Array.from({length:26},(_,i)=>2000+i);
+
+function gen(label, unit, base, drift, color){
+  const trend = YEARS.slice(-11).map((_,i)=>
+    +(base*(0.72 + drift*i/10 + 0.02*Math.sin(i*1.7))).toFixed(2));
+  const rank = REGIONS
+    .map((r,i)=>[r, +(base*(0.80+0.02*((i*7)%9))).toFixed(2)])
+    .sort((a,b)=>b[1]-a[1]);
+  return {label, unit, color, trend, rank};
+}
+
+const METRICS = {
+  gdp:  { label:'GDP',      unit:'万亿元', color:'var(--cyan)',
+    trend:[6.2,6.8,7.4,8.1,9.0,9.7,10.8,11.1,12.4,12.9,13.6],
+    rank:[['广东',12.91],['江苏',12.82],['山东',9.21],['浙江',8.26],['四川',6.01],
+          ['河南',5.91],['湖北',5.58],['福建',5.44],['湖南',5.00],['上海',4.72]] },
+  gdpCap:{ label:'人均GDP',  unit:'万元',   color:'var(--cyan)',
+    trend:[5.3,5.6,5.9,6.2,6.5,6.8,7.2,7.5,8.0,8.6,9.8],
+    rank:[['上海',19.7],['广东',9.8],['江苏',9.6],['浙江',9.2],['福建',8.6],
+          ['湖北',7.9],['山东',7.6],['湖南',6.8],['四川',6.4],['河南',6.0]] },
+  unemp:{ label:'失业率',   unit:'%',      color:'var(--gold)',
+    trend:[3.5,3.6,3.4,3.3,3.5,3.2,3.1,3.4,3.3,3.6,3.8],
+    rank:[['浙江',4.6],['上海',4.5],['江苏',4.8],['福建',4.9],['湖南',5.1],
+          ['广东',5.2],['湖北',5.3],['山东',5.4],['四川',5.5],['河南',5.6]] },
+  pop:   { label:'人口',     unit:'亿',     color:'var(--cyan)',
+    trend:[0.86,0.91,0.95,0.99,1.03,1.06,1.09,1.13,1.17,1.21,1.27],
+    rank:[['广东',1.27],['山东',1.02],['河南',0.99],['江苏',0.85],['四川',0.84],
+          ['湖南',0.66],['浙江',0.66],['湖北',0.58],['福建',0.42],['上海',0.25]] },
+  area:  { label:'面积',     unit:'万km²',  color:'var(--cyan)',
+    trend:[16.0,16.2,16.4,16.6,16.8,17.1,17.3,17.5,17.7,17.8,17.97],
+    rank:[['四川',48.60],['湖南',21.18],['湖北',18.59],['广东',17.97],['河南',16.70],
+          ['山东',15.58],['福建',12.40],['江苏',10.72],['浙江',10.55],['上海',0.63]] },
+  trade: gen('贸易占GDP','%', 64.5, 0.02, 'var(--cyan)'),
+  health:gen('医疗支出','%GDP', 5.4, 0.03, 'var(--cyan)'),
+  edu:   gen('教育支出','%GDP', 4.9, 0.02, 'var(--cyan)'),
+  life:  gen('预期寿命','岁', 79.3, 0.015, 'var(--cyan)'),
+  net:   gen('互联网普及','%', 88.6, 0.02, 'var(--cyan)'),
+  mil:   gen('军费','亿元', 512, 0.04, 'var(--cyan)'),
+};
+
+const state = { metric:'gdp', year:2023, compare:true };
+const $ = s => document.querySelector(s);
+
+/* —— 图元：经纬网 —— */
+(function(){
+  const g = $('#grat');
+  for(let x=0; x<=1200; x+=120) g.insertAdjacentHTML('beforeend',`<line x1="${x}" y1="0" x2="${x}" y2="600"/>`);
+  for(let y=0; y<=600; y+=100)  g.insertAdjacentHTML('beforeend',`<line x1="0" y1="${y}" x2="1200" y2="${y}"/>`);
+})();
+
+/* —— 渲染：趋势图 —— */
+function renderTrend(){
+  const m = METRICS[state.metric];
+  $('#trendTitle').textContent = `${m.label} · 趋势`;
+  $('#trendMeta').textContent  = `2013–2023 · ${m.unit}`;
+  const svg = $('#trend svg');
+  const W=320, H=150, padL=8, padR=30, padT=14, padB=22;
+  const n = m.trend.length;
+  const min = Math.min(...m.trend), max = Math.max(...m.trend);
+  const X = i => padL + i*(W-padL-padR)/(n-1);
+  const Y = v => padT + (1-(v-min)/((max-min)||1))*(H-padT-padB);
+  const pts = m.trend.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`);
+  const area = `M${X(0)},${Y(m.trend[0])} L${pts.join(' L')} L${X(n-1)},${H-padB} L${X(0)},${H-padB} Z`;
+  const g = `M${X(0)},${Y(m.trend[0])} L${pts.join(' L')}`;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+        <stop class="a0" offset="0%" stop-opacity=".22"/>
+        <stop class="a1" offset="100%" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${[.25,.5,.75].map(f=>`<line class="grid" x1="${padL}" y1="${(H-padB-f*(H-padT-padB)).toFixed(1)}" x2="${W-padR}" y2="${(H-padB-f*(H-padT-padB)).toFixed(1)}"/>`).join('')}
+    <text class="tick" x="${padL}" y="${Y(max).toFixed(1)-4}">${max.toFixed(1)}</text>
+    <text class="tick" x="${padL}" y="${Y(min).toFixed(1)+11}">${min.toFixed(1)}</text>
+    <path class="area" d="${area}"/>
+    <path class="line" d="${g}"/>
+    <circle class="dot" cx="${X(n-1).toFixed(1)}" cy="${Y(m.trend[n-1]).toFixed(1)}" r="4"/>
+    <text class="tick" x="${X(0)}"  y="${H-8}">2013</text>
+    <text class="tick" x="${X((n-1)/2)}" y="${H-8}">2018</text>
+    <text class="tick" x="${X(n-1)-18}" y="${H-8}">2023</text>
+  `;
+  svg.style.setProperty('--tc', m.color);
+  const wrap = $('#trend');
+  wrap.classList.remove('refresh'); void wrap.offsetWidth; wrap.classList.add('refresh');
+}
+
+/* —— 渲染：TOP10 —— */
+function renderRank(){
+  const m = METRICS[state.metric];
+  $('#rank').innerHTML = m.rank.map(([name,val],i)=>{
+    const cur = name==='广东';
+    return `<div class="rank-row${cur?' current':''}">
+      <span class="rank-no">${i+1}</span>
+      <span class="rank-name-cell"><span class="rank-name">${name}</span>${cur?'<span class="rank-tag">当前</span>':''}</span>
+      <span class="rank-val">${val.toFixed(2)}${m.unit}</span>
+    </div>`;
+  }).join('');
+}
+
+/* —— 渲染：对比列表（当前指标值列 + 表头标签） —— */
+function renderCompare(){
+  const m = METRICS[state.metric];
+  $('#cmpCurLabel').textContent = `${m.label}(${m.unit})`;
+  document.querySelectorAll('.compare-row').forEach(row=>{
+    const r = row.dataset.region;
+    const v = (m.rank.find(([n])=>n===r)||[r,0])[1];
+    row.querySelector('.compare-val').textContent = v.toFixed(2);
+  });
+}
+
+/* —— 联动：banner / tip / 面板时间 —— */
+function renderMeta(){
+  const m = METRICS[state.metric];
+  $('#bannerMeta').innerHTML = `<b>${state.year}</b> · ${m.label}`;
+  const v = (m.rank.find(([n])=>n==='广东')||['广东',0])[1];
+  $('#tipText').textContent = `广东 · ${m.label} ${v.toFixed(2)}${m.unit}`;
+  $('#regionTime').textContent = `更新于 ${state.year}`;
+}
+
+/* —— 事件绑定 —— */
+// 年份：2000–2025，默认 2023
+$('#yearSel').innerHTML = YEARS.map(y=>`<option value="${y}"${y===state.year?' selected':''}>${y}</option>`).join('');
+$('#yearSel').addEventListener('change', e=>{ state.year = +e.target.value; renderMeta(); });
+
+// 指标切换：active 态 + 三处重绘（趋势/排行/对比）+ 元信息
+$('#metricSeg').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-metric]'); if(!btn) return;
+  state.metric = btn.dataset.metric;
+  document.querySelectorAll('#metricSeg button').forEach(b=>{
+    const on = b===btn;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on);
+  });
+  renderTrend(); renderRank(); renderCompare(); renderMeta();
+});
+
+// 对比开关：按钮 active 态 ↔ compareBox 显隐（演示默认开启）
+function setCompare(on){
+  state.compare = on;
+  $('#cmpBtn').classList.toggle('active', on);
+  $('#cmpBtn').setAttribute('aria-pressed', on);
+  $('#compareBox').classList.toggle('open', on);
+}
+$('#cmpBtn').addEventListener('click', ()=>setCompare(!state.compare));
+$('#cmpClose').addEventListener('click', ()=>setCompare(false));
+
+// 返回：演示下钻回退（生产环境联动 app 状态：世界级时禁用并隐藏）
+$('#backBtn').addEventListener('click', ()=>{
+  const crumb = $('#crumb');
+  const cur = crumb.querySelector('.crumb-current');
+  if(!cur) return;
+  const prev = cur.previousElementSibling;
+  if(prev && prev.classList.contains('crumb-link')){
+    crumb.removeChild(cur.previousElementSibling); /* 去 sep */
+    crumb.removeChild(cur);
+    prev.classList.remove('crumb-link');
+    prev.classList.add('crumb-current');
+    prev.removeAttribute('href');
+  }
+});
+
+// 重置视图：演示反馈（生产环境重设地图视口）
+$('#resetView').addEventListener('click', e=>{
+  const b = e.currentTarget;
+  b.classList.remove('spin'); void b.offsetWidth; b.classList.add('spin');
+});
+
+/* —— 初始渲染：对比默认开启（演示态），状态与按钮 aria 同步 —— */
+setCompare(true);
+renderTrend(); renderRank(); renderCompare(); renderMeta();
+</script>
+</body>
+</html>

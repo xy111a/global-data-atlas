@@ -6,55 +6,116 @@
 <title>全球数据地图 · Global Data Atlas</title>
 <style>
   :root{
+    /* 品牌令牌（数据语义，沿用） */
     --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
     --cyan:#00F0FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
+    /* 质感/光效令牌（Open Design 再设计） */
+    --panel-solid:#0c121c;                /* 输入框实底（聚焦态） */
+    --panel-float:rgba(13,20,31,0.92);    /* 悬浮层（tooltip/banner/dropdown） */
+    --line-soft:rgba(19,49,74,.45);       /* 面板内部弱分隔线 */
+    --line-bright:rgba(0,240,255,.35);    /* hover 描边微亮 */
+    --line-top:linear-gradient(90deg,transparent,rgba(0,240,255,.5),rgba(255,46,147,.28),transparent);  /* 顶部发丝高光 */
+    --hover:rgba(0,240,255,.06);          /* hover 遮罩 */
+    --hover-strong:rgba(0,240,255,.10);   /* 选中/更强 hover */
+    --pressed:rgba(0,240,255,.14);        /* active 按压 */
+    --glow-sm:0 0 10px rgba(0,240,255,.14);
+    --glow-md:0 0 22px rgba(0,240,255,.22);
+    --shadow-panel:0 14px 40px rgba(0,0,0,.45);
+    --shadow-float:0 18px 50px rgba(0,0,0,.55);
+    /* 结构令牌 */
+    --num:tabular-nums;
+    --r-sm:6px; --r-md:10px; --r-lg:14px;
+    --t-fast:.14s ease; --t-med:.22s ease;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  body{
+    background:
+      radial-gradient(1100px 700px at 12% -8%, rgba(0,240,255,.05), transparent 60%),
+      radial-gradient(900px 600px at 108% 112%, rgba(255,46,147,.04), transparent 60%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(0,240,255,.25);}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:4px;}
+  *::-webkit-scrollbar{width:8px;height:8px;}
+  *::-webkit-scrollbar-thumb{background:rgba(19,49,74,.7);border-radius:4px;}
+  *::-webkit-scrollbar-track{background:transparent;}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;}
   #app{display:flex;flex-direction:column;height:100vh;}
-  header{display:flex;align-items:center;gap:14px;padding:12px 18px;
-    border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(0,240,255,0.06),transparent);}
-  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px;}
+  header{position:relative;z-index:20;display:flex;flex-direction:column;gap:10px;padding:12px 20px;
+    border-bottom:1px solid var(--line);
+    background:color-mix(in oklab, var(--bg) 72%, transparent);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    box-shadow:0 10px 30px rgba(0,0,0,.25);}
+  header::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
+    background:var(--line-top);opacity:.55;pointer-events:none;}   /* 顶部发丝高光 */
+  .tb-main{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+  .brand{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px;white-space:nowrap;}
   header h1 .en{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;}
   .breadcrumb{font-size:13px;color:var(--muted);}
-  .breadcrumb b{color:var(--cyan);font-weight:500;}
-  .spacer{flex:1;}
-  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
-  .seg button{background:transparent;color:var(--muted);border:0;padding:7px 13px;font-size:13px;cursor:pointer;}
-  .seg button.active{background:rgba(0,240,255,0.12);color:var(--cyan);}
-  .btn{background:transparent;border:1px solid var(--line);color:var(--text);
-    padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;}
-  .btn:hover{border-color:var(--cyan);}
-  .btn.active{background:rgba(0,240,255,0.12);color:var(--cyan);border-color:var(--cyan);}  /* S2: 对比模式开启反馈 */
+  .breadcrumb b{color:var(--cyan);font-weight:500;position:relative;}
+  .breadcrumb b::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:1px;
+    background:var(--cyan);box-shadow:var(--glow-sm);}   /* 当前层级发光下划线 */
+  .tb-actions{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;}
+  .seg{display:flex;gap:2px;padding:3px;
+    background:rgba(10,16,26,.55);border:1px solid var(--line);border-radius:var(--r-lg);}
+  .seg button{position:relative;background:transparent;color:var(--muted);border:0;padding:6px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap;border-radius:var(--r-sm);
+    transition:color var(--t-fast),background var(--t-fast);}
+  .seg button:hover{color:var(--text);background:var(--hover);}
+  .seg button:active{background:var(--pressed);}
+  .seg button.active{color:var(--cyan);font-weight:500;text-shadow:0 0 12px rgba(0,240,255,.35);}
+  .seg button.active::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:2px;
+    background:var(--cyan);box-shadow:0 0 8px rgba(0,240,255,.4);}   /* active 发光条 */
+  .btn{background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    padding:8px 12px;border-radius:var(--r-md);font-size:13px;cursor:pointer;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:6px;
+    transition:color var(--t-fast),background var(--t-fast),border-color var(--t-fast),box-shadow var(--t-med);}
+  .btn:hover{color:var(--text);border-color:var(--line-bright);background:var(--hover);}
+  .btn:active{background:var(--pressed);transform:translateY(.5px);}
+  .btn.active{color:var(--cyan);border-color:var(--line-bright);background:var(--hover-strong);box-shadow:var(--glow-sm);}  /* S2: 对比模式开启反馈 */
+  #search{background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:8px 12px;border-radius:var(--r-md);font-size:13px;width:200px;outline:none;caret-color:var(--cyan);
+    transition:border-color var(--t-fast),box-shadow var(--t-med),background var(--t-fast);}
+  #search::placeholder{color:color-mix(in oklab, var(--muted) 70%, transparent);}
+  #search:hover{border-color:var(--line-bright);}
+  #search:focus{border-color:var(--cyan);background:var(--panel-solid);box-shadow:var(--glow-sm),inset 0 0 0 1px var(--line-bright);}
+  #yearSel{appearance:none;-webkit-appearance:none;background:var(--panel);color:var(--muted);
+    border:1px solid var(--line);border-radius:var(--r-md);padding:8px 30px 8px 12px;font-size:13px;cursor:pointer;font-variant-numeric:var(--num);
+    transition:border-color var(--t-fast),box-shadow var(--t-med),background var(--t-fast);}
+  #yearSel:hover{border-color:var(--line-bright);}
+  #yearSel:focus{outline:none;border-color:var(--cyan);box-shadow:var(--glow-sm);background:var(--panel-solid);}
   #main{flex:1;position:relative;display:flex;}  /* relative 供 resetView 定位 */
-  #chart{flex:1;min-width:0;}
-  #panel{width:clamp(300px,26vw,380px);border-left:1px solid var(--line);padding:18px;
-    background:var(--panel);overflow:auto;}  /* 宽屏可增宽（L6） */
+  #chart{flex:1;min-width:0;position:relative;border:1px solid var(--line-soft);border-radius:var(--r-lg);overflow:hidden;
+    box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--shadow-panel);margin:12px;}
+  #panel{position:relative;width:clamp(300px,26vw,380px);border-left:1px solid var(--line);padding:18px;
+    background:var(--panel);overflow:auto;
+    box-shadow:var(--shadow-panel);}  /* 宽屏可增宽（L6）；面板投影 */
+  #panel::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
+    background:var(--line-top);opacity:.4;pointer-events:none;}   /* 面板顶部发丝高光 */
   #panel h2{font-size:15px;margin:0 0 4px;}
   #panel .sub{color:var(--muted);font-size:12px;margin-bottom:16px;}
   .metric{margin-bottom:14px;}
   .metric .k{font-size:12px;color:var(--muted);}
-  .metric .v{font-size:20px;font-weight:600;color:var(--cyan);}
+  .metric .v{font-size:20px;font-weight:600;color:var(--cyan);font-variant-numeric:var(--num);text-shadow:var(--glow-sm);}
   .metric .v.growth.pos{color:#00F0FF;}
   .metric .v.growth.neg{color:var(--gold);}
   .metric .v.growth.muted{color:#7f93a8;}
   .metric .v.muted{color:#8fa2b5;font-size:16px;}  /* 提亮：对比度 3.7→5.5 (L1) */
   .metric .v.pink{color:var(--pink);}
-  .hint{font-size:12px;color:var(--muted);line-height:1.7;border-top:1px dashed var(--line);
+  .hint{font-size:12px;color:var(--muted);line-height:1.7;border-top:1px dashed var(--line-soft);
     padding-top:12px;margin-top:6px;}
   #loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     background:rgba(5,6,10,0.7);color:var(--cyan);font-size:14px;z-index:5;}
-  #banner{position:absolute;right:14px;bottom:14px;left:auto;font-size:12px;color:var(--muted);
-    background:rgba(5,6,10,0.6);border:1px solid var(--line);border-radius:8px;padding:6px 10px;z-index:4;}  /* 右下角，避开左下 visualMap（P5） */
+  #banner{position:absolute;right:16px;bottom:16px;left:auto;font-size:12px;color:var(--muted);
+    background:var(--panel-float);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 12px;z-index:4;
+    backdrop-filter:blur(8px);box-shadow:var(--shadow-float),var(--glow-sm);}  /* 悬浮层第3层 */
   #fatal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     color:var(--pink);font-size:14px;text-align:center;padding:30px;z-index:9;}
   .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;
     border:1px solid var(--line);color:var(--muted);margin-top:6px;}
-
-  #search{background:rgba(5,6,10,0.6);border:1px solid var(--line);color:var(--text);
-    padding:7px 12px;border-radius:8px;font-size:13px;width:190px;outline:none;}
-  #search:focus{border-color:var(--cyan);}
 
 /* ===== 响应式断点（排版审计 P1/P2/P3） ===== */
 @media(max-width:1200px){
@@ -66,7 +127,7 @@
   #metricSeg{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}  /* 指标按钮横向滚动，避免堆多行 */
   #metricSeg button{flex:none;}
   #main{flex-direction:column;}   /* 面板转全宽（原 768 断点提前到 1024） */
-  #chart{width:100%;height:55vh;min-height:360px;flex:none;}
+  #chart{width:100%;height:55vh;min-height:360px;flex:none;margin:0;border-radius:0;border-left:none;border-right:none;}
   #panel{width:100%;max-width:none;border-left:none;border-top:1px solid var(--line);
     max-height:45vh;overflow-y:auto;}
 }
@@ -74,6 +135,8 @@
   body{font-size:13px;}
   #app{flex-direction:column; height:auto; min-height:100vh;}
   header{flex-wrap:wrap; gap:6px; padding:8px 10px;}
+  .tb-main{gap:8px;}
+  .tb-actions{gap:6px;}
   #chart{width:100%;height:55vh; min-height:360px; flex:none;}
   #panel{width:100%; max-width:none; border-left:none; border-top:1px solid var(--line);
     max-height:45vh; overflow-y:auto;}
@@ -90,34 +153,39 @@
   #search{max-width:120px;}
 }
   #rank{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px;}
-  .rank-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;}
+  .rank-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;font-weight:600;}
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
-    cursor:pointer;font-size:13px;}
-  .rank-item:hover{background:rgba(0,240,255,0.08);}
-  .rank-item .rk{color:var(--pink);font-weight:600;width:18px;text-align:center;}
+    cursor:pointer;font-size:13px;transition:background var(--t-fast);}
+  .rank-item:hover{background:var(--hover);}
+  .rank-item .rk{color:var(--pink);font-weight:600;width:18px;text-align:center;font-variant-numeric:var(--num);}
   .rank-item .rn{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .rank-item .rv{color:var(--cyan);font-size:12px;white-space:nowrap;flex:0 1 auto;max-width:45%;text-align:right;overflow:hidden;text-overflow:ellipsis;}  /* 窄面板下不挤占名称（P2） */
+  .rank-item .rv{color:var(--cyan);font-size:12px;white-space:nowrap;flex:0 1 auto;max-width:45%;text-align:right;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:var(--num);}  /* 窄面板下不挤占名称（P2） */
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <h1>全球数据地图<span class="en">GLOBAL DATA ATLAS</span></h1>
-    <div class="breadcrumb" id="crumb">世界</div>
-    <input id="search" placeholder="搜索国家 / 省份 / 城市…" />
-    <div class="spacer"></div>
+    <div class="tb-main">
+      <div class="brand">
+        <h1>全球数据地图<span class="en">GLOBAL DATA ATLAS</span></h1>
+        <div class="breadcrumb" id="crumb">世界</div>
+      </div>
+      <div class="tb-actions">
+        <input id="search" placeholder="搜索国家 / 省份 / 城市…" />
+        <select id="yearSel">
+          <option value="2025" selected>2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+        </select>
+        <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
+        <button class="btn" id="backBtn">← 返回世界</button>
+      </div>
+    </div>
     <div class="seg" id="metricSeg"></div>
-    <select id="yearSel" style="background:#0a1520;color:#9fb3c8;border:1px solid #1d5a72;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer;">
-      <option value="2025" selected>2025</option>
-      <option value="2024">2024</option>
-      <option value="2023">2023</option>
-    </select>
-    <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
-    <button class="btn" id="backBtn">← 返回世界</button>
   </header>
   <div id="main">
     <div id="chart"></div>
-    <button id="resetView" title="地图被拖拽/缩放后，点击恢复初始视图" style="position:absolute;right:8px;top:8px;display:none;z-index:3;background:rgba(5,6,10,0.8);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">⟲ 恢复视图</button>
+    <button id="resetView" title="地图被拖拽/缩放后，点击恢复初始视图" style="position:absolute;right:20px;top:20px;display:none;z-index:3;background:var(--panel-float);border:1px solid var(--line);color:var(--muted);border-radius:var(--r-md);padding:6px 10px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);">⟲ 恢复视图</button>
     <div id="panel">
       <div id="compareBox" style="display:none;margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;background:rgba(0,240,255,0.05);"></div>
       <h2 id="pName">世界地图</h2>
