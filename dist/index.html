@@ -103,11 +103,13 @@
       <option value="2022">2022</option>
       <option value="2021">2021</option>
     </select>
+    <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
     <button class="btn" id="backBtn">返回世界</button>
   </header>
   <div id="main">
     <div id="chart"></div>
     <div id="panel">
+      <div id="compareBox" style="display:none;margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;background:rgba(0,240,255,0.05);"></div>
       <h2 id="pName">世界地图</h2>
       <div class="sub" id="pSub">加载中…</div>
       <div id="pMetrics"></div>
@@ -735,8 +737,62 @@ function doSearch(q){
   showBanner("未找到匹配：「"+q+"」");
 }
 
+/* ============== 对比模式（Phase D 补齐） ============== */
+let cmpMode=false, cmpList=[];   // cmpList: [{t:"country"|"prov"|"usstate", name, iso/name, en}]
+function cmpGetData(it){
+  const y=dataYear;
+  if(it.t==="country"){ return {g:cMetric(it.k,"gdp",y), p:cMetric(it.k,"pop",y), a:cMetric(it.k,"area",y)}; }
+  if(it.t==="prov"){ const g=cnGdpRMB(it.k,y), o=window.CN_TS&&window.CN_TS[it.k];
+    return {g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
+  if(it.t==="usstate"){ return {g:usGdpY(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
+  return null;
+}
+function cmpToggle(it){
+  const i=cmpList.findIndex(x=>x.t===it.t&&x.k===it.k);
+  if(i>=0) cmpList.splice(i,1); else cmpList.push(it);
+  cmpRender();
+}
+function cmpRender(){
+  const box=document.getElementById("compareBox"); if(!box) return;
+  box.style.display = cmpMode ? "block" : "none";
+  if(!cmpMode) return;
+  if(!cmpList.length){ box.innerHTML=`<div class="rank-title">对比模式 · 点击地图区域加入</div>`; return; }
+  const rows=cmpList.map(it=>{
+    const d=cmpGetData(it);
+    const g=d&&d.g!=null?fmtGDP(d.g):"—", p=d&&d.p!=null?fmtPop(d.p):"—", a=d&&d.a!=null?fmtArea(d.a):"—";
+    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #0e2233;font-size:12px;">
+      <button class="cmp-del" data-k="${it.t}:${it.k}" style="background:transparent;border:1px solid var(--line);color:var(--pink);border-radius:4px;width:18px;height:18px;line-height:14px;cursor:pointer;font-size:10px;">×</button>
+      <span style="flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.name}</span>
+      <span style="color:var(--cyan);font-size:11px;">${g}</span>
+      <span style="color:#9fb3c8;font-size:11px;">${p}</span>
+      <span style="color:#7f93a8;font-size:11px;">${a}</span></div>`;
+  }).join("");
+  box.innerHTML=`<div class="rank-title">对比 · ${metricLabel()}（GDP / 人口 / 面积）<span style="float:right;color:var(--pink);cursor:pointer;" onclick="cmpClear()">清空</span></div>${rows}`;
+  box.querySelectorAll(".cmp-del").forEach(el=>{
+    el.onclick=()=>{ const [t,k]=el.dataset.k.split(":"); cmpToggle({t,k,name:""}); };
+  });
+}
+function cmpClear(){ cmpList=[]; cmpRender(); }
+function cmpHandleClick(type, name, key){
+  cmpToggle({t:type, name, k:key});
+  return true;
+}
+
 /* ============== 交互 ============== */
 function onChartClick(p){
+  if(cmpMode){
+    if(currentLevel==="world"){
+      const c=p.data&&p.data.cn; if(!c) return;
+      if(c[2]==="CN"){ loadChina(); return; }   // 中国是下钻层级，不加入对比
+      cmpHandleClick("country", c[0], c[2]);
+    } else if(currentLevel==="china"){
+      const nm=normProv(p.name); if(PROV_ADCODE[nm]) cmpHandleClick("prov", nm, nm);
+    } else if(currentLevel==="us"){
+      cmpHandleClick("usstate", p.name, p.name);
+    }
+    cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.g!=null?d.g:0};}), "对比 GDP");
+    return;
+  }
   if(currentLevel==="world"){
     const c = p.data && p.data.cn;
     if(!c) return;
@@ -804,6 +860,12 @@ window.addEventListener("load", ()=>{
   const searchEl=document.getElementById("search");
   searchEl.addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(e.target.value); });
   searchEl.addEventListener("blur", e=> doSearch(e.target.value));
+  document.getElementById("cmpBtn").addEventListener("click", ()=>{
+    cmpMode=!cmpMode;
+    document.getElementById("cmpBtn").classList.toggle("active", cmpMode);
+    if(!cmpMode){ cmpClear(); document.getElementById("trend").innerHTML=""; renderRank(); }
+    else cmpRender();
+  });
   window.addEventListener("resize", ()=>chart && chart.resize());
 });
 </script>
