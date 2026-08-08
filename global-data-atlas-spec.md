@@ -106,21 +106,28 @@
 
 ```
 ┌─ 视图层 ──────────────────────────┐
-│  2D 平面地图 (ECharts map)          │
+│  2D 世界地图 / 中国省级 / 美国州级    │
 │  控制栏 / 面包屑 / 信息面板 / 图例   │
 ├─ 交互层 ──────────────────────────┤
-│  点击跳级 · 指标切换 · 视图切换      │
-│  面包屑返回 · (规划)搜索/排行榜      │
+│  点击跳级 · 指标切换 · 对比模式      │
+│  搜索 / 排行榜 / 趋势洞察            │
+├─ 指标层 ──────────────────────────┤
+│  METRICS 注册表（统一指标元数据）     │
+│  label/fmt/near/series/growth/unit  │
 ├─ 数据层 ──────────────────────────┤
-│  国家指标: World Bank API (规划)     │
-│  中国边界: DataV GeoAtlas (fetch)    │
-│  本地缓存: registerMap / JSON        │
+│  reg 统一区域接口（国家/省/州/市）    │
+│  WB 国家指标 · CN 省级序列 · BEA 州   │
+│  EXT 扩展指标（贸易/医疗/教育/寿命）  │
 └─ 资源层 ──────────────────────────┘
 ```
 
+**架构核心（V2 重构）**：
+- **METRICS 指标注册表**：每个指标（gdp/pop/area/trade/health/edu/life/gdpcap）定义 label、fmt、unit、near（取某年最近值）、growth。渲染层（地图着色/排行/对比/面板）全部读注册表，新增指标只需注册 1 条 + 数据源 1 个文件，按钮自动生成。
+- **reg 统一区域接口**：国家/省/州/市各暴露 `{get, ext, years, growth, gdpSeries}`，取数与增长口径在各 reg 内实现，上层不感知差异。
 - 世界边界：`vendor/world.json`（ECharts 官方，已本地化）。
 - 中国下钻：运行时 `fetch` DataV `{adcode}_full.json` → `echarts.registerMap` → 重绘。
-- 国家数据：原型内置数组；Phase 1 改为 World Bank 动态拉取 + 本地快照。
+- 国家数据：`vendor/countries_wb.js`（WB 211 国快照 2000–2024）。
+- 扩展指标：`vendor/ext_indicators.js`（WB 179 国 5 指标，仅国家层）。
 
 ---
 
