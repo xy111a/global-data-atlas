@@ -66,7 +66,13 @@ tag = "VERIFY" in dom and "P2024" in dom
 print("  " + ("OK " if tag else "FAIL") + " cn_verify DOM captured")
 # Take the LAST match: the rendered <pre> is injected at runtime (end of body),
 # after the inline <script> source that also contains the same string literal.
-pres = [m for m in re.findall(r'<pre id="testout">(.*?)</pre>', dom, re.S) if 'P2024' in m]
+# Stricter filter: runtime output starts with "VERIFY " followed by actual data
+# (e.g. "广东@2000="), while the inline-script source segment starts with
+# "VERIFY '" (a JS string literal continuation), so source matches are excluded.
+pres = [m for m in re.findall(r'<pre id="testout">(.*?)</pre>', dom, re.S)
+        if m.startswith('VERIFY ') and not m.startswith("VERIFY '")]
+if not pres:
+    pres = [m for m in re.findall(r'<pre id="testout">(.*?)</pre>', dom, re.S) if 'P2024' in m]
 if pres: print("    " + pres[-1][:700])
 
 print("\nDone ->", os.path.abspath(OUT))
