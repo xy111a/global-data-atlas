@@ -14,3 +14,4 @@ dist/vendor/cn/*.json
 .wrangler/
 # 数据修复备份
 *.bak
+ext_blank_regions.json

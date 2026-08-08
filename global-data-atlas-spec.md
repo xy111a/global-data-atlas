@@ -127,7 +127,7 @@
 - 世界边界：`vendor/world.json`（ECharts 官方，已本地化）。
 - 中国下钻：运行时 `fetch` DataV `{adcode}_full.json` → `echarts.registerMap` → 重绘。
 - 国家数据：`vendor/countries_wb.js`（WB 211 国快照 2000–2024）。
-- 扩展指标：`vendor/ext_indicators.js`（WB 179 国 5 指标，仅国家层）。
+- 扩展指标：`vendor/ext_indicators.js`（WB 181 国 5 指标，仅国家层；含 CW/PS 新增区域）。
 
 ---
 
