@@ -461,7 +461,7 @@ function regCountry(iso2){
     growth(m,base){
       if(m==="gdp") return cGrowth(iso2,base,"gdpKd");  // 国家用不变价（真实增长）
       if(m==="pop") return cGrowth(iso2,base,"pop");    // 人口增长（WB pop 序列）
-      if(m==="area") return null;                        // 面积基本不变，无增长意义
+      if(m==="area") return cGrowth(iso2,base,"area");  // 面积变化（WB area 序列：测量修订/填海/领土变更）
       // EXT 扩展指标：trade/health/edu/life/gdpcap 较 base 年变化
       const d=window.EXT&&window.EXT[iso2]&&window.EXT[iso2][m];
       if(!d) return null;
