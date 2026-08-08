@@ -99,9 +99,9 @@
     <div class="spacer"></div>
     <div class="seg" id="metricSeg"></div>
     <select id="yearSel" style="background:#0a1520;color:#9fb3c8;border:1px solid #1d5a72;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer;">
+      <option value="2025" selected>2025</option>
+      <option value="2024">2024</option>
       <option value="2023">2023</option>
-      <option value="2022">2022</option>
-      <option value="2021">2021</option>
     </select>
     <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
     <button class="btn" id="backBtn">返回世界</button>
@@ -505,7 +505,7 @@ function regCity(cm){
 function regGet(reg, m, year){ return METRICS[m] && reg ? METRICS[m].near(reg, year) : null; }
 
 /* ============== 工具 ============== */
-let chart, currentLevel="world", metric="gdp", worldGeo=null, dataYear="2023";
+let chart, currentLevel="world", metric="gdp", worldGeo=null, dataYear="2025";
 let currentProvName="", currentProvAdcode="", currentProvData=[];
 
 function fmtGDP(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e12)return "¥"+(v/1e12).toFixed(2)+" 万亿"; if(v>=1e8)return "¥"+(v/1e8).toFixed(2)+" 亿"; if(v>=1e4)return "¥"+(v/1e4).toFixed(1)+" 万"; return "¥"+v.toFixed(0); }
@@ -959,13 +959,20 @@ function doSearch(q){
 let cmpMode=false, cmpList=[];   // cmpList: [{t:"country"|"prov"|"usstate", name, iso/name, en}]
 function cmpGetData(it){
   const y=dataYear;
-  if(it.t==="country"){ return {g:cMetric(it.k,"gdp",y), p:cMetric(it.k,"pop",y), a:cMetric(it.k,"area",y)}; }
-  if(it.t==="prov"){ const g=cnGdpRMB(it.k,y), o=window.CN_TS&&window.CN_TS[it.k];
-    return {g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
-  if(it.t==="usstate"){ return {g:usGdpY(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
-  if(it.t==="city"){ const cm=getCityMetric(it.k); if(!cm) return null;
-    return {g:cm.gdp, p:cm.pop, a:cm.area}; }   // 数据已由 city_metrics.js 折算为元/人
-  return null;
+  let base={};
+  if(it.t==="country"){ base={g:cMetric(it.k,"gdp",y), p:cMetric(it.k,"pop",y), a:cMetric(it.k,"area",y)}; }
+  else if(it.t==="prov"){ const g=cnGdpRMB(it.k,y), o=window.CN_TS&&window.CN_TS[it.k];
+    base={g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
+  else if(it.t==="usstate"){ base={g:usGdpY(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
+  else if(it.t==="city"){ const cm=getCityMetric(it.k); if(!cm) return null;
+    base={g:cm.gdp, p:cm.pop, a:cm.area}; }   // 数据已由 city_metrics.js 折算为元/人
+  else return null;
+  // 当前维度值：gdp/pop/area 用对应值；EXT 系指标（trade/health/edu/life/gdpcap）仅国家层有
+  if(metric==="gdp") base.v=base.g;
+  else if(metric==="pop") base.v=base.p;
+  else if(metric==="area") base.v=base.a;
+  else base.v = (it.t==="country"&&window.EXT&&window.EXT[it.k]&&window.EXT[it.k][metric]) ? (function(){const d=window.EXT[it.k][metric],yy=String(y);if(d[yy]!=null)return d[yy];const ks=Object.keys(d).map(Number).sort((a,b)=>a-b);return d[String(ks[ks.length-1])];})() : null;
+  return base;
 }
 function cmpToggle(it){
   const i=cmpList.findIndex(x=>x.t===it.t&&x.k===it.k);
@@ -979,16 +986,16 @@ function cmpRender(){
   if(!cmpList.length){ box.innerHTML=`<div class="rank-title">对比模式 · 点击地图区域加入</div>`; return; }
   const rows=cmpList.map(it=>{
     const d=cmpGetData(it);
+    const v=d&&d.v!=null?metricFmt(metric,d.v):"—";      // 当前维度值（跟随切换）
     const g=d&&d.g!=null?fmtGDP(d.g):"—", p=d&&d.p!=null?fmtPop(d.p):"—", a=d&&d.a!=null?fmtArea(d.a):"—";
     return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #0e2233;font-size:12px;">
       <button class="cmp-del" data-k="${it.t}:${it.k}" style="background:transparent;border:1px solid var(--line);color:var(--pink);border-radius:4px;width:18px;height:18px;line-height:14px;cursor:pointer;font-size:10px;">×</button>
       <span style="flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${it.name}</span>
-      <span style="color:var(--cyan);font-size:11px;">${g}</span>
-      <span style="color:#9fb3c8;font-size:11px;">${p}</span>
-      <span style="color:#7f93a8;font-size:11px;">${a}</span></div>`;
+      <span style="color:var(--cyan);font-weight:600;font-size:12px;">${v}</span>
+      <span style="color:#9fb3c8;font-size:10px;">${g} · ${p} · ${a}</span></div>`;
   }).join("");
-  // 对比固定展示三项核心指标（GDP/人口/面积），与当前 metric 无关
-  box.innerHTML=`<div class="rank-title">对比 · GDP / 人口 / 面积<span style="float:right;color:var(--pink);cursor:pointer;" onclick="cmpClear()">清空</span></div>${rows}`;
+  // 对比列跟随当前维度（L6 修复）：标题标注当前指标
+  box.innerHTML=`<div class="rank-title">对比 · ${metricLabel(metric)}<span style="float:right;color:var(--pink);cursor:pointer;" onclick="cmpClear()">清空</span></div>${rows}`;
   box.querySelectorAll(".cmp-del").forEach(el=>{
     el.onclick=()=>{ const [t,k]=el.dataset.k.split(":"); cmpToggle({t,k,name:""}); };
   });
@@ -1013,7 +1020,7 @@ function onChartClick(p){
     } else if(currentLevel==="province"){
       const d=p.data; if(d&&d.cm) cmpHandleClick("city", d.name, d.adcode);   // 城市加入对比（仅 GDP/人口/面积）
     }
-    cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.g!=null?d.g:0};}), "对比 GDP", fmtGDP);
+    cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v));
     return;
   }
   if(currentLevel==="world"){
@@ -1073,6 +1080,7 @@ window.addEventListener("load", ()=>{
     else if(currentLevel==="province"){ if(currentProvName && currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); }
     else if(currentLevel==="us") loadUS();
     renderRank();
+    if(cmpMode){ cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v)); }   // 维度切换时对比跟随刷新
   });
   /* 年份选择器 (C) — 多年度由 World Bank(2000-2024) 驱动 */
   (function(){
@@ -1082,8 +1090,8 @@ window.addEventListener("load", ()=>{
       Object.values(window.WB).forEach(o=>Object.keys(o.years).forEach(y=>yrs.add(+y)));
       const arr=[...yrs].sort((a,b)=>b-a);
       if(!arr.includes(2025)) arr.unshift(2025);   // 省级有 2025 初核，纳入下拉使选择器成为唯一年份来源（国家/州缺 2025 时按最近年回退）
-      sel.innerHTML=arr.map(y=>"<option value=\""+y+"\""+(String(y)==="2023"?" selected":"")+">"+y+"</option>").join("");
-      dataYear="2023";
+      sel.innerHTML=arr.map(y=>"<option value=\""+y+"\""+(String(y)==="2025"?" selected":"")+">"+y+"</option>").join("");
+      dataYear="2025";   // 默认最新年份（省 2025 初核；国家/州按最近年回退并诚实标注）
     }
   })();
   document.getElementById("yearSel").addEventListener("change", e=>{
