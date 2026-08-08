@@ -364,7 +364,7 @@ const RATE23 = (window.FXRATE && window.FXRATE["2023"]) || USD_CNY;  // 美国�
 Object.keys(US_STATES_GDP).forEach(k=> US_STATES_GDP[k].gdp = US_STATES_GDP[k].gdp*RATE23*1e12);
 
 /* 美国州 GDP 多年序列（BEA SAGDP1 现价, 百万美元）：按所选年份取数, 缺失取最近可得年
-   注：数据实际为 2017 链式美元不变价（SAGDP9N）；待 BEA_KEY 到位后重跑 build_bea_states.js 可切换为现价 */
+   注：BEA SAGDP2 = 现价（current dollars）；SAGDP1 才是 2017 链式不变价，勿混淆 */
 function usGdpUsdM(name, year){            // 返回 USD 百万 (number) 或 null
   const ts = window.US_TS && window.US_TS[name];
   if(!ts) return null;
@@ -396,7 +396,7 @@ function usGdpUsdT(name, year){            // 返回 美元 万亿 (用于悬浮
   const m = usGdpUsdM(name, year);
   return m==null ? null : m/1e6;
 }
-function usNominalGrowth(name, baseYear){  // 较基准年 实际(2017不变价)增长, 返回小数, 缺失返回 null
+function usNominalGrowth(name, baseYear){  // 较基准年 名义(现价)增长, 返回小数, 缺失返回 null
   const b = usGdpUsdM(name, baseYear), e = usGdpUsdM(name, dataYear);
   if(b==null || e==null || b===0) return null;
   return e/b - 1;
@@ -808,7 +808,7 @@ function loadUS(){
       if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
       const yg=regGet(r,"gdp",dataYear), ut=usGdpUsdT(p.name,dataYear);
       return `<b>${p.name}</b> · ${dataYear}<br/>GDP ${fmtGDP(yg)}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`
-        +`<br/><span style="color:#7f93a8">美元 2017不变价约 ${(ut!=null?ut:(US_STATES_GDP[p.name].gdp/RATE23/1e12)).toFixed(2)} 万亿</span>`;}},
+        +`<br/><span style="color:#7f93a8">美元现价约 ${(ut!=null?ut:(US_STATES_GDP[p.name].gdp/RATE23/1e12)).toFixed(2)} 万亿</span>`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
     series:[{type:"map",map:"us",roam:true,data,label:{show:false},
@@ -816,10 +816,10 @@ function loadUS(){
   });
   setCrumb("世界 / <b>美国</b>");
   showGeneric("美国 · 州", "共 "+gj.features.length+" 个州/特区；点击州查看三项指标",
-    `美国各州：GDP 为 BEA 2017链式美元不变价序列（2000–2024，按逐年平均汇率折算人民币），切换年份可看变迁；人口为 Census 2023 估计、面积为总面积（含水域）。切换上方指标可重新着色。点「返回世界」回到全球。`);
-  /* 洞察：各州较2000实际增长对比（2017不变价） */
+    `美国各州：GDP 为 BEA 现价序列（SAGDP2, 2000–2024，按逐年平均汇率折算人民币），切换年份可看变迁；人口为 Census 2023 估计、面积为总面积（含水域）。切换上方指标可重新着色。点「返回世界」回到全球。`);
+  /* 洞察：各州较2000名义增长对比（现价） */
   const comp=Object.keys(US_STATES_GDP).map(k=>({name:k, val:usNominalGrowth(k,2000)})).filter(e=>e.val!=null);
-  renderTrendCompare(comp, "各州较2000 实际增长(2017不变价) · TOP 8");
+  renderTrendCompare(comp, "各州较2000 名义增长(现价) · TOP 8");
   renderRank();
 }
 function showUSStatePanel(nm){
@@ -831,7 +831,7 @@ function showUSStatePanel(nm){
     ["GDP ("+gy+")",fmtGDP(yg!=null?yg:s.gdp),false],
     ["人口 ("+popY+")",fmtPop(s.pop),false],
     ["面积",fmtArea(s.area),true],
-    grRow("较2000 实际增长(2017不变价)", ng)
+    grRow("较2000 名义增长(现价)", ng)
   ], "bea");
   const tr=usTrend(nm);
   if(tr) renderTrend([{name:nm, years:tr.years, values:tr.values}], nm+" · GDP 趋势", fmtGDP);
@@ -867,7 +867,7 @@ function renderRank(){
   const growthOf=(reg,base)=>reg&&reg.growth?reg.growth(metric,base):null;
   let growthTag="";
   if(currentLevel==="us"){
-    growthTag="实际(2017不变价)";   // 州级实际增长
+    growthTag="名义(现价)";   // 州级名义增长
     items=Object.keys(US_STATES_GDP).map(k=>{
       const r=regUSState(k), g=growthOf(r,2000);
       return [k,k,regGet(r,metric,dataYear),"usstate", g==null?null:fmtGrowth(g)];

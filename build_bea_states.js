@@ -1,4 +1,5 @@
-// 拉取 BEA 州级 GDP 多年序列 (SAGDP1 = 现价 GDP by state, 百万美元)
+// 拉取 BEA 州级 GDP 多年序列 (SAGDP2 = 现价 GDP by state, 百万美元)
+// 注：BEA 表定义——SAGDP1=2017链式不变价, SAGDP2=现价(current dollars)
 // 输出 vendor/us_states_bea.js -> window.US_TS = { "<州全名>": { years: { "2000": 1784320.6, ... } } }
 // 注: BEA 不含人口, 人口/面积沿用 global-data-atlas.html 内 US_STATES_GDP 的单年值
 const fs = require("fs");
@@ -21,13 +22,13 @@ async function fetchBEA(tbl, line, years) {
 }
 
 (async () => {
-  console.log("拉取 BEA SAGDP1 (现价州GDP, 2000-2024, 逐年) ...");
+  console.log("拉取 BEA SAGDP2 (现价州GDP, 2000-2024, 逐年) ...");
   const out = {};
   let minY = 9999, maxY = 0;
   for (let y = 2000; y <= 2024; y++) {
-    const rows = await fetchBEA("SAGDP1", 1, String(y));
+    const rows = await fetchBEA("SAGDP2", 1, String(y));
     for (const r of rows) {
-      const name = r.GeoName;
+      const name = r.GeoName.replace(/\s*\*$/, "");   // 去掉"United States *"的星号
       const v = r.DataValue != null ? Math.round(Number(r.DataValue) * 10) / 10 : null; // 百万美元
       if (!name || v == null) continue;
       if (!out[name]) out[name] = { years: {} };
