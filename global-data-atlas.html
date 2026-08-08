@@ -103,7 +103,6 @@
       <option value="2024">2024</option>
       <option value="2023">2023</option>
     </select>
-    <button class="btn" id="playBtn" title="播放/暂停年份动画（2000-2025 逐年演变）">▶ 播放</button>
     <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
     <button class="btn" id="backBtn">返回世界</button>
   </header>
@@ -127,6 +126,8 @@
 
 <script src="vendor/echarts.min.js"></script>
 <script src="vendor/world.js"></script>
+<script src="vendor/japan.js"></script>
+<script src="vendor/jp_metrics.js"></script>
 <script src="vendor/us-states.js"></script>
 <script src="vendor/us_states_bea.js"></script>
 <script src="vendor/cn/100000.js"></script>
@@ -537,6 +538,17 @@ function regCity(cm){
     growth(){ return null; }, gdpSeries(){ return null; }
   };
 }
+/* 日本都道府县（F3）：单年数据（GDP 人民币元/人口/面积），无多年序列 */
+function regJapanPref(nm){
+  const d=window.JP_METRICS&&window.JP_METRICS[nm]; if(!d) return null;
+  return {
+    name:nm, cn:nm,
+    years:()=>[],   // 县级无多年序列（单年数据）
+    ext(){ return null; },
+    get(m){ return m==="gdp"?d.gdp:m==="pop"?d.pop:(m==="area"?d.area:null); },
+    growth(){ return null; }, gdpSeries(){ return null; }
+  };
+}
 /* 便捷：按 metric 从 reg 取"某年最近可得值"（走 METRICS.near 定义） */
 function regGet(reg, m, year){ return METRICS[m] && reg ? METRICS[m].near(reg, year) : null; }
 
@@ -572,6 +584,7 @@ function goLevel(level){
   if(level==="world"){ renderWorld2D(); }
   else if(level==="china"){ if(currentLevel!=="china") loadChina(); }
   else if(level==="us"){ if(currentLevel!=="us") loadUS(); }
+  else if(level==="japan"){ if(currentLevel!=="japan") loadJapan(); }
   else if(level==="province"){ if(currentProvName&&currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); }
 }
 function showLoading(b){ document.getElementById("loading").style.display=b?"flex":"none"; }
@@ -679,7 +692,7 @@ function renderTrendCompare(entries, title, fmt){
 function sourceTag(src){
   const map={
     wb:"World Bank", wiki:"维基百科（五经普修订）", bea:"BEA + Census",
-    city:"公开整理近似值", mix:"多来源混合"
+    city:"公开整理近似值", japan:"日本内阁府（県民経済計算）", mix:"多来源混合"
   };
   const t=map[src]||"公开整理";
   const color=src==="wb"?"#00F0FF":(src==="bea"?"#00F0FF":(src==="wiki"?"#ffd166":(src==="city"?"#FF2E93":"#7f93a8")));
@@ -893,6 +906,44 @@ function loadUS(){
   } else document.getElementById("trend").innerHTML="";
   renderRank();
 }
+/* 日本都道府县层（F3）：单年数据（2021 GDP / 2023 人口 / 面积），无多年序列与 EXT 指标 */
+function loadJapan(){
+  currentLevel="japan";
+  if(metricScope(metric)==="world"){ showGeneric("日本 · 都道府县","", metricUnavailableMsg(metric)); renderRank(); return; }
+  const gj = window.JP_GEO; if(!gj){ showGeneric("日本","都道府县边界未加载","vendor/japan.js 缺失"); return; }
+  echarts.registerMap("japan", gj);
+  const data = gj.features.map(f=>{
+    const nm=f.properties.name;
+    return {name:nm, value:regGet(regJapanPref(nm),metric,dataYear)||0, reg:regJapanPref(nm)};
+  });
+  const vals=data.map(d=>d.value).filter(v=>v>0);
+  const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
+  chart.clear();
+  chart.setOption({
+    backgroundColor:"#05060a",
+    tooltip:{trigger:"item", formatter:p=>{ const r=p.data&&p.data.reg;
+      if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
+      return `<b>${p.name}</b> · 2021<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
+    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 2021",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
+    series:[{type:"map",map:"japan",roam:true,data,label:{show:false},
+      emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+  });
+  setCrumbPath([{label:"世界", level:"world"},{label:"日本", level:"japan"}]);
+  showGeneric("日本 · 都道府县", "共 47 县；点击县查看三项指标",
+    `日本 47 都道府县：GDP 为 2021 年度県民経済計算（名义，按 1日元≈0.05元折算人民币）；人口为 2023 估计、面积为总面积。县级数据为单年快照（无多年序列），年份切换不生效。`);
+  document.getElementById("trend").innerHTML="";   // 县级无多年序列
+  renderRank();
+}
+function showJapanPrefPanel(nm){
+  const r=regJapanPref(nm); if(!r) return;
+  showMetrics(nm, "日本都道府县 · 2021", [
+    ["GDP (2021)",fmtGDP(regGet(r,"gdp",dataYear)),false],
+    ["人口 (2023)",fmtPop(regGet(r,"pop",dataYear)),false],
+    ["面积",fmtArea(regGet(r,"area",dataYear)),true]
+  ], "japan", "2021");
+  document.getElementById("trend").innerHTML="";   // 县级无多年序列
+}
 function showUSStatePanel(nm){
   const s=US_STATES_GDP[nm]; if(!s) return;
   const gy=usGdpYear(nm,dataYear), yg=usGdpY(nm,dataYear), ng=usNominalGrowth(nm,2000);
@@ -940,6 +991,11 @@ function renderRank(){
       const r=regUSState(k);
       return [k,k,regGet(r,metric,dataYear),"usstate"];})
       .sort((a,b)=>b[2]-a[2]).slice(0,10);
+  } else if(currentLevel==="japan"){
+    items=Object.keys(window.JP_METRICS||{}).map(k=>{
+      const r=regJapanPref(k);
+      return [k,k,regGet(r,metric,dataYear),"jppref"];})
+      .sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else if(currentLevel==="province"){
     items=currentProvData.filter(d=>d.cm)
       .map(d=>{ const cm=d.cm; const r=regCity(cm); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
@@ -967,6 +1023,7 @@ function renderRank(){
       else if(t==="prov"){ if(currentLevel!=="china") loadChina(); setTimeout(()=>showProvincePanel(k), currentLevel==="china"?0:700); }
       else if(t==="city"){ showCityPanel(it[0], it[4], it[5]); }
       else if(t==="usstate"){ if(currentLevel!=="us"){ loadUS(); setTimeout(()=>showUSStatePanel(k),80); } else showUSStatePanel(k); }
+      else if(t==="jppref"){ if(currentLevel!=="japan"){ loadJapan(); setTimeout(()=>showJapanPrefPanel(k),80); } else showJapanPrefPanel(k); }
     };
   });
 }
@@ -976,6 +1033,7 @@ function doSearch(q){
   if(c){
     if(c[2]==="CN") loadChina();
     else if(c[2]==="US") loadUS();
+    else if(c[2]==="JP") loadJapan();
     else showCountry(c);
     return;
   }
@@ -1007,6 +1065,8 @@ function cmpGetData(it){
   else if(it.t==="prov"){ const g=cnGdpRMB(it.k,y), o=window.CN_TS&&window.CN_TS[it.k];
     base={g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
   else if(it.t==="usstate"){ base={g:usGdpY(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
+  else if(it.t==="jppref"){ const d=window.JP_METRICS&&window.JP_METRICS[it.k]; if(!d) return null;
+    base={g:d.gdp, p:d.pop, a:d.area}; }
   else if(it.t==="city"){ const cm=getCityMetric(it.k); if(!cm) return null;
     base={g:cm.gdp, p:cm.pop, a:cm.area}; }   // 数据已由 city_metrics.js 折算为元/人
   else return null;
@@ -1055,11 +1115,14 @@ function onChartClick(p){
     if(currentLevel==="world"){
       const c=p.data&&p.data.cn; if(!c) return;
       if(c[2]==="CN"){ loadChina(); return; }   // 中国是下钻层级，不加入对比
+      if(c[2]==="JP"){ loadJapan(); return; }   // 日本同是下钻层级
       cmpHandleClick("country", c[0], c[2]);
     } else if(currentLevel==="china"){
       const nm=normProv(p.name); if(PROV_ADCODE[nm]) cmpHandleClick("prov", nm, nm);
     } else if(currentLevel==="us"){
       cmpHandleClick("usstate", p.name, p.name);
+    } else if(currentLevel==="japan"){
+      cmpHandleClick("jppref", p.name, p.name);
     } else if(currentLevel==="province"){
       const d=p.data; if(d&&d.cm) cmpHandleClick("city", d.name, d.adcode);   // 城市加入对比（仅 GDP/人口/面积）
     }
@@ -1071,12 +1134,15 @@ function onChartClick(p){
     if(!c) return;
     if(c[2]==="CN") loadChina();
     else if(c[2]==="US") loadUS();
+    else if(c[2]==="JP") loadJapan();   // F3: 日本下钻
     else showCountry(c);
   } else if(currentLevel==="china"){
     const nm=normProv(p.name); const adcode=PROV_ADCODE[nm];
     if(adcode) loadProvince(nm, adcode);
   } else if(currentLevel==="us"){
     showUSStatePanel(p.name);
+  } else if(currentLevel==="japan"){
+    showJapanPrefPanel(p.name);
   } else if(currentLevel==="province"){
     const d=p.data; if(d&&d.cm) showCityPanel(d.name, d.adcode, d.parentAdcode);
   }
@@ -1149,31 +1215,12 @@ window.addEventListener("load", ()=>{
     dataYear = e.target.value;
     redrawByYear();
   });
-  /* F1: 年份动画播放（2000→2025 逐年） */
-  let playTimer=null;
-  const playBtn=document.getElementById("playBtn");
-  function stopPlay(){ if(playTimer){ clearInterval(playTimer); playTimer=null; } playBtn.textContent="▶ 播放"; playBtn.classList.remove("active"); }
-  function startPlay(){
-    const sel=document.getElementById("yearSel");
-    const years=Array.from(sel.options).map(o=>+o.value).sort((a,b)=>a-b);
-    let i=years.indexOf(+dataYear);
-    if(i<0||i>=years.length-1) i=0;
-    playBtn.textContent="⏸ 暂停"; playBtn.classList.add("active");
-    playTimer=setInterval(()=>{
-      i++;
-      if(i>=years.length){ stopPlay(); return; }
-      dataYear=String(years[i]); sel.value=dataYear;
-      redrawByYear();
-    }, 800);
-  }
-  playBtn.addEventListener("click", ()=>{
-    if(playTimer) stopPlay(); else startPlay();
-  });
   document.getElementById("backBtn").addEventListener("click", ()=>{
     // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致
     if(currentLevel==="province") goLevel("china");
     else if(currentLevel==="china") goLevel("world");
     else if(currentLevel==="us") goLevel("world");
+    else if(currentLevel==="japan") goLevel("world");
     else goLevel("world");   // world 层：回到世界（重绘无副作用）
   });
   const searchEl=document.getElementById("search");
