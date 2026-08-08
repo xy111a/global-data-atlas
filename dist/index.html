@@ -649,7 +649,7 @@ function renderTrendCompare(entries, title, fmt){
   tc.setOption({
     backgroundColor:"transparent",
     tooltip:{trigger:"axis", axisPointer:{type:"shadow"},
-      formatter:ps=>ps.map(p=>`${p.name}: <b style="color:${p.color}">${fmtV(p.value/100)}</b>`).join("<br/>")},
+      formatter:ps=>ps.map(p=>`${p.name}: <b style="color:${p.color}">${fmtV(isGrowth?p.value/100:p.value)}</b>`).join("<br/>")},
     grid:{left:10,right:60,top:8,bottom:8,containLabel:true},
     xAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:isGrowth?v=>(v>0?"+":"")+v+"%":v=>fmt(v)}},
     yAxis:{type:"category",data:sorted.map(e=>e.name).reverse(),axisLabel:{color:"#7f93a8",fontSize:11}},
@@ -707,8 +707,9 @@ function renderWorld2D(){
     "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
   renderRank();
   /* 洞察：各国较2000实际增长对比（不变价 GDP） */
-  const comp=COUNTRIES.map(c=>({name:c[0], val:cGrowth(c[2],2000,"gdpKd")})).filter(e=>e.val!=null);
-  renderTrendCompare(comp, "较2000 实际增长 · TOP 8");
+  /* 洞察：各国较2000增长/变化对比（跟随当前维度） */
+  const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
+  renderTrendCompare(comp, "较2000 "+(metric==="gdp"?"实际增长":(metric==="life"?"变化":metricLabel(metric)+"增长"))+" · TOP 8", v=>fmtGrowthFor(metric,v));
 }
 
 /* ============== 中国（2D 省→市 下钻） ============== */
@@ -738,9 +739,11 @@ async function loadChina(){
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"}]);
     showGeneric("中国","点击任意省份进入下一级（市）","颜色按当前指标着色，GDP 随上方年份切换（2000–2024 维基序列，2025 为初步核算）。货币统一为人民币(CNY)。点省份下钻到地级市。");
-    /* 洞察：各省较2000名义增长对比 */
-    const comp=Object.keys(CN).map(k=>({name:k, val:cnNominalGrowth(k,2000)})).filter(e=>e.val!=null);
-    renderTrendCompare(comp, "各省较2000 名义增长 · TOP 8");
+    /* 洞察：各省较2000名义增长（仅 GDP 有多年序列；pop/area 为单年常量无增长） */
+    if(metric==="gdp"){
+      const comp=Object.keys(CN).map(k=>({name:k, val:cnNominalGrowth(k,2000)})).filter(e=>e.val!=null);
+      renderTrendCompare(comp, "各省较2000 名义增长 · TOP 8");
+    } else document.getElementById("trend").innerHTML="";   // 省级 pop/area 无序列，不显示洞察
   }catch(e){ showGeneric("加载失败",String(e),"请检查网络（需可访问 DataV）。"); }
   renderRank();
   showLoading(false);
@@ -866,9 +869,11 @@ function loadUS(){
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
   showGeneric("美国 · 州", "共 "+gj.features.length+" 个州/特区；点击州查看三项指标",
     `美国各州：GDP 为 BEA 现价序列（SAGDP2, 2000–2024，按逐年平均汇率折算人民币），切换年份可看变迁；人口为 Census 2023 估计、面积为总面积（含水域）。切换上方指标可重新着色。点「返回世界」回到全球。`);
-  /* 洞察：各州较2000名义增长对比（现价） */
-  const comp=Object.keys(US_STATES_GDP).map(k=>({name:k, val:usNominalGrowth(k,2000)})).filter(e=>e.val!=null);
-  renderTrendCompare(comp, "各州较2000 名义增长(现价) · TOP 8");
+  /* 洞察：各州较2000名义增长（仅 GDP 有多年序列；pop/area 单年常量） */
+  if(metric==="gdp"){
+    const comp=Object.keys(US_STATES_GDP).map(k=>({name:k, val:usNominalGrowth(k,2000)})).filter(e=>e.val!=null);
+    renderTrendCompare(comp, "各州较2000 名义增长(现价) · TOP 8");
+  } else document.getElementById("trend").innerHTML="";
   renderRank();
 }
 function showUSStatePanel(nm){
