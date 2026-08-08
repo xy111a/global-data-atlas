@@ -129,7 +129,6 @@
 <script src="vendor/cn/city_metrics.js"></script>
 <script src="vendor/cn_country_names.js"></script>
 <script src="vendor/countries_wb.js"></script>
-<script>if(window.CN_NAMES){for(const k in window.CN_NAMES){if(window.WB&&window.WB[k])window.WB[k].cn=window.CN_NAMES[k];}}</script>
 <script src="vendor/fxrate.js"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script>
@@ -137,6 +136,20 @@
 /* 国家：多年度序列（GDP=World Bank 当期USD$, 人口/面积；另含不变价GDP gdpKd 与 PPP不变价 gdpPpKd 用于真实增长计算），运行时按所选年份取数、GDP 按逐年平均市场汇率(USD/CNY)折算人民币(CNY) */
 const COUNTRIES = Object.values(window.WB || {}).map(o => [o.cn, o.en, o.iso2, o.lng, o.lat]);
 const BY_EN = {}; COUNTRIES.forEach(c=>BY_EN[c[1]]=c);
+/* world.json 边界名 → WB en 名 别名表（ECharts 官方 world.json 用旧名/缩写，此处归一以便地图着色与点击）
+   另收录 world.json 缺失边界但数据存在的国家，保证搜索/面板可用。 */
+const EN_ALIAS = {
+  "Côte d'Ivoire":"Cote d'Ivoire", "S. Sudan":"South Sudan", "Faeroe Is.":"Faroe Islands",
+  "N. Mariana Is.":"Northern Mariana Islands", "St. Vin. and Gren.":"St. Vincent and the Grenadines",
+  "Turks and Caicos Is.":"Turks and Caicos Islands", "Marshall Is.":"Marshall Islands",
+  "Br. Virgin Is.":"British Virgin Islands", "St. Kitts-Nevis":"St. Kitts and Nevis",
+  "U.S. Virgin Is.":"Virgin Islands (U.S.)", "Congo, Dem. Rep.":"Congo, Dem. Rep.",
+  "Dem. Rep. Congo":"Congo, Dem. Rep.", "Macedonia":"North Macedonia", "Swaziland":"Eswatini",
+  "Congo":"Congo, Rep.", "Korea":"Korea, Rep.", "Dem. Rep. Korea":"Korea, Dem. People's Rep.",
+  "Nauru":"Naoero", "Macau":"Macao SAR, China", "Hong Kong":"Hong Kong SAR, China"
+};
+function enToWb(nm){ if(BY_EN[nm]) return nm; return EN_ALIAS[nm] || null; }
+function wbForMapName(nm){ const k=enToWb(nm); return k ? BY_EN[k] : null; }
 /* 取某国在指定年份的指标值（缺失时取最近可得年份；GDP 由 USD 折算 CNY） */
 function cMetric(iso2, m, year){
   const o = window.WB && window.WB[iso2]; if(!o || !o.years) return 0;
@@ -467,7 +480,7 @@ function renderWorld2D(){
   currentLevel="world";
   const geo = worldGeo;
   const data = geo.features.map(f=>{
-    const nm=f.properties.name; const c=BY_EN[nm];
+    const nm=f.properties.name; const c=wbForMapName(nm);
     const v = c ? cMetric(c[2], metric, dataYear) : null;
     return {name:nm, value:v, cn:c};
   });

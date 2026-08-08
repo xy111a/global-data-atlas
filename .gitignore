@@ -9,3 +9,8 @@ vendor/cn/*.json
 dist/vendor/cn/*.json
 
 # 保留：dist/(可部署产物) / vendor/(数据与库) / 源码构建脚本
+
+# wrangler 本地缓存（含账号信息，不入库）
+.wrangler/
+# 数据修复备份
+*.bak
