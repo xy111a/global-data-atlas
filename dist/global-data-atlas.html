@@ -918,37 +918,31 @@ function showProvincePanel(short){
 function renderRank(){
   const box=document.getElementById("rank");
   let items=[], unit=metricLabel(metric);
-  const growthOf=(reg,base)=>reg&&reg.growth?reg.growth(metric,base):null;
-  let growthTag="";
   if(currentLevel==="us"){
-    growthTag="名义(现价)";   // 州级名义增长
     items=Object.keys(US_STATES_GDP).map(k=>{
-      const r=regUSState(k), g=growthOf(r,2000);
-      return [k,k,regGet(r,metric,dataYear),"usstate", g==null?null:fmtGrowthFor(metric,g)];
-    })
+      const r=regUSState(k);
+      return [k,k,regGet(r,metric,dataYear),"usstate"];})
       .sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else if(currentLevel==="province"){
     items=currentProvData.filter(d=>d.cm)
       .map(d=>{ const cm=d.cm; const r=regCity(cm); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
       .sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else if(currentLevel==="china"){
-    growthTag="名义";   // 省级名义增长
     items=Object.keys(CN).map(k=>{
-      const r=regProv(k), v=regGet(r,metric,dataYear), g=growthOf(r,2000);
-      return [k+"省",k,v,"prov", g==null?null:fmtGrowthFor(metric,g)];})
+      const r=regProv(k), v=regGet(r,metric,dataYear);
+      return [k+"省",k,v,"prov"];})
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else if(currentLevel==="world"){
-    growthTag=metric==="gdp"?"实际(不变价)":"较2000";   // 国家：gdp 实际增长，其余维度跟随
     items=COUNTRIES.map(c=>{
-      const r=regCountry(c[2]); const g=growthOf(r,2000);
-      return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country", g==null?null:fmtGrowthFor(metric,g)];})
+      const r=regCountry(c[2]);
+      return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country"];})
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
   const fmt=v=> metricFmt(metric,v);
-  box.innerHTML=`<div class="rank-title">${unit} · TOP 10${growthTag?` <span style="font-weight:normal;color:#7f93a8;font-size:11px;">增长口径：${growthTag}</span>`:""}</div>`+items.map((it,i)=>
+  box.innerHTML=`<div class="rank-title">${unit} · TOP 10</div>`+items.map((it,i)=>
     `<div class="rank-item" data-type="${it[3]}" data-key="${it[1]}">
-       <span class="rk">${i+1}</span><span class="rn">${it[0]}</span><span class="rv">${fmt(it[2])}</span>${it[4]!=null?`<span class="rg ${it[4][0]==='-'?'neg':'pos'}">${it[4]}</span>`:""}</div>`).join("");
+       <span class="rk">${i+1}</span><span class="rn">${it[0]}</span><span class="rv">${fmt(it[2])}</span></div>`).join("");
   box.querySelectorAll(".rank-item").forEach(el=>{
     el.onclick=()=>{
       const t=el.dataset.type, k=el.dataset.key;
