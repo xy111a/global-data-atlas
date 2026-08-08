@@ -103,6 +103,7 @@
       <option value="2024">2024</option>
       <option value="2023">2023</option>
     </select>
+    <button class="btn" id="playBtn" title="播放/暂停年份动画（2000-2025 逐年演变）">▶ 播放</button>
     <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
     <button class="btn" id="backBtn">返回世界</button>
   </header>
@@ -204,6 +205,22 @@ const METRICS = {
   gdpcap: {
     label:"人均GDP", fmt:v=>v!=null?"$"+v.toFixed(0):null, unit:"USD(2015不变价)",
     near(o,year){ return (o&&o.ext)?o.ext("gdpcap",year):null; },
+    series(){ return null; }, growth(){ return null; }
+  },
+  /* ===== Phase F2 新增指标 ===== */
+  unemp: {
+    label:"失业率", fmt:v=>fmtPct(v), unit:"% 劳动力",
+    near(o,year){ return (o&&o.ext)?o.ext("unemp",year):null; },
+    series(){ return null; }, growth(){ return null; }
+  },
+  internet: {
+    label:"互联网普及", fmt:v=>fmtPct(v), unit:"% 人口",
+    near(o,year){ return (o&&o.ext)?o.ext("internet",year):null; },
+    series(){ return null; }, growth(){ return null; }
+  },
+  military: {
+    label:"军费", fmt:v=>fmtPct(v), unit:"% GDP",
+    near(o,year){ return (o&&o.ext)?o.ext("military",year):null; },
     series(){ return null; }, growth(){ return null; }
   }
 };
@@ -534,7 +551,7 @@ function normProv(n){ return n.replace(/(省|市|自治区|特别行政区|壮�
 /* 按当前指标格式化数值 / 取指标名 */
 function fmtBy(v,m){ m=m||metric; return metricFmt(m,v); }
 /* 指标适用的区域层级：world=仅国家层, all=所有层级 */
-function metricScope(m){ return (m==="trade"||m==="health"||m==="edu"||m==="life"||m==="gdpcap") ? "world" : "all"; }
+function metricScope(m){ return (m==="trade"||m==="health"||m==="edu"||m==="life"||m==="gdpcap"||m==="unemp"||m==="internet"||m==="military") ? "world" : "all"; }
 function metricUnavailableMsg(m){ return `当前指标「${metricLabel(m)}」仅国家层可用（World Bank），省级/州级无此数据。请切换回 GDP / 人口 / 面积。`; }
 /* 美国州：按当前指标取值（gdp 元 / pop 人 / area km²） */
 function usVal(nm,m){ const s=US_STATES_GDP[nm]; if(!s) return 0; m=m||metric;
@@ -1120,13 +1137,37 @@ window.addEventListener("load", ()=>{
       dataYear="2025";   // 默认最新年份（省 2025 初核；国家/州按最近年回退并诚实标注）
     }
   })();
-  document.getElementById("yearSel").addEventListener("change", e=>{
-    dataYear = e.target.value;
+  /* 按当前 dataYear 重绘当前层（年份下拉/播放动画共用） */
+  function redrawByYear(){
     if(currentLevel==="world"){ renderWorld2D(); }
     else if(currentLevel==="china") loadChina();
     else if(currentLevel==="province" && currentProvName) loadProvince(currentProvName, currentProvAdcode);
     else if(currentLevel==="us") loadUS();
     renderRank();
+  }
+  document.getElementById("yearSel").addEventListener("change", e=>{
+    dataYear = e.target.value;
+    redrawByYear();
+  });
+  /* F1: 年份动画播放（2000→2025 逐年） */
+  let playTimer=null;
+  const playBtn=document.getElementById("playBtn");
+  function stopPlay(){ if(playTimer){ clearInterval(playTimer); playTimer=null; } playBtn.textContent="▶ 播放"; playBtn.classList.remove("active"); }
+  function startPlay(){
+    const sel=document.getElementById("yearSel");
+    const years=Array.from(sel.options).map(o=>+o.value).sort((a,b)=>a-b);
+    let i=years.indexOf(+dataYear);
+    if(i<0||i>=years.length-1) i=0;
+    playBtn.textContent="⏸ 暂停"; playBtn.classList.add("active");
+    playTimer=setInterval(()=>{
+      i++;
+      if(i>=years.length){ stopPlay(); return; }
+      dataYear=String(years[i]); sel.value=dataYear;
+      redrawByYear();
+    }, 800);
+  }
+  playBtn.addEventListener("click", ()=>{
+    if(playTimer) stopPlay(); else startPlay();
   });
   document.getElementById("backBtn").addEventListener("click", ()=>{
     // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致

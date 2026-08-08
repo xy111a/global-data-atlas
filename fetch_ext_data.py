@@ -24,6 +24,9 @@ IND = {
     "edu":    "SE.XPD.TOTL.GD.ZS", # 教育支出占GDP %
     "life":   "SP.DYN.LE00.IN",    # 预期寿命
     "gdpcap": "NY.GDP.PCAP.KD",    # 人均GDP 2015不变价USD
+    "unemp":  "SL.UEM.TOTL.ZS",    # 失业率%（Phase F2）
+    "internet":"IT.NET.USER.ZS",   # 互联网普及率%（Phase F2）
+    "military":"MS.MIL.XPND.GD.ZS",# 军费占GDP%（Phase F2）
 }
 
 def main():
