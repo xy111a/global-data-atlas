@@ -1,0 +1,11 @@
+# ===== 内部/本地文件（不入库）=====
+.workbuddy/
+atlas_test/
+node_modules/
+.env
+
+# vendor/cn 与 dist/vendor/cn 下的 .json 是 .js 地图文件的冗余副本（HTML 只加载 .js），不入库
+vendor/cn/*.json
+dist/vendor/cn/*.json
+
+# 保留：dist/(可部署产物) / vendor/(数据与库) / 源码构建脚本
