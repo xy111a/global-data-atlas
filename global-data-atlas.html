@@ -104,11 +104,11 @@
       <option value="2023">2023</option>
     </select>
     <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
-    <button class="btn" id="backBtn">返回世界</button>
+    <button class="btn" id="backBtn">← 返回世界</button>
   </header>
   <div id="main">
     <div id="chart"></div>
-    <button id="resetView" title="重置地图视图（缩放/平移后使用）" style="position:absolute;right:8px;top:8px;display:none;z-index:3;background:rgba(5,6,10,0.8);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">⟲ 重置视图</button>
+    <button id="resetView" title="地图被拖拽/缩放后，点击恢复初始视图" style="position:absolute;right:8px;top:8px;display:none;z-index:3;background:rgba(5,6,10,0.8);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">⟲ 恢复视图</button>
     <div id="panel">
       <div id="compareBox" style="display:none;margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;background:rgba(0,240,255,0.05);"></div>
       <h2 id="pName">世界地图</h2>
@@ -578,6 +578,14 @@ function setCrumbPath(paths){
     if(isLast) return `<b>${p.label}</b>`;
     return `<a href="javascript:void(0)" onclick="goLevel('${p.level}')" style="color:var(--muted);text-decoration:none;cursor:pointer;">${p.label}</a>`;
   }).join(" / "));
+  updateBackBtn();   // 层级变化时同步返回按钮文字
+  document.getElementById("resetView").style.display="none";   // 切层后视图自动重置，隐藏恢复按钮
+}
+/* 返回按钮动态文字：显示上一级名称 */
+function updateBackBtn(){
+  const b=document.getElementById("backBtn"); if(!b) return;
+  const map={province:"← 返回省级", china:"← 返回世界", us:"← 返回世界", japan:"← 返回世界"};
+  b.textContent=map[currentLevel]||"← 返回世界";
 }
 /* 统一返回逻辑：面包屑/返回按钮共用（L6/I2 修复） */
 function goLevel(level){
@@ -733,7 +741,7 @@ function renderWorld2D(){
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"}]);
-  showGeneric("世界地图","点击国家查看数据；点击中国可下钻省/市",
+  showGeneric("世界地图","单击国家查看数据；双击中国/美国/日本下钻",
     "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
   renderRank();
   /* 洞察：各国较2000实际增长对比（不变价 GDP） */
@@ -768,7 +776,7 @@ async function loadChina(){
         label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"}]);
-    showGeneric("中国","点击任意省份进入下一级（市）","颜色按当前指标着色，GDP 随上方年份切换（2000–2024 维基序列，2025 为初步核算）。货币统一为人民币(CNY)。点省份下钻到地级市。");
+    showGeneric("中国","单击省份查看数据；双击省份下钻到地级市","颜色按当前指标着色，GDP 随上方年份切换（2000–2024 维基序列，2025 为初步核算）。货币统一为人民币(CNY)。");
     /* 洞察：各省较2000名义增长（仅 GDP 有多年序列；pop/area 为单年常量无增长） */
     if(metric==="gdp"){
       const comp=Object.keys(CN).map(k=>({name:k, val:cnNominalGrowth(k,2000)})).filter(e=>e.val!=null);
@@ -804,7 +812,7 @@ function loadCnProvGeo(adcode){
 async function loadProvince(short, adcode){
   showLoading(true);
   if(metricScope(metric)==="world"){ showGeneric(short+" · 地级市","", metricUnavailableMsg(metric)); renderRank(); showLoading(false); return; }
-  if(adcode==="710000"){ showGeneric(short+" · 台湾","暂无下级行政区边界","DataV 未提供台湾市县级 GeoJSON，仅展示省级面板。点「返回世界」回到中国。"); showLoading(false); return; }
+  if(adcode==="710000"){ showGeneric(short+" · 台湾","暂无下级行政区边界","DataV 未提供台湾市县级 GeoJSON，仅展示省级面板。点返回按钮回到省级列表。"); showLoading(false); return; }
   if(adcode==="810000"||adcode==="820000"){   // 港澳：有区级边界（本地 810000.js/820000.js），无省级 GDP 序列
     try{
       let gj = window.CN_PROV && window.CN_PROV[adcode];
@@ -897,8 +905,8 @@ function loadUS(){
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
-  showGeneric("美国 · 州", "共 "+gj.features.length+" 个州/特区；点击州查看三项指标",
-    `美国各州：GDP 为 BEA 现价序列（SAGDP2, 2000–2024，按逐年平均汇率折算人民币），切换年份可看变迁；人口为 Census 2023 估计、面积为总面积（含水域）。切换上方指标可重新着色。点「返回世界」回到全球。`);
+  showGeneric("美国 · 州", "共 "+gj.features.length+" 个州/特区；单击州查看三项指标",
+    `美国各州：GDP 为 BEA 现价序列（SAGDP2, 2000–2024，按逐年平均汇率折算人民币），切换年份可看变迁；人口为 Census 2023 估计、面积为总面积（含水域）。切换上方指标可重新着色。点返回按钮回到世界。`);
   /* 洞察：各州较2000名义增长（仅 GDP 有多年序列；pop/area 单年常量） */
   if(metric==="gdp"){
     const comp=Object.keys(US_STATES_GDP).map(k=>({name:k, val:usNominalGrowth(k,2000)})).filter(e=>e.val!=null);
@@ -930,7 +938,7 @@ function loadJapan(){
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"日本", level:"japan"}]);
-  showGeneric("日本 · 都道府县", "共 47 县；点击县查看三项指标",
+  showGeneric("日本 · 都道府县", "共 47 县；单击县查看三项指标",
     `日本 47 都道府县：GDP 为 2021 年度県民経済計算（名义，按 1日元≈0.05元折算人民币）；人口为 2023 估计、面积为总面积。县级数据为单年快照（无多年序列），年份切换不生效。`);
   document.getElementById("trend").innerHTML="";   // 县级无多年序列
   renderRank();
@@ -1110,13 +1118,22 @@ function cmpHandleClick(type, name, key){
 }
 
 /* ============== 交互 ============== */
+/* 交互：单击显示内容（260ms 防抖，避免双击误触发），双击下钻 */
+let clickTimer=null;
 function onChartClick(p){
+  if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
+  clickTimer=setTimeout(()=>{ clickTimer=null; showContentFor(p); }, 260);
+}
+function onChartDblClick(p){
+  if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
+  drillDownFor(p);
+}
+/* 单击：显示该区域内容/加入对比（不下钻） */
+function showContentFor(p){
   if(cmpMode){
     if(currentLevel==="world"){
       const c=p.data&&p.data.cn; if(!c) return;
-      if(c[2]==="CN"){ loadChina(); return; }   // 中国是下钻层级，不加入对比
-      if(c[2]==="JP"){ loadJapan(); return; }   // 日本同是下钻层级
-      cmpHandleClick("country", c[0], c[2]);
+      cmpHandleClick("country", c[0], c[2]);   // 所有国家（含 CN/US/JP）都可加入对比
     } else if(currentLevel==="china"){
       const nm=normProv(p.name); if(PROV_ADCODE[nm]) cmpHandleClick("prov", nm, nm);
     } else if(currentLevel==="us"){
@@ -1124,21 +1141,16 @@ function onChartClick(p){
     } else if(currentLevel==="japan"){
       cmpHandleClick("jppref", p.name, p.name);
     } else if(currentLevel==="province"){
-      const d=p.data; if(d&&d.cm) cmpHandleClick("city", d.name, d.adcode);   // 城市加入对比（仅 GDP/人口/面积）
+      const d=p.data; if(d&&d.cm) cmpHandleClick("city", d.name, d.adcode);
     }
     cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v));
     return;
   }
   if(currentLevel==="world"){
-    const c = p.data && p.data.cn;
-    if(!c) return;
-    if(c[2]==="CN") loadChina();
-    else if(c[2]==="US") loadUS();
-    else if(c[2]==="JP") loadJapan();   // F3: 日本下钻
-    else showCountry(c);
+    const c=p.data&&p.data.cn; if(!c) return;
+    showCountry(c);   // 所有国家（含 CN/US/JP）单击都显示面板
   } else if(currentLevel==="china"){
-    const nm=normProv(p.name); const adcode=PROV_ADCODE[nm];
-    if(adcode) loadProvince(nm, adcode);
+    const nm=normProv(p.name); if(PROV_ADCODE[nm]) showProvincePanel(nm);
   } else if(currentLevel==="us"){
     showUSStatePanel(p.name);
   } else if(currentLevel==="japan"){
@@ -1146,6 +1158,20 @@ function onChartClick(p){
   } else if(currentLevel==="province"){
     const d=p.data; if(d&&d.cm) showCityPanel(d.name, d.adcode, d.parentAdcode);
   }
+}
+/* 双击：下钻（仅可下钻层级） */
+function drillDownFor(p){
+  if(currentLevel==="world"){
+    const c=p.data&&p.data.cn; if(!c) return;
+    if(c[2]==="CN") loadChina();
+    else if(c[2]==="US") loadUS();
+    else if(c[2]==="JP") loadJapan();
+    else showContentFor(p);   // 无下钻目标：退化为显示面板
+  } else if(currentLevel==="china"){
+    const nm=normProv(p.name); const adcode=PROV_ADCODE[nm];
+    if(adcode) loadProvince(nm, adcode);
+  }
+  /* us / japan / province 层无下一级，双击忽略 */
 }
 
 /* ============== 启动 ============== */
@@ -1157,6 +1183,7 @@ window.addEventListener("load", ()=>{
   }
   chart = echarts.init(document.getElementById("chart"));
   chart.on("click", onChartClick);
+  chart.on("dblclick", onChartDblClick);   // 双击下钻（单击已防抖 260ms）
   /* I5: 缩放/平移后显示重置按钮 */
   chart.on("georoam", ()=>{ document.getElementById("resetView").style.display="block"; });
   document.getElementById("resetView").addEventListener("click", ()=>{
@@ -1223,6 +1250,8 @@ window.addEventListener("load", ()=>{
     else if(currentLevel==="japan") goLevel("world");
     else goLevel("world");   // world 层：回到世界（重绘无副作用）
   });
+  /* ESC 键返回上一级 */
+  window.addEventListener("keydown", e=>{ if(e.key==="Escape"){ document.getElementById("backBtn").click(); } });
   const searchEl=document.getElementById("search");
   searchEl.addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(e.target.value); });
   searchEl.addEventListener("blur", e=>{ /* 不搜索：避免点击地图/排行时误触发跳转（M10 修复） */ });
