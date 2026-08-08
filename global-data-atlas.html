@@ -145,7 +145,8 @@ const EN_ALIAS = {
   "U.S. Virgin Is.":"Virgin Islands (U.S.)", "Congo, Dem. Rep.":"Congo, Dem. Rep.",
   "Dem. Rep. Congo":"Congo, Dem. Rep.", "Macedonia":"North Macedonia", "Swaziland":"Eswatini",
   "Congo":"Congo, Rep.", "Korea":"Korea, Rep.", "Dem. Rep. Korea":"Korea, Dem. People's Rep.",
-  "Nauru":"Naoero", "Macau":"Macao SAR, China", "Hong Kong":"Hong Kong SAR, China"
+  "Nauru":"Naoero", "Macau":"Macao SAR, China", "Hong Kong":"Hong Kong SAR, China",
+  "Curaçao":"Curacao", "Palestine":"West Bank and Gaza", "Jersey":"Channel Islands"
 };
 function enToWb(nm){ if(BY_EN[nm]) return nm; return EN_ALIAS[nm] || null; }
 function wbForMapName(nm){ const k=enToWb(nm); return k ? BY_EN[k] : null; }
@@ -157,18 +158,18 @@ function wbForMapName(nm){ const k=enToWb(nm); return k ? BY_EN[k] : null; }
 const METRICS = {
   gdp: {
     label:"GDP", fmt:fmtGDP, unit:"人民币元",
-    near(o,year){ return (o&&o.gdp)?o.gdp(year):null; },
+    near(o,year){ return (o&&o.get)?o.get("gdp",year):null; },
     series(o){ return (o&&o.gdpSeries)?o.gdpSeries():null; },
-    growth(o,base){ return (o&&o.growth)?o.growth(base):null; }
+    growth(o,base){ return (o&&o.growth)?o.growth("gdp",base):null; }
   },
   pop: {
     label:"人口", fmt:fmtPop, unit:"人",
-    near(o,year){ return (o&&o.pop)?o.pop(year):null; },
+    near(o,year){ return (o&&o.get)?o.get("pop",year):null; },
     series(){ return null; }, growth(){ return null; }
   },
   area: {
     label:"面积", fmt:fmtArea, unit:"km²",
-    near(o,year){ return (o&&o.area)?o.area(year):null; },
+    near(o,year){ return (o&&o.get)?o.get("area",year):null; },
     series(){ return null; }, growth(){ return null; }
   },
   /* ===== 扩展指标（World Bank EXT，国家层） =====
