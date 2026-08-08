@@ -263,6 +263,12 @@ function fmtGrowth(g){
   if(g==null) return "—";
   return (g>=0?"+":"") + (g*100).toFixed(1) + "%";
 }
+/* 按维度格式化增长/变化（L7）：life 用绝对变化（岁），其余用百分比增长 */
+function fmtGrowthFor(m, g){
+  if(g==null) return "—";
+  if(m==="life") return (g>=0?"+":"") + g.toFixed(1) + " 岁";
+  return (g>=0?"+":"") + (g*100).toFixed(1) + "%";
+}
 
 
 /* 统一货币：国家 GDP 来自 World Bank(当期USD$)，运行时按所选年份取数、按逐年平均市场汇率(USD/CNY)折算为人民币(CNY) */
@@ -454,7 +460,20 @@ function regCountry(iso2){
     },
     growth(m,base){
       if(m==="gdp") return cGrowth(iso2,base,"gdpKd");  // 国家用不变价（真实增长）
-      return null;
+      if(m==="pop") return cGrowth(iso2,base,"pop");    // 人口增长（WB pop 序列）
+      if(m==="area") return null;                        // 面积基本不变，无增长意义
+      // EXT 扩展指标：trade/health/edu/life/gdpcap 较 base 年变化
+      const d=window.EXT&&window.EXT[iso2]&&window.EXT[iso2][m];
+      if(!d) return null;
+      const ks=Object.keys(d).map(Number).sort((a,b)=>a-b);
+      const near=yr=>{ if(d[yr]!=null)return yr; const b=ks.filter(y=>y<=yr&&d[y]!=null).pop(); const a=ks.filter(y=>y>yr&&d[y]!=null)[0]; return b!=null?b:(a!=null?a:null); };
+      const yb=near(base), ys=near(dataYear);
+      if(yb==null||ys==null) return null;
+      const vb=d[yb], vs=d[ys];
+      if(vb==null) return null;
+      if(m==="life") return vs - vb;   // 预期寿命：绝对变化（岁）
+      if(vb===0) return null;
+      return vs/vb - 1;   // 相对增长率（trade/health/edu/gdpcap）
     },
     gdpSeries(){ const tr=countryTrend(iso2); return tr?{name:o.cn,years:tr.years,values:tr.values}:null; }
   };
@@ -545,15 +564,21 @@ function showCountry(c){
   const iso2=c[2];
   const y=cYear(iso2);
   const g=cMetric(iso2,"gdp"), p=cMetric(iso2,"pop"), a=cMetric(iso2,"area");
+  const reg=regCountry(iso2);
   const gKd=cGrowth(iso2,2000,"gdpKd"), gPp=cGrowth(iso2,2000,"gdpPpKd");
-  const grRow=(label,val)=>[label, fmtGrowth(val), false, "growth "+(val==null?"muted":(val>=0?"pos":"neg"))];
-  showMetrics(c[0], c[1] + " · " + y, [
-    ["GDP",fmtGDP(g),false],
-    ["人口",fmtPop(p),false],
-    ["面积",fmtArea(a),true],
-    grRow("较2000 实际增长(不变价)", gKd),
-    grRow("较2000 实际增长(PPP不变价)", gPp)
-  ], "wb", y);
+  const grRow=(label,val,fmt)=>[label, fmt(val), false, "growth "+(val==null?"muted":(val>=0?"pos":"neg"))];
+  const rows=[["GDP",fmtGDP(g),false],["人口",fmtPop(p),false],["面积",fmtArea(a),true]];
+  if(metric!=="gdp"){
+    // 当前维度值 + 增长跟随（L7）
+    const mv=regGet(reg,metric,y);
+    const mg=reg.growth(metric,2000);
+    rows.unshift([metricLabel(metric), metricFmt(metric,mv), false]);
+    rows.push(grRow("较2000 "+(metric==="life"?"变化":"增长"), mg, v=>fmtGrowthFor(metric,v)));
+  } else {
+    rows.push(grRow("较2000 实际增长(不变价)", gKd, fmtGrowth));
+    rows.push(grRow("较2000 实际增长(PPP不变价)", gPp, fmtGrowth));
+  }
+  showMetrics(c[0], c[1] + " · " + y, rows, "wb", y);
   const tr=countryTrend(iso2);
   if(tr) renderTrend([{name:c[0], years:tr.years, values:tr.values}], c[0]+" · GDP 趋势", fmtGDP);
   else document.getElementById("trend").innerHTML="";
@@ -668,8 +693,10 @@ function renderWorld2D(){
   chart.setOption({
     backgroundColor:"#05060a",
     tooltip:{trigger:"item", formatter:p=>{ const c=p.data&&p.data.cn, reg=p.data&&p.data.reg; if(!c)return p.name;
-      const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=reg.growth("gdp",2000);
-      return `<b>${c[0]}</b> ${c[1]} · ${dataYear}<br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>较2000实际增长 <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowth(gr)}</b>`;}},
+      const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=reg.growth(metric,2000);
+      const grFmt = metric==="gdp" ? ("较2000实际增长 <b style=\"color:"+((gr||0)>=0?'#00F0FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
+        : (`较2000${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
+      return `<b>${c[0]}</b> ${c[1]} · ${dataYear}<br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>${grFmt}`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · "+dataYear,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>F(metric,v)}:{show:false},
     series:[{type:"map",map:"world",roam:true,data,
@@ -892,7 +919,7 @@ function renderRank(){
     growthTag="名义(现价)";   // 州级名义增长
     items=Object.keys(US_STATES_GDP).map(k=>{
       const r=regUSState(k), g=growthOf(r,2000);
-      return [k,k,regGet(r,metric,dataYear),"usstate", g==null?null:fmtGrowth(g)];
+      return [k,k,regGet(r,metric,dataYear),"usstate", g==null?null:fmtGrowthFor(metric,g)];
     })
       .sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else if(currentLevel==="province"){
@@ -903,13 +930,13 @@ function renderRank(){
     growthTag="名义";   // 省级名义增长
     items=Object.keys(CN).map(k=>{
       const r=regProv(k), v=regGet(r,metric,dataYear), g=growthOf(r,2000);
-      return [k+"省",k,v,"prov", g==null?null:fmtGrowth(g)];})
+      return [k+"省",k,v,"prov", g==null?null:fmtGrowthFor(metric,g)];})
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else if(currentLevel==="world"){
-    growthTag="实际";   // 国家实际增长（不变价）
+    growthTag=metric==="gdp"?"实际(不变价)":"较2000";   // 国家：gdp 实际增长，其余维度跟随
     items=COUNTRIES.map(c=>{
       const r=regCountry(c[2]); const g=growthOf(r,2000);
-      return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country", g==null?null:fmtGrowth(g)];})
+      return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country", g==null?null:fmtGrowthFor(metric,g)];})
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]).slice(0,10);
   } else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
