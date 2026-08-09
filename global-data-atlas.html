@@ -234,6 +234,7 @@
 <script src="vendor/us_states_bea.js"></script>
 <script src="vendor/cn/city_metrics.js"></script>
 <script src="vendor/cn/city_index.js"></script>
+<script src="vendor/cn/city_ts.js"></script>
 <script src="vendor/countries_wb.js"></script>
 <script src="vendor/ext_indicators.js"></script>
 <script src="vendor/fxrate.js"></script>
@@ -659,14 +660,38 @@ function regUSState(nm){
     gdpSeries(){ const tr=usTrend(nm); return tr?{name:nm,years:tr.years,values:tr.values}:null; }
   };
 }
-function regCity(cm){
+function regCity(cm, adcode){
   if(!cm) return null;
+  /* 多年序列（Phase E）：CITY_TS[adcode] = {年份: 亿元} */
+  const ts = adcode && window.CITY_TS && window.CITY_TS[String(adcode)];
+  const ylist = ts ? Object.keys(ts).map(Number).sort((a,b)=>a-b) : [];
   return {
     name:cm.name||"", cn:cm.name||"",
-    years:()=>[],   // 城市无多年序列
+    years:()=>ylist.slice(),   // 无序列城市返回 []
     ext(){ return null; },   // 城市无 World Bank 扩展指标
-    get(m){ return m==="gdp"?cm.gdp:m==="pop"?cm.pop:(m==="area"?cm.area:null); },
-    growth(){ return null; }, gdpSeries(){ return null; }
+    get(m, year){
+      if(m==="gdp"){
+        if(ts){
+          if(!year || year==="2023") return cm.gdp;          // 默认/2023 → 单年值（已折算元）
+          const y=+year;
+          if(ts[y]!=null) return ts[y]*1e8;                  // 序列年 → 亿元×1e8=元
+          const near = ylist.length? ylist.reduce((a,b)=>Math.abs(b-y)<Math.abs(a-y)?b:a) : null;
+          return near!=null && ts[near]!=null ? ts[near]*1e8 : cm.gdp;
+        }
+        return cm.gdp;
+      }
+      return m==="pop"?cm.pop:(m==="area"?cm.area:null);
+    },
+    growth(m, base){
+      if(m!=="gdp" || !ts || ylist.length<2) return null;
+      const b=base==null?ylist[0]:+base;
+      const lo=ylist[0], hi=ylist[ylist.length-1];
+      const bv=ts[b]!=null?ts[b]:(b<lo?ts[lo]:ts[hi]);
+      if(bv==null) return null;
+      return (ts[hi]-bv)/bv;
+    },
+    gdpSeries(){ if(!ts) return null;
+      return {years:ylist, values:ylist.map(y=>ts[y]*1e8)}; }
   };
 }
 /* 日本都道府县（F3）：单年数据（GDP 人民币元/人口/面积），无多年序列 */
@@ -1058,7 +1083,8 @@ async function loadProvince(short, adcode){
     const data = gj.features.map(f=>{
       const ac=f.properties.adcode, pa=f.properties.parent && f.properties.parent.adcode;
       const cm=getCityMetric(ac, pa);
-      const v=cityMetricVal(cm);
+      const r=cm?regCity(cm, ac):null;
+      const v=r?regGet(r, metric, dataYear):0;   // 序列城市跟随年份，单年城市返回约2023（Phase E）
       currentProvData.push({name:f.properties.name, adcode:ac, parentAdcode:pa, cm});
       return {name:f.properties.name, value:v, adcode:ac, parentAdcode:pa, cm};
     });
@@ -1071,8 +1097,10 @@ async function loadProvince(short, adcode){
         const d=p.data; if(!d) return p.name;
         const cm=d.cm;
         if(!cm) return `<b>${d.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
-        return `<b>${d.name}</b><br/>GDP ${fmtGDP(cm.gdp)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;}},
-      visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 约2023",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+        const r=cm?regCity(cm, d.adcode):null;
+        const gv=r?r.get("gdp", dataYear):cm.gdp;
+        return `<b>${d.name}</b><br/>GDP${r&&r.years().length?" ("+dataYear+")":""} ${fmtGDP(gv)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;}},
+      visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · "+dataYear,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
         textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>fmtBy(v)}:{show:false},
       series:[{type:"map",map:mapName,roam:true,scaleLimit:{min:0.7,max:8},data,
         label:{show:false},itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
@@ -1081,7 +1109,7 @@ async function loadProvince(short, adcode){
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"},{label:short, level:"province"}]);
     const m=CN[short];
     showGeneric(short+" · 地级市", m?`GDP ${fmtGDP(cnGdpRMB(short,dataYear)??0)} · 人口 ${fmtPop(m.pop*1e4)} · 面积 ${fmtArea(m.area)}`:"",
-      `共 ${data.length} 个地级行政区。颜色按市级「${metricLabel()}」着色；已覆盖 ${data.filter(d=>d.cm).length} 个城市公开指标，其余显示“暂无细分指标”。城市为单年公开整理值（约2023），年份切换不生效。`);
+      `共 ${data.length} 个地级行政区。颜色按市级「${metricLabel()}」着色；已覆盖 ${data.filter(d=>d.cm).length} 个城市公开指标，其余显示“暂无细分指标”。46 个主要城市含多年 GDP 序列（维基/统计局口径），切换年份或单击查看趋势；其余城市为单年值（约2023）。`);
     document.getElementById("trend").innerHTML="";  // 市级无多年序列，不显示趋势
   }catch(e){ showGeneric("加载失败",String(e),"请检查网络。"); }
   renderRank();
@@ -1089,18 +1117,32 @@ async function loadProvince(short, adcode){
 }
 function showCityPanel(cityName, adcode, parentAdcode){
   const cm=getCityMetric(adcode, parentAdcode); if(!cm) return;
+  const r=regCity(cm, adcode);
+  const yrs=r.years();
+  const hasTS = yrs.length >= 2;
+  const gv = r.get("gdp", dataYear);   // 序列城市跟随年份；单年城市返回约2023值
+  const gd = hasTS ? (r.get("gdp", dataYear)/cm.gdp) : null;   // 相对2023的变化
+  const growth = hasTS ? r.growth("gdp", 2009) : null;
   renderDashboard({
-    name:cityName, en:"中国地级市", level:"地级市",
-    tags:["来源：公开整理近似值","约2023","单年快照"],
+    name:cityName, en:hasTS?"中国地级市 · 多年序列":"中国地级市", level:"地级市",
+    tags:[hasTS?"来源：维基（国家统计局口径）":"来源：公开整理近似值", hasTS?`GDP ${dataYear} · 序列 ${yrs[0]}–${yrs[yrs.length-1]}`:"约2023", hasTS?"多年序列":"单年快照"],
     stats:[
-      {label:"GDP", value:fmtGDP(cm.gdp)},
-      {label:"人口", value:fmtPop(cm.pop)},
+      {label:"GDP"+(hasTS?" ("+dataYear+")":""), value:fmtGDP(gv), delta:hasTS&&gd!=null?{txt:(gd>=0?"+":"")+(gd*100).toFixed(1)+"% vs 2023",dir:gd>=0?"up":"down"}:null},
+      {label:"人口 (2023)", value:fmtPop(cm.pop)},
       {label:"面积", value:cm.area?fmtArea(cm.area):"暂无"}
     ],
-    insight:[],
+    insight:hasTS&&growth!=null?[{label:"较2009年 增长（可得年）", value:fmtGrowth(growth), cls:growth>=0?"pos":"neg"}]:[],
+    trendHTML:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('city','${cityName}','${adcode}',${parentAdcode||0})">＋ 加入对比</button>`
   });
-  document.getElementById("trend").innerHTML="";  // 城市无多年序列
+  /* 多年序列城市 → GDP 趋势图 */
+  if(hasTS){
+    const ser=r.gdpSeries();
+    document.getElementById("trend").innerHTML=`<div class="rank-title">${cityName} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`;
+    renderTrendChart([{name:cityName, years:ser.years, values:ser.values}], fmtGDP);
+  } else {
+    document.getElementById("trend").innerHTML="";  // 城市无多年序列
+  }
 }
 
 /* ============== 美国州级下钻 ============== */
@@ -1252,7 +1294,7 @@ function renderRank(){
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="province"){
     items=currentProvData.filter(d=>d.cm)
-      .map(d=>{ const cm=d.cm; const r=regCity(cm); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
+      .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
       .sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="china"){
     items=Object.keys(CN).map(k=>{
