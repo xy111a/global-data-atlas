@@ -15,3 +15,4 @@ dist/vendor/cn/*.json
 # 数据修复备份
 *.bak
 ext_blank_regions.json
+.DS_Store
