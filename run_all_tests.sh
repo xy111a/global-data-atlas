@@ -1,0 +1,45 @@
+#!/bin/bash
+# 全量测试门禁（L5）：语法 → 数据自洽 → 回归截图 → 对比 → EXT
+# 用法: ./run_all_tests.sh   （任一步失败即退出非 0）
+set -e
+cd "$(dirname "$0")"
+PASS=0; FAIL=0
+step() { echo ""; echo "════ $1 ════"; }
+
+step "L1 语法检查（inline scripts）"
+python3 - <<'EOF'
+import re, subprocess, tempfile, os
+html = open('global-data-atlas.html', encoding='utf-8').read()
+blocks = re.findall(r'<script>(.*?)</script>', html, re.S)
+ok = True
+for i, b in enumerate(blocks):
+    if not b.strip(): continue
+    with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f:
+        f.write(b); path = f.name
+    r = subprocess.run(['node', '--check', path], capture_output=True, text=True)
+    if r.returncode != 0:
+        ok = False; print(f'  FAIL {i}: {r.stderr[:200]}')
+    os.unlink(path)
+print('  SYNTAX:', 'OK' if ok else 'FAIL')
+exit(0 if ok else 1)
+EOF
+echo "  ✓ L1 通过"; PASS=$((PASS+1))
+
+step "L2 数据自洽校验"
+python3 data_verify.py > /tmp/verify.log 2>&1 && tail -1 /tmp/verify.log || { echo "  ✗ 数据自洽失败:"; grep ✗ /tmp/verify.log | head -5; exit 1; }
+echo "  ✓ L2 通过"; PASS=$((PASS+1))
+
+step "L3a 回归截图（offline_test）"
+python3 offline_test.py > /tmp/offline.log 2>&1 && grep -c "OK" /tmp/offline.log || { echo "  ✗ 回归失败:"; grep -E "FAIL|Error" /tmp/offline.log | head -5; exit 1; }
+echo "  ✓ L3a 通过"; PASS=$((PASS+1))
+
+step "L3b 对比模式（cmp_test）"
+python3 cmp_test.py > /tmp/cmp.log 2>&1 && tail -2 /tmp/cmp.log || { echo "  ✗ 对比失败:"; tail -5 /tmp/cmp.log; exit 1; }
+echo "  ✓ L3b 通过"; PASS=$((PASS+1))
+
+step "L3c 扩展指标（ext_test）"
+python3 ext_test.py > /tmp/ext.log 2>&1 && tail -2 /tmp/ext.log || { echo "  ✗ EXT 失败:"; tail -5 /tmp/ext.log; exit 1; }
+echo "  ✓ L3c 通过"; PASS=$((PASS+1))
+
+echo ""
+echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"
