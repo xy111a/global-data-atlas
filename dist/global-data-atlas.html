@@ -90,7 +90,9 @@
   #yearSel:focus{outline:none;border-color:var(--cyan);box-shadow:var(--glow-sm);background:var(--panel-solid);}
   #main{flex:1;position:relative;display:flex;}  /* relative 供 resetView 定位 */
   #chart{flex:1;min-width:0;position:relative;border:1px solid var(--line-soft);border-radius:var(--r-lg);overflow:hidden;
-    box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--shadow-panel);margin:12px;}
+    box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--shadow-panel);margin:12px;outline:none;}   /* outline:none 供 focus 自定义 */
+  #chart:focus{outline:2px solid var(--cyan);outline-offset:2px;box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--glow-md);}   /* P1b: 地图容器聚焦态 */
+  .rank-item:focus-visible{outline:2px solid var(--cyan);outline-offset:1px;background:var(--hover);}   /* P1b: 排行项聚焦态 */
   #panel{position:relative;width:clamp(300px,26vw,380px);border-left:1px solid var(--line);padding:18px;
     background:var(--panel);overflow:auto;
     box-shadow:var(--shadow-panel);}  /* 宽屏可增宽（L6）；面板投影 */
@@ -174,6 +176,9 @@
   #chart{height:50vh; min-height:300px;}
   #metricSeg button{padding:4px 8px; font-size:11px;}
   #search{max-width:120px;}
+  .tb-actions{width:100%;}   /* P2: 操作栏占满一行，内部换行不裁切 */
+  .tb-actions .btn{padding:6px 8px; font-size:12px; flex:0 1 auto; min-width:0;}
+  #yearSel{padding:6px 8px; font-size:12px;}
 }
   #rank{margin-top:16px;border-top:1px dashed var(--line-soft);padding-top:12px;max-height:340px;overflow-y:auto;}   /* 全量排行可滚动（默认顶部） */
   .trend-scroll{max-height:380px;overflow-y:auto;}   /* 洞察增长图全量可滚动 */
@@ -208,7 +213,7 @@
     <div class="seg" id="metricSeg"></div>
   </header>
   <div id="main">
-    <div id="chart"></div>
+    <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
     <button id="resetView" title="地图被拖拽/缩放后，点击恢复初始视图" style="position:absolute;right:20px;top:20px;display:none;z-index:3;background:var(--panel-float);border:1px solid var(--line);color:var(--muted);border-radius:var(--r-md);padding:6px 10px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);">⟲ 恢复视图</button>
     <div id="panel">
       <div id="compareBox" style="display:none;margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;background:rgba(0,240,255,0.05);"></div>
@@ -335,6 +340,10 @@ const METRICS = {
   }
 };
 function fmtPct(v){ return v==null?null:v.toFixed(1)+"%"; }
+/* P2 注入加固：HTML 转义（面包屑/仪表盘/排行等 innerHTML 插值使用） */
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
 function metricLabel(m){ return (METRICS[m]||{}).label || m; }
 function metricFmt(m,v){ if(v==null||isNaN(v)) return "—"; const f=(METRICS[m]||{}).fmt; return f?f(v):v; }
 /* 区域统一接口：把各类数据源包装成 reg {name, get, years, growth} */
@@ -731,8 +740,8 @@ function setCrumb(h){ document.getElementById("crumb").innerHTML=h; }
 function setCrumbPath(paths){
   setCrumb(paths.map((p,i)=>{
     const isLast = i===paths.length-1;
-    if(isLast) return `<b>${p.label}</b>`;
-    return `<a href="javascript:void(0)" onclick="goLevel('${p.level}')" style="color:var(--muted);text-decoration:none;cursor:pointer;">${p.label}</a>`;
+    if(isLast) return `<b>${esc(p.label)}</b>`;
+    return `<a href="javascript:void(0)" onclick="goLevel('${p.level}')" style="color:var(--muted);text-decoration:none;cursor:pointer;">${esc(p.label)}</a>`;
   }).join(" / "));
   updateBackBtn();   // 层级变化时同步返回按钮文字
   document.getElementById("resetView").style.display="none";   // 切层后视图自动重置，隐藏恢复按钮
@@ -922,15 +931,15 @@ function sourceTag(src){
    insight[i] = {label, value, cls:pos|neg|null}
    所有层级共用同一组件，数据来自统一 reg 接口；缺失自动降级。 */
 function renderDashboard(cfg){
-  document.getElementById("pName").textContent=cfg.name;
+  document.getElementById("pName").textContent=cfg.name;   // textContent 天然防注入
   document.getElementById("pSub").textContent=cfg.en||"";
-  const tags=(cfg.tags||[]).map(t=>`<span class="tag">${t}</span>`).join("");
-  document.getElementById("pHint").innerHTML=`<span class="dash-level">${cfg.level||"区域"}</span> ${tags}`;
+  const tags=(cfg.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  document.getElementById("pHint").innerHTML=`<span class="dash-level">${esc(cfg.level||"区域")}</span> ${tags}`;
   document.getElementById("pMetrics").innerHTML=`<div class="dash-stats">${(cfg.stats||[]).map(s=>
-    `<div class="dash-stat"><div class="k">${s.label}</div><div class="v ${s.cls||''}">${s.value}</div>`+
-    (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${s.delta.txt}</div>`:``)+`</div>`).join("")}</div>`+
+    `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
+    (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div>`+
     ((cfg.insight&&cfg.insight.length)?`<div class="dash-insight">${cfg.insight.map(i=>
-      `<div class="dash-insight-row"><span>${i.label}</span><b class="${i.cls||''}">${i.value}</b></div>`).join("")}</div>`:"")+
+      `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div>`:"")+
     ((cfg.actionsHTML)?`<div class="dash-actions">${cfg.actionsHTML}</div>`:"");
   if(cfg.trendHTML){ document.getElementById("trend").innerHTML=cfg.trendHTML; }
   else document.getElementById("trend").innerHTML="";
@@ -1297,9 +1306,10 @@ function renderRank(){
       .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
       .sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="china"){
+    const MUNI=["上海","北京","天津","重庆"];   // 直辖市不加"省"
     items=Object.keys(CN).map(k=>{
       const r=regProv(k), v=regGet(r,metric,dataYear);
-      return [k+"省",k,v,"prov"];})
+      return [MUNI.includes(k)?k:k+"省",k,v,"prov"];})
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
   } else if(currentLevel==="world"){
     items=COUNTRIES.map(c=>{
@@ -1309,9 +1319,9 @@ function renderRank(){
   } else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
   const fmt=v=> metricFmt(metric,v);
-  box.innerHTML=`<div class="rank-title">${unit} · 排行（全量，可滚动）</div>`+items.map((it,i)=>
-    `<div class="rank-item" data-type="${it[3]}" data-key="${it[1]}">
-       <span class="rk">${i+1}</span><span class="rn">${it[0]}</span><span class="rv">${fmt(it[2])}</span></div>`).join("");
+  box.innerHTML=`<div class="rank-title">${esc(unit)} · 排行（全量，可滚动）</div>`+items.map((it,i)=>
+    `<div class="rank-item" data-type="${it[3]}" data-key="${esc(it[1])}" tabindex="0" role="button" aria-label="${esc(it[0])} ${esc(fmt(it[2]))}">
+       <span class="rk">${i+1}</span><span class="rn">${esc(it[0])}</span><span class="rv">${esc(fmt(it[2]))}</span></div>`).join("");
   box.querySelectorAll(".rank-item").forEach(el=>{
     el.onclick=()=>{
       const t=el.dataset.type, k=el.dataset.key;
@@ -1321,6 +1331,7 @@ function renderRank(){
       else if(t==="usstate"){ if(currentLevel!=="us"){ loadUS(); setTimeout(()=>showUSStatePanel(k),80); } else showUSStatePanel(k); }
       else if(t==="jppref"){ if(currentLevel!=="japan"){ loadJapan(); setTimeout(()=>showJapanPrefPanel(k),80); } else showJapanPrefPanel(k); }
     };
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); el.onclick(); } });   // P1b: 键盘可操作排行
   });
 }
 function doSearch(q){
