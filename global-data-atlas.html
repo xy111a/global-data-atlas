@@ -925,7 +925,7 @@ function renderTrendCompare(entries, title, fmt){
   if(!entries || !entries.length){ box.innerHTML=""; return; }
   const isGrowth = !fmt;                 // 默认按增长率渲染；传 fmt 则按绝对值（如 GDP 对比）
   const sorted=entries.slice().sort((a,b)=>b.val-a.val);   // 全量（dataZoom 默认显示头部）
-  const H=Math.min(480,Math.max(140,sorted.length*20));    // 高度封顶 480，避免全量超高
+  const H=Math.min(360,Math.max(150,Math.min(sorted.length,8)*40));   // 高度按默认显示的 8 条适配，全量靠滑块滚动
   box.innerHTML=`<div class="rank-title">${title||"增长对比"}</div><div class="trend-scroll"><div id="trendChart" style="height:${H}px;width:100%;"></div></div>`;
   const tc=echarts.init(document.getElementById("trendChart"));
   const fmtV = isGrowth ? (v=>fmtGrowth(v/100)) : (v=>fmt(v));
@@ -936,7 +936,7 @@ function renderTrendCompare(entries, title, fmt){
     grid:{left:10,right:60,top:8,bottom:8,containLabel:true},
     xAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:11,formatter:isGrowth?v=>(v>0?"+":"")+v+"%":v=>fmt(v)}},
     yAxis:{type:"category",data:sorted.map(e=>e.name).reverse(),axisLabel:{color:"#7f93a8",fontSize:11}},
-    dataZoom:[{type:"slider", yAxisIndex:0, startValue:0, endValue:Math.min(9,sorted.length-1),   // 默认显示头部前 10 名，滑块拖拽看全量
+    dataZoom:[{type:"slider", yAxisIndex:0, startValue:0, endValue:Math.min(7,sorted.length-1),   // 默认显示头部前 8 名，滑块拖拽看全量
       right:0,width:16,top:8,bottom:8,borderColor:"#1d3a4a",fillerColor:"rgba(0,240,255,.08)",
       handleStyle:{color:"#00F0FF",borderColor:"#00F0FF"},textStyle:{color:"#7f93a8",fontSize:10}}],
     series:[{type:"bar",data:sorted.map(e=>({value:isGrowth?+(e.val*100).toFixed(1):e.val,itemStyle:{color:e.val>=0?"#00F0FF":"var(--gold)"}})).reverse(),
