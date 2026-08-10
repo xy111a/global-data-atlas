@@ -1003,7 +1003,7 @@ function renderWorld2D(){
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"}]);
-  togglePanel(true);   /* 世界层自动折叠：地图优先，悬浮按钮可随时展开 */
+  ensurePanelOpen();   /* 世界层保留面板：显示各国排行 + 增长洞察（不折叠） */
   showGeneric("世界地图","单击国家查看数据；双击中国/美国/日本下钻",
     "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
   renderRank();
