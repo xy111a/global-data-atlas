@@ -648,7 +648,22 @@ function regCountry(iso2){
       if(vb===0) return null;
       return vs/vb - 1;   // 相对增长率（trade/health/edu/gdpcap）
     },
-    gdpSeries(){ const tr=countryTrend(iso2); return tr?{name:o.cn,years:tr.years,values:tr.values}:null; }
+    gdpSeries(){ const tr=countryTrend(iso2); return tr?{name:o.cn,years:tr.years,values:tr.values}:null; },
+    /* 趋势随维度：gdp→WB序列(人民币元)；pop/area→WB 多年；EXT 指标→按年（≥2 点才有趋势） */
+    series(m){
+      if(m==="gdp"){ const tr=countryTrend(iso2); return tr?{name:o.cn,years:tr.years,values:tr.values}:null; }
+      if(m==="pop"||m==="area"){
+        const ys=(o.years&&Object.keys(o.years))||[];
+        const pairs=ys.map(Number).sort((a,b)=>a-b).map(y=>[y,o.years[y]&&o.years[y][m]]).filter(p=>p[1]!=null);
+        return pairs.length>=2?{name:o.cn,years:pairs.map(p=>p[0]),values:pairs.map(p=>p[1])}:null;
+      }
+      const ed=window.EXT&&window.EXT[iso2]&&window.EXT[iso2][m];
+      if(ed&&typeof ed==="object"){
+        const yrs=Object.keys(ed).map(Number).sort((a,b)=>a-b);
+        if(yrs.length>=2) return {name:o.cn,years:yrs,values:yrs.map(y=>ed[y])};
+      }
+      return null;
+    }
   };
 }
 function regProv(short){
@@ -664,7 +679,8 @@ function regProv(short){
       return null;
     },
     growth(m,base){ return m==="gdp"?cnNominalGrowth(short,base):null; },
-    gdpSeries(){ const tr=provTrend(short); return tr?{name:short,years:tr.years,values:tr.values}:null; }
+    gdpSeries(){ const tr=provTrend(short); return tr?{name:short,years:tr.years,values:tr.values}:null; },
+    series(m){ return m==="gdp"?this.gdpSeries():null; }   // 省 pop 单年/area 单值，无趋势
   };
 }
 function regUSState(nm){
@@ -680,7 +696,8 @@ function regUSState(nm){
       return null;
     },
     growth(m,base){ return m==="gdp"?usNominalGrowth(nm,base):null; },
-    gdpSeries(){ const tr=usTrend(nm); return tr?{name:nm,years:tr.years,values:tr.values}:null; }
+    gdpSeries(){ const tr=usTrend(nm); return tr?{name:nm,years:tr.years,values:tr.values}:null; },
+    series(m){ return m==="gdp"?this.gdpSeries():null; }   // 州仅 GDP 多年序列（人口 Census 单年）
   };
 }
 function regCity(cm, adcode){
@@ -714,7 +731,8 @@ function regCity(cm, adcode){
       return (ts[hi]-bv)/bv;
     },
     gdpSeries(){ if(!ts) return null;
-      return {years:ylist, values:ylist.map(y=>ts[y]*1e8)}; }
+      return {years:ylist, values:ylist.map(y=>ts[y]*1e8)}; },
+    series(m){ return m==="gdp"?this.gdpSeries():null; }   // 城市仅 GDP 序列（city_ts 46 城）
   };
 }
 /* 日本都道府县（F3）：单年数据（GDP 人民币元/人口/面积），无多年序列 */
@@ -833,15 +851,15 @@ function showCountry(c){
     stats.unshift({label, value:metricFmt(metric,mv), delta:mg!=null?delta(mg,v=>fmtGrowthFor(metric,v)):null});
     insight.push({label:"较2000年 "+(metric==="life"?"变化":"增长"), value:mg!=null?fmtGrowthFor(metric,mg):"—", cls:mg!=null?(mg>=0?"pos":"neg"):""});
   }
-  const tr=countryTrend(iso2);
+  const tr=reg.series(metric);
   renderDashboard({
     name:c[0], en:c[1]+" · "+y, level:"国家",
     tags:[currencyTag(metric).replace(/<[^>]+>/g,""), sourceTag("wb").replace(/<[^>]+>/g,""), `年份 ${y}`].filter(Boolean),
     stats, insight,
-    trendHTML: tr?`<div class="rank-title">${c[0]} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`:null,
+    trendHTML: tr?`<div class="rank-title">${c[0]} · ${metricLabel(metric)} 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('country','${c[0]}','${iso2}')">＋ 加入对比</button>`
   });
-  if(tr){ renderTrendChart([{name:c[0], years:tr.years, values:tr.values}], fmtGDP); }
+  if(tr){ renderTrendChart([{name:c[0], years:tr.years, values:tr.values}], METRICS[metric].fmt); }
 }
 function showGeneric(name,sub,hint){
   document.getElementById("pName").textContent=name;
