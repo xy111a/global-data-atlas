@@ -150,7 +150,7 @@
   .dash-insight-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);}
   .dash-insight-row b{color:var(--text);font-weight:500;font-variant-numeric:var(--num);}
   .dash-insight-row b.pos{color:#00F0FF;} .dash-insight-row b.neg{color:var(--gold);}
-  .dash-actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+  .dash-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}   /* 移到标题下方（pHint 后），按钮更显眼 */
 
 /* ===== 响应式断点（排版审计 P1/P2/P3） ===== */
 @media(max-width:1200px){
@@ -221,7 +221,7 @@
           <option value="2024">2024</option>
           <option value="2023">2023</option>
         </select>
-        <button class="btn" id="cmpBtn" title="点击开启/关闭对比模式，开启后点击地图区域加入对比列表">🔍 对比</button>
+        <button class="btn" id="cmpBtn" title="显示/隐藏对比列表；在区域面板点『＋ 加入对比』收集条目">🔍 对比</button>
         <button class="btn" id="backBtn">← 返回世界</button>
       </div>
     </div>
@@ -236,6 +236,7 @@
       <h2 id="pName">世界地图</h2>
       <div class="sub" id="pSub">加载中…</div>
       <div class="hint" id="pHint"></div>
+      <div id="pActions"></div>
       <div id="pMetrics"></div>
       <div id="trend" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:10px;"></div>
       <div id="rank"></div>
@@ -983,8 +984,8 @@ function renderDashboard(cfg){
     `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
     (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div>`+
     ((cfg.insight&&cfg.insight.length)?`<div class="dash-insight">${cfg.insight.map(i=>
-      `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div>`:"")+
-    ((cfg.actionsHTML)?`<div class="dash-actions">${cfg.actionsHTML}</div>`:"");
+      `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div>`:"");
+  document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
   if(cfg.trendHTML){ document.getElementById("trend").innerHTML=cfg.trendHTML; }
   else document.getElementById("trend").innerHTML="";
 }
@@ -1409,7 +1410,7 @@ function doSearch(q){
 }
 
 /* ============== 对比模式（Phase D 补齐） ============== */
-let cmpMode=false, cmpList=[];   // cmpList: [{t:"country"|"prov"|"usstate", name, iso/name, en}]
+let cmpMode=false, cmpList=[];   // cmpMode=对比列表是否展示（不改变单击行为）；cmpList: [{t,name,k,pa}]
 function cmpGetData(it){
   const y=dataYear;
   let base={};
@@ -1432,13 +1433,19 @@ function cmpGetData(it){
 function cmpToggle(it){
   const i=cmpList.findIndex(x=>x.t===it.t&&x.k===it.k);
   if(i>=0) cmpList.splice(i,1); else cmpList.push(it);
+  if(cmpList.length) cmpMode=true; else cmpMode=false;   // 有对比项自动展示列表
+  updateCompare();
+}
+/* 统一对比刷新：展示列表 + ≥2 项自动渲染对比图（跟随维度）；<2 项清空对比图 */
+function updateCompare(){
   cmpRender();
+  if(cmpList.length>=2) renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v));
+  else document.getElementById("trend").innerHTML="";
 }
 function cmpRender(){
   const box=document.getElementById("compareBox"); if(!box) return;
-  box.style.display = cmpMode ? "block" : "none";
-  if(!cmpMode) return;
-  if(!cmpList.length){ box.innerHTML=`<div class="rank-title">对比模式 · 点击地图区域加入</div>`; return; }
+  box.style.display = (cmpList.length && cmpMode) ? "block" : "none";   // 有对比项才显示，cmpMode 控制显隐
+  if(!cmpList.length || !cmpMode) return;
   const rows=cmpList.map(it=>{
     const d=cmpGetData(it);
     const v=d&&d.v!=null?metricFmt(metric,d.v):"—";      // 当前维度值（跟随切换）
@@ -1457,7 +1464,7 @@ function cmpRender(){
     el.onclick=()=>{ const [t,k]=el.dataset.k.split(":"); cmpToggle({t,k,name:""}); };
   });
 }
-function cmpClear(){ cmpList=[]; cmpRender(); }
+function cmpClear(){ cmpList=[]; cmpMode=false; updateCompare(); document.getElementById("trend").innerHTML=""; }
 function cmpHandleClick(type, name, key, pa){
   cmpToggle({t:type, name, k:key, pa});
   return true;
@@ -1474,25 +1481,9 @@ function onChartDblClick(p){
   if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
   drillDownFor(p);
 }
-/* 单击：显示该区域内容/加入对比（不下钻） */
+/* 单击：显示该区域内容（不下钻） */
 function showContentFor(p){
   ensurePanelOpen();   /* 单击区域：自动展开面板看数据 */
-  if(cmpMode){
-    if(currentLevel==="world"){
-      const c=p.data&&p.data.cn; if(!c) return;
-      cmpHandleClick("country", c[0], c[2]);   // 所有国家（含 CN/US/JP）都可加入对比
-    } else if(currentLevel==="china"){
-      const nm=normProv(p.name); if(PROV_ADCODE[nm]) cmpHandleClick("prov", nm, nm);
-    } else if(currentLevel==="us"){
-      cmpHandleClick("usstate", p.name, p.name);
-    } else if(currentLevel==="japan"){
-      cmpHandleClick("jppref", p.name, p.name);
-    } else if(currentLevel==="province"){
-      const d=p.data; if(d&&d.cm) cmpHandleClick("city", d.name, d.adcode, d.parentAdcode);
-    }
-    cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v));
-    return;
-  }
   if(currentLevel==="world"){
     const c=p.data&&p.data.cn; if(!c) return;
     showCountry(c);   // 所有国家（含 CN/US/JP）单击都显示面板
@@ -1564,7 +1555,7 @@ window.addEventListener("load", ()=>{
     else if(currentLevel==="us") loadUS();
     else if(currentLevel==="japan") loadJapan();
     renderRank();
-    if(cmpMode){ cmpRender(); renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v)); }   // 维度切换时对比跟随刷新
+    updateCompare();   // 维度切换：对比值/图跟随刷新
   });
   /* 年份选择器 (C) — 多年度由 World Bank(2000-2024) 驱动 */
   (function(){
@@ -1607,8 +1598,7 @@ window.addEventListener("load", ()=>{
   document.getElementById("cmpBtn").addEventListener("click", ()=>{
     cmpMode=!cmpMode;
     document.getElementById("cmpBtn").classList.toggle("active", cmpMode);
-    if(!cmpMode){ cmpClear(); document.getElementById("trend").innerHTML=""; renderRank(); }
-    else { cmpRender(); if(cmpList.length) renderTrendCompare(cmpList.map(it=>{const d=cmpGetData(it); return {name:it.name, val:d&&d.v!=null?d.v:0};}), "对比 · "+metricLabel(metric), v=>metricFmt(metric,v)); }   // L8: 开启对比立即渲染已有对比项
+    cmpRender();   // 仅切换对比列表显隐，不改变地图单击行为
   });
   window.addEventListener("resize", ()=>chart && chart.resize());
 });
