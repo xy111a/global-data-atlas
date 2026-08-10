@@ -935,11 +935,11 @@ function renderTrendCompare(entries, title, fmt){
       formatter:ps=>ps.map(p=>`${p.name}: <b style="color:${p.color}">${fmtV(p.value)}</b>`).join("<br/>")},
     grid:{left:10,right:60,top:8,bottom:8,containLabel:true},
     xAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:11,formatter:isGrowth?v=>(v>0?"+":"")+v+"%":v=>fmt(v)}},
-    yAxis:{type:"category",data:sorted.map(e=>e.name).reverse(),axisLabel:{color:"#7f93a8",fontSize:11}},
+    yAxis:{type:"category",inverse:true,data:sorted.map(e=>e.name),axisLabel:{color:"#7f93a8",fontSize:11}},   // inverse:第一名在顶部，与 dataZoom 索引一致
     dataZoom:[{type:"slider", yAxisIndex:0, startValue:0, endValue:Math.min(7,sorted.length-1),   // 默认显示头部前 8 名，滑块拖拽看全量
       right:0,width:16,top:8,bottom:8,borderColor:"#1d3a4a",fillerColor:"rgba(0,240,255,.08)",
       handleStyle:{color:"#00F0FF",borderColor:"#00F0FF"},textStyle:{color:"#7f93a8",fontSize:10}}],
-    series:[{type:"bar",data:sorted.map(e=>({value:isGrowth?+(e.val*100).toFixed(1):e.val,itemStyle:{color:e.val>=0?"#00F0FF":"var(--gold)"}})).reverse(),
+    series:[{type:"bar",data:sorted.map(e=>({value:isGrowth?+(e.val*100).toFixed(1):e.val,itemStyle:{color:e.val>=0?"#00F0FF":"var(--gold)"}})),
       label:{show:true,position:"right",color:"#9fb3c8",fontSize:11,formatter:p=>fmtV(p.value)} }]
   });
   window.__trendChart=tc;
