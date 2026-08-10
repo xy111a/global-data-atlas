@@ -88,7 +88,7 @@
     transition:border-color var(--t-fast),box-shadow var(--t-med),background var(--t-fast);}
   #yearSel:hover{border-color:var(--line-bright);}
   #yearSel:focus{outline:none;border-color:var(--cyan);box-shadow:var(--glow-sm);background:var(--panel-solid);}
-  #main{flex:1;position:relative;display:flex;}  /* relative 供 resetView 定位 */
+  #main{flex:1;position:relative;display:flex;}  
   #chart{flex:1;min-width:0;position:relative;border:1px solid var(--line-soft);border-radius:var(--r-lg);overflow:hidden;
     box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--shadow-panel);margin:12px;outline:none;}   /* outline:none 供 focus 自定义 */
   #chart:focus{outline:2px solid var(--cyan);outline-offset:2px;box-shadow:inset 0 0 70px rgba(0,0,0,.5), var(--glow-md);}   /* P1b: 地图容器聚焦态 */
@@ -214,7 +214,7 @@
   </header>
   <div id="main">
     <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
-    <button id="resetView" title="地图被拖拽/缩放后，点击恢复初始视图" style="position:absolute;right:20px;top:20px;display:none;z-index:3;background:var(--panel-float);border:1px solid var(--line);color:var(--muted);border-radius:var(--r-md);padding:6px 10px;font-size:12px;cursor:pointer;backdrop-filter:blur(8px);">⟲ 恢复视图</button>
+    <!-- I5: 缩放已锁死（roam:false），无需恢复视图按钮 -->
     <div id="panel">
       <div id="compareBox" style="display:none;margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;background:rgba(0,240,255,0.05);"></div>
       <h2 id="pName">世界地图</h2>
@@ -742,7 +742,7 @@ function setCrumbPath(paths){
     return `<a href="javascript:void(0)" onclick="goLevel('${p.level}')" style="color:var(--muted);text-decoration:none;cursor:pointer;">${esc(p.label)}</a>`;
   }).join(" / "));
   updateBackBtn();   // 层级变化时同步返回按钮文字
-  document.getElementById("resetView").style.display="none";   // 切层后视图自动重置，隐藏恢复按钮
+  // 切层后视图自动重置（roam:false 无缩放，无需处理）
   updateMetricButtons();   // 层级变化时刷新指标按钮可用性（scope=world 仅世界层）
 }
 /* 按当前层级刷新指标按钮可用性：scope=world 的指标仅在 world 层可用，其余层禁用弱化 */
@@ -972,7 +972,7 @@ function renderWorld2D(){
       return `<b>${c[0]}</b> ${c[1]} · ${cYear(c[2])}<br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>${grFmt}`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>F(metric,v)}:{show:false},
-    series:[{type:"map",map:"world",roam:true,scaleLimit:{min:0.7,max:8},data,
+    series:[{type:"map",map:"world",roam:false,data,
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"}]);
@@ -1008,7 +1008,7 @@ async function loadChina(){
         return `<b>${d.name}</b> · ${dataYear}<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
       visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · "+dataYear,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
         textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-      series:[{type:"map",map:"china",roam:true,scaleLimit:{min:0.7,max:8},data:provData,
+      series:[{type:"map",map:"china",roam:false,data:provData,
         label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"}]);
@@ -1070,7 +1070,7 @@ async function loadProvince(short, adcode){
       currentProvData=data;
       chart.clear(); chart.setOption({backgroundColor:"#05060a",
         tooltip:{trigger:"item", formatter:p=>`<b>${p.name}</b><br/><span style="color:#7f93a8">暂无 GDP 数据（港澳未纳入维基省级序列）</span>`},
-        series:[{type:"map",map:mapName,roam:true,scaleLimit:{min:0.7,max:8},data,
+        series:[{type:"map",map:mapName,roam:false,data,
           label:{show:true,color:"#9fb3c8",fontSize:10},
           itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
           emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]});
@@ -1109,7 +1109,7 @@ async function loadProvince(short, adcode){
         return `<b>${d.name}</b><br/>GDP${r&&r.years().length?" ("+dataYear+")":""} ${fmtGDP(gv)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;}},
       visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · "+dataYear,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
         textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>fmtBy(v)}:{show:false},
-      series:[{type:"map",map:mapName,roam:true,scaleLimit:{min:0.7,max:8},data,
+      series:[{type:"map",map:mapName,roam:false,data,
         label:{show:false},itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
         emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
     });
@@ -1175,7 +1175,7 @@ async function loadUS(){
         +`<br/><span style="color:#7f93a8">美元现价约 ${(ut!=null?ut:(US_STATES_GDP[p.name].gdp/RATE23/1e12)).toFixed(2)} 万亿</span>`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"us",roam:true,scaleLimit:{min:0.7,max:8},data,label:{show:false},
+    series:[{type:"map",map:"us",roam:false,data,label:{show:false},
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
@@ -1209,7 +1209,7 @@ async function loadJapan(){
       return `<b>${p.name}</b> · 2021<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 2021",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"japan",roam:true,scaleLimit:{min:0.7,max:8},data,label:{show:false},
+    series:[{type:"map",map:"japan",roam:false,data,label:{show:false},
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"日本", level:"japan"}]);
@@ -1483,12 +1483,6 @@ window.addEventListener("load", ()=>{
   chart = echarts.init(document.getElementById("chart"));
   chart.on("click", onChartClick);
   chart.on("dblclick", onChartDblClick);   // 双击下钻（单击已防抖 260ms）
-  /* I5: 缩放/平移后显示重置按钮 */
-  chart.on("georoam", ()=>{ document.getElementById("resetView").style.display="block"; });
-  document.getElementById("resetView").addEventListener("click", ()=>{
-    chart.dispatchAction({type:"restore"});
-    document.getElementById("resetView").style.display="none";
-  });
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){
