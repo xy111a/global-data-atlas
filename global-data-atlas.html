@@ -1495,7 +1495,7 @@ function drillDownFor(p){
     if(c[2]==="CN") loadChina();
     else if(c[2]==="US") loadUS();
     else if(c[2]==="JP") loadJapan();
-    else showContentFor(p);   // 无下钻目标：退化为显示面板
+    else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（仅 中国/美国/日本 可双击下钻）。单击查看国家详情，或返回世界选择其他区域。");   // 双击语义=下钻：无下钻数据时明确提示，不退化显示面板
   } else if(currentLevel==="china"){
     const nm=normProv(p.name); const adcode=PROV_ADCODE[nm];
     if(adcode) loadProvince(nm, adcode);
