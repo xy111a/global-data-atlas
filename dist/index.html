@@ -978,6 +978,13 @@ function sourceTag(src){
    stats[i] = {label, value, cls, delta}   delta = {txt, dir:up|down|flat|null}
    insight[i] = {label, value, cls:pos|neg|null}
    所有层级共用同一组件，数据来自统一 reg 接口；缺失自动降级。 */
+/* 非 GDP 维度面板统一处理：当前维度卡前置（无多年序列→delta null），洞察替换为诚实提示 */
+function metricCards(baseStats, baseInsight, cur){
+  if(metric==="gdp") return {stats:baseStats, insight:baseInsight};
+  const card={label:cur?cur.label:metricLabel(metric), value:cur?cur.value:"—", delta:null};
+  const others=baseStats.filter(s=>s.label!==card.label);   // 去重
+  return {stats:[card,...others], insight:[{label:"较2000年 增长", value:"—（该维度无多年序列）", cls:""}]};
+}
 function renderDashboard(cfg){
   document.getElementById("pName").textContent=cfg.name;   // textContent 天然防注入
   document.getElementById("pSub").textContent=cfg.en||"";
@@ -1182,25 +1189,28 @@ function showCityPanel(cityName, adcode, parentAdcode){
   const gv = r.get("gdp", dataYear);   // 序列城市跟随年份；单年城市返回约2023值
   const gd = hasTS ? (r.get("gdp", dataYear)/cm.gdp) : null;   // 相对2023的变化
   const growth = hasTS ? r.growth("gdp", 2009) : null;
-  renderDashboard({
-    name:cityName, en:hasTS?"中国地级市 · 多年序列":"中国地级市", level:"地级市",
-    tags:[hasTS?"来源：维基（国家统计局口径）":"来源：公开整理近似值", hasTS?`GDP ${dataYear} · 序列 ${yrs[0]}–${yrs[yrs.length-1]}`:"约2023", hasTS?"多年序列":"单年快照"],
-    stats:[
+  const baseStats=[
       {label:"GDP"+(hasTS?" ("+dataYear+")":""), value:fmtGDP(gv), delta:hasTS&&gd!=null?{txt:(gd>=0?"+":"")+(gd*100).toFixed(1)+"% vs 2023",dir:gd>=0?"up":"down"}:null},
       {label:"人口 (2023)", value:fmtPop(cm.pop)},
       {label:"面积", value:cm.area?fmtArea(cm.area):"暂无"}
-    ],
-    insight:hasTS&&growth!=null?[{label:"较2009年 增长（可得年）", value:fmtGrowth(growth), cls:growth>=0?"pos":"neg"}]:[],
+    ];
+  const baseInsight=hasTS&&growth!=null?[{label:"较2009年 增长（可得年）", value:fmtGrowth(growth), cls:growth>=0?"pos":"neg"}]:[];
+  const cards=metricCards(baseStats, baseInsight,
+    metric==="pop"?{label:"人口 (2023)", value:fmtPop(cm.pop)}:metric==="area"?{label:"面积", value:cm.area?fmtArea(cm.area):"暂无"}:null);
+  renderDashboard({
+    name:cityName, en:hasTS?"中国地级市 · 多年序列":"中国地级市", level:"地级市",
+    tags:[hasTS?"来源：维基（国家统计局口径）":"来源：公开整理近似值", hasTS?`GDP ${dataYear} · 序列 ${yrs[0]}–${yrs[yrs.length-1]}`:"约2023", hasTS?"多年序列":"单年快照"],
+    stats:cards.stats, insight:cards.insight,
     trendHTML:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('city','${cityName}','${adcode}',${parentAdcode||0})">＋ 加入对比</button>`
   });
-  /* 多年序列城市 → GDP 趋势图 */
-  if(hasTS){
+  /* 多年序列城市 → GDP 趋势图（仅 GDP 维度；其他维度无序列不渲染） */
+  if(hasTS && metric==="gdp"){
     const ser=r.gdpSeries();
     document.getElementById("trend").innerHTML=`<div class="rank-title">${cityName} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`;
     renderTrendChart([{name:cityName, years:ser.years, values:ser.values}], fmtGDP);
   } else {
-    document.getElementById("trend").innerHTML="";  // 城市无多年序列
+    document.getElementById("trend").innerHTML="";  // 城市无多年序列/非 GDP 维度
   }
 }
 
@@ -1273,15 +1283,17 @@ async function loadJapan(){
 function showJapanPrefPanel(nm){
   lastShown={type:"jppref", nm};
   const r=regJapanPref(nm); if(!r) return;
-  renderDashboard({
-    name:nm, en:"日本都道府县", level:"都道府县",
-    tags:["来源：日本内阁府（県民経済計算）","GDP 2021 / 人口 2023","单年快照"],
-    stats:[
+  const baseStats=[
       {label:"GDP (2021)", value:fmtGDP(regGet(r,"gdp",dataYear))},
       {label:"人口 (2023)", value:fmtPop(regGet(r,"pop",dataYear))},
       {label:"面积", value:fmtArea(regGet(r,"area",dataYear))}
-    ],
-    insight:[],
+    ];
+  const cards=metricCards(baseStats, [],
+    metric==="pop"?{label:"人口 (2023)", value:fmtPop(regGet(r,"pop",dataYear))}:metric==="area"?{label:"面积", value:fmtArea(regGet(r,"area",dataYear))}:null);
+  renderDashboard({
+    name:nm, en:"日本都道府县", level:"都道府县",
+    tags:["来源：日本内阁府（県民経済計算）","GDP 2021 / 人口 2023","单年快照"],
+    stats:cards.stats, insight:cards.insight,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('jppref','${nm}','${nm}')">＋ 加入对比</button>`
   });
   document.getElementById("trend").innerHTML="";   // 县级无多年序列
@@ -1292,15 +1304,18 @@ function showUSStatePanel(nm){
   const gy=usGdpYear(nm,dataYear), yg=usGdpY(nm,dataYear), ng=usNominalGrowth(nm,2000);
   const popY=(s.popYear||2023);
   const delta=(v,fmt)=>v==null?null:{txt:fmt(v),dir:v>=0?"up":"down"};
-  renderDashboard({
-    name:nm, en:"United States · 州", level:"美国州",
-    tags:[`来源：BEA + Census`,`GDP ${gy} · 人口 ${popY}`],
-    stats:[
+  const baseStats=[
       {label:"GDP ("+gy+")", value:fmtGDP(yg!=null?yg:s.gdp), delta:delta(ng,fmtGrowth)},
       {label:"人口 ("+popY+")", value:fmtPop(s.pop)},
       {label:"面积", value:fmtArea(s.area)}
-    ],
-    insight:[{label:"较2000年 名义增长(现价)", value:ng!=null?fmtGrowth(ng):"—", cls:ng!=null?(ng>=0?"pos":"neg"):""}],
+    ];
+  const baseInsight=[{label:"较2000年 名义增长(现价)", value:ng!=null?fmtGrowth(ng):"—", cls:ng!=null?(ng>=0?"pos":"neg"):""}];
+  const cards=metricCards(baseStats, baseInsight,
+    metric==="pop"?{label:"人口 ("+popY+")", value:fmtPop(s.pop)}:metric==="area"?{label:"面积", value:fmtArea(s.area)}:null);
+  renderDashboard({
+    name:nm, en:"United States · 州", level:"美国州",
+    tags:[`来源：BEA + Census`,`GDP ${gy} · 人口 ${popY}`],
+    stats:cards.stats, insight:cards.insight,
     trendHTML:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('usstate','${nm}','${nm}')">＋ 加入对比</button>`
   });
@@ -1320,17 +1335,19 @@ function showProvincePanel(short){
   const g25 = (o && o.gdpRMB && o.gdpRMB["2025"]!=null) ? o.gdpRMB["2025"] : null;
   const rg25 = (o && o.rg25!=null) ? o.rg25 : null;
   const ng = cnNominalGrowth(short, 2000);
-  const stats=[{label:"GDP ("+gdY+(gdY!==dataYear?" 回退":"")+")", value:fmtGDP(gd!=null?gd:0)}];
-  if(g25!=null && dataYear!=="2025") stats.push({label:"GDP (2025 初核)", value:fmtGDP(g25)});
-  stats.push({label:"人口 (2023)", value:fmtPop(pop)});
-  stats.push({label:"面积", value:fmtArea(area)});
-  const insight=[];
-  if(ng!=null && dataYear!=="2000") insight.push({label:"较2000年 名义增长", value:fmtGrowth(ng), cls:ng>=0?"pos":"neg"});
-  if(rg25!=null) insight.push({label:"2025 实际增幅", value:(rg25*100).toFixed(1)+"%", cls:rg25>=0?"pos":"neg"});
+  const baseStats=[{label:"GDP ("+gdY+(gdY!==dataYear?" 回退":"")+")", value:fmtGDP(gd!=null?gd:0)}];
+  if(g25!=null && dataYear!=="2025") baseStats.push({label:"GDP (2025 初核)", value:fmtGDP(g25)});
+  baseStats.push({label:"人口 (2023)", value:fmtPop(pop)});
+  baseStats.push({label:"面积", value:fmtArea(area)});
+  const baseInsight=[];
+  if(ng!=null && dataYear!=="2000") baseInsight.push({label:"较2000年 名义增长", value:fmtGrowth(ng), cls:ng>=0?"pos":"neg"});
+  if(rg25!=null) baseInsight.push({label:"2025 实际增幅", value:(rg25*100).toFixed(1)+"%", cls:rg25>=0?"pos":"neg"});
+  const cards=metricCards(baseStats, baseInsight,
+    metric==="pop"?{label:"人口 (2023)", value:fmtPop(pop)}:metric==="area"?{label:"面积", value:fmtArea(area)}:null);
   renderDashboard({
     name:short, en:"中国省份 · "+dataYear, level:"省级",
     tags:["来源：维基百科整理（官方公报/五经普修订）",`年份 ${dataYear}`],
-    stats, insight,
+    stats:cards.stats, insight:cards.insight,
     trendHTML:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('prov','${short}','${short}')">＋ 加入对比</button>`
   });
