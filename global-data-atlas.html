@@ -829,13 +829,14 @@ function showLoading(b){ document.getElementById("loading").style.display=b?"fle
 function showBanner(t){ document.getElementById("banner").textContent=t; }
 
 function showCountry(c){
+  lastShown={type:"country", data:c};   // 记录当前面板区域：切维度时恢复并跟随刷新
   const iso2=c[2];
   const y=cYear(iso2);
   const g=cMetric(iso2,"gdp"), p=cMetric(iso2,"pop"), a=cMetric(iso2,"area");
   const reg=regCountry(iso2);
   const gKd=cGrowth(iso2,2000,"gdpKd"), gPp=cGrowth(iso2,2000,"gdpPpKd");
   const delta=(v,fmt)=>v==null?null:{txt:fmt(v),dir:v>=0?"up":"down"};
-  const stats=[
+  let stats=[
     {label:"GDP", value:fmtGDP(g), delta:delta(gKd,fmtGrowth)},
     {label:"人口", value:fmtPop(p), delta:delta(cGrowth(iso2,2000,"pop"),fmtGrowth)},
     {label:"面积", value:fmtArea(a), delta:delta(cGrowth(iso2,2000,"area"),fmtGrowth)},
@@ -849,7 +850,9 @@ function showCountry(c){
     const ey=reg.extYear?reg.extYear(metric,y):null;
     const label = metricScope(metric)==="world" && ey && ey!==+y ? `${metricLabel(metric)} (${ey})` : metricLabel(metric);
     const mg=reg.growth(metric,2000);
-    stats.unshift({label, value:metricFmt(metric,mv), delta:mg!=null?delta(mg,v=>fmtGrowthFor(metric,v)):null});
+    const card={label, value:metricFmt(metric,mv), delta:mg!=null?delta(mg,v=>fmtGrowthFor(metric,v)):null};
+    const others=stats.filter(s=>s.label!==label);   // 当前维度卡替换/去重，避免重复
+    stats=[card, ...others];
     insight.push({label:"较2000年 "+(metric==="life"?"变化":"增长"), value:mg!=null?fmtGrowthFor(metric,mg):"—", cls:mg!=null?(mg>=0?"pos":"neg"):""});
   }
   const tr=reg.series(metric);
@@ -1171,6 +1174,7 @@ async function loadProvince(short, adcode){
   showLoading(false);
 }
 function showCityPanel(cityName, adcode, parentAdcode){
+  lastShown={type:"city", name:cityName, adcode, pa:parentAdcode};
   const cm=getCityMetric(adcode, parentAdcode); if(!cm) return;
   const r=regCity(cm, adcode);
   const yrs=r.years();
@@ -1267,6 +1271,7 @@ async function loadJapan(){
   renderRank();
 }
 function showJapanPrefPanel(nm){
+  lastShown={type:"jppref", nm};
   const r=regJapanPref(nm); if(!r) return;
   renderDashboard({
     name:nm, en:"日本都道府县", level:"都道府县",
@@ -1282,6 +1287,7 @@ function showJapanPrefPanel(nm){
   document.getElementById("trend").innerHTML="";   // 县级无多年序列
 }
 function showUSStatePanel(nm){
+  lastShown={type:"usstate", nm};
   const s=US_STATES_GDP[nm]; if(!s) return;
   const gy=usGdpYear(nm,dataYear), yg=usGdpY(nm,dataYear), ng=usNominalGrowth(nm,2000);
   const popY=(s.popYear||2023);
@@ -1304,6 +1310,7 @@ function showUSStatePanel(nm){
   else document.getElementById("trend").innerHTML="";
 }
 function showProvincePanel(short){
+  lastShown={type:"prov", short};
   const m=CN[short]; if(!m){ showGeneric(short, "省级数据未收录", "该地区未纳入维基省级序列（GDP/人口/面积暂无）。双击可进入下一级视图。"); return; }   // L2: 港澳单击给出提示
   const o = window.CN_TS && window.CN_TS[short];
   const gd = cnGdpRMB(short, dataYear);
@@ -1411,6 +1418,7 @@ function doSearch(q){
 
 /* ============== 对比模式（Phase D 补齐） ============== */
 let cmpMode=false, cmpList=[];   // cmpMode=对比列表是否展示（不改变单击行为）；cmpList: [{t,name,k,pa}]
+let lastShown=null;   // 当前面板显示的区域（切维度时恢复并跟随刷新）
 function cmpGetData(it){
   const y=dataYear;
   let base={};
@@ -1549,11 +1557,11 @@ window.addEventListener("load", ()=>{
     const b=e.target.closest("button"); if(!b)return;
     if(b.disabled) return;   // 当前层级不可用的指标不可点击
     metric=b.dataset.m; [...e.currentTarget.children].forEach(x=>x.classList.toggle("active",x===b));
-    if(currentLevel==="world"){ renderWorld2D(); }
-    else if(currentLevel==="china") loadChina();
-    else if(currentLevel==="province"){ if(currentProvName && currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); }
-    else if(currentLevel==="us") loadUS();
-    else if(currentLevel==="japan") loadJapan();
+    if(currentLevel==="world"){ renderWorld2D(); if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }   // 切维度：恢复面板区域并跟随刷新
+    else if(currentLevel==="china"){ loadChina(); if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }
+    else if(currentLevel==="province"){ if(currentProvName && currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
+    else if(currentLevel==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
+    else if(currentLevel==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
     renderRank();
     updateCompare();   // 维度切换：对比值/图跟随刷新
   });
