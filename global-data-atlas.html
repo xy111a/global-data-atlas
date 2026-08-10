@@ -96,10 +96,20 @@
   #panel{position:relative;width:clamp(300px,26vw,380px);border-left:1px solid var(--line);padding:18px;
     background:var(--panel);overflow:auto;
     box-shadow:var(--shadow-panel);}  /* 宽屏可增宽（L6）；面板投影 */
+  #panel.collapsed{display:none;}   /* 折叠：地图全宽 */
+  #panelFold{position:absolute;top:8px;right:10px;z-index:7;background:var(--panel-float);border:1px solid var(--line);
+    color:var(--muted);border-radius:var(--r-md);padding:3px 8px;font-size:12px;cursor:pointer;
+    backdrop-filter:blur(8px);transition:color var(--t-fast),border-color var(--t-fast);}
+  #panelFold:hover{color:var(--cyan);border-color:var(--cyan);}
+  #panelFloat{position:fixed;right:18px;bottom:24px;z-index:20;display:none;align-items:center;gap:6px;
+    background:var(--panel-float);border:1px solid var(--cyan);color:var(--cyan);border-radius:999px;
+    padding:9px 16px;font-size:13px;cursor:pointer;box-shadow:var(--glow-sm),var(--shadow-panel);
+    backdrop-filter:blur(10px);}
+  #panelFloat:hover{background:var(--cyan);color:#04101c;}
   #panel::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
     background:var(--line-top);opacity:.4;pointer-events:none;}   /* 面板顶部发丝高光 */
   #panel h2{font-size:15px;margin:0 0 4px;}
-  #panel .sub{color:var(--muted);font-size:12px;margin-bottom:16px;}
+  #panel .sub{color:var(--muted);font-size:12px;margin-bottom:8px;}
   .metric{margin-bottom:14px;}
   .metric .k{font-size:12px;color:var(--muted);}
   .metric .v{font-size:20px;font-weight:600;color:var(--cyan);font-variant-numeric:var(--num);text-shadow:var(--glow-sm);}
@@ -108,8 +118,8 @@
   .metric .v.growth.muted{color:#7f93a8;}
   .metric .v.muted{color:#8fa2b5;font-size:16px;}  /* 提亮：对比度 3.7→5.5 (L1) */
   .metric .v.pink{color:var(--pink);}
-  .hint{font-size:12px;color:var(--muted);line-height:1.7;border-top:1px dashed var(--line-soft);
-    padding-top:12px;margin-top:6px;}
+  .hint{font-size:12px;color:var(--muted);line-height:1.7;border-bottom:1px dashed var(--line-soft);
+    padding-bottom:12px;margin-bottom:10px;}   /* 上移到指标卡上方：来源/年份标签在顶部 */
   #loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     background:rgba(5,6,10,0.7);color:var(--cyan);font-size:14px;z-index:5;}
   #banner{position:absolute;right:16px;bottom:16px;left:auto;font-size:12px;color:var(--muted);
@@ -161,6 +171,8 @@
   #app{flex-direction:column; height:auto; min-height:100vh;}
   header{flex-wrap:wrap; gap:6px; padding:8px 10px;}
   .tb-main{gap:8px;}
+  #panelFold{display:none;}   /* 窄屏面板在下方，无需折叠 */
+  #panelFloat{display:none!important;}
   .tb-actions{gap:6px;}
   #chart{width:100%;height:55vh; min-height:360px; flex:none;}
   #panel{width:100%; max-width:none; border-left:none; border-top:1px solid var(--line);
@@ -180,8 +192,11 @@
   .tb-actions .btn{padding:6px 8px; font-size:12px; flex:0 1 auto; min-width:0;}
   #yearSel{padding:6px 8px; font-size:12px;}
 }
+@media(min-width:1600px){
+  #panel{width:clamp(340px,22vw,460px);}   /* 宽屏放宽：排行/趋势更舒适 */
+}
   #rank{margin-top:16px;border-top:1px dashed var(--line-soft);padding-top:12px;max-height:340px;overflow-y:auto;}   /* 全量排行可滚动（默认顶部） */
-  .trend-scroll{max-height:380px;overflow-y:auto;}   /* 洞察增长图全量可滚动 */
+  .trend-scroll{max-height:none;overflow:visible;}   /* 面板整体滚动，趋势图不再单独滚动（全量条形图高度自适应） */
   .rank-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;font-weight:600;}
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
     cursor:pointer;font-size:13px;transition:background var(--t-fast);}
@@ -216,20 +231,21 @@
     <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
     <!-- I5: 缩放已锁死（roam:false），无需恢复视图按钮 -->
     <div id="panel">
-      <div id="compareBox" style="display:none;margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;background:rgba(0,240,255,0.05);"></div>
+      <button id="panelFold" title="收起面板" aria-label="收起数据面板">▸</button>
+      <div id="compareBox" style="display:none;position:sticky;top:0;z-index:6;background:var(--panel);margin-bottom:12px;border:1px solid var(--cyan);border-radius:8px;padding:10px;box-shadow:var(--shadow-panel);"></div>
       <h2 id="pName">世界地图</h2>
       <div class="sub" id="pSub">加载中…</div>
-      <div id="pMetrics"></div>
       <div class="hint" id="pHint"></div>
+      <div id="pMetrics"></div>
       <div id="trend" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:10px;"></div>
       <div id="rank"></div>
     </div>
     <div id="loading">加载中…</div>
     <div id="banner"></div>
     <div id="fatal"></div>
+    <button id="panelFloat" title="展开数据面板" aria-label="展开数据面板">📊 数据面板</button>
   </div>
 </div>
-</footer>
 
 <script src="vendor/echarts.min.js"></script>
 <script src="vendor/world.js"></script>
@@ -735,6 +751,17 @@ function usVal(nm,m){ const s=US_STATES_GDP[nm]; if(!s) return 0; m=m||metric;
 function setCrumb(h){ document.getElementById("crumb").innerHTML=h; }
 /* 结构化面包屑：paths = [{label, level}]，每段可点击返回对应层级（L6/I2 修复）
    level: "world"|"china"|"province"|"us"（点击返回该层）；末段加粗不可点 */
+/* 面板折叠控制：折叠→地图全宽 + 悬浮按钮；展开→恢复面板；区域点击/下钻自动展开 */
+function togglePanel(force){
+  const p=document.getElementById("panel"), fb=document.getElementById("panelFloat");
+  const col = force!==undefined ? force : !p.classList.contains("collapsed");
+  p.classList.toggle("collapsed", col);
+  fb.style.display = col ? "flex" : "none";
+  if(chart) setTimeout(()=>chart.resize(), 0);
+}
+function ensurePanelOpen(){
+  if(document.getElementById("panel").classList.contains("collapsed")) togglePanel(false);
+}
 function setCrumbPath(paths){
   setCrumb(paths.map((p,i)=>{
     const isLast = i===paths.length-1;
@@ -976,6 +1003,7 @@ function renderWorld2D(){
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"}]);
+  togglePanel(true);   /* 世界层自动折叠：地图优先，悬浮按钮可随时展开 */
   showGeneric("世界地图","单击国家查看数据；双击中国/美国/日本下钻",
     "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
   renderRank();
@@ -1429,6 +1457,7 @@ function onChartDblClick(p){
 }
 /* 单击：显示该区域内容/加入对比（不下钻） */
 function showContentFor(p){
+  ensurePanelOpen();   /* 单击区域：自动展开面板看数据 */
   if(cmpMode){
     if(currentLevel==="world"){
       const c=p.data&&p.data.cn; if(!c) return;
@@ -1460,6 +1489,7 @@ function showContentFor(p){
 }
 /* 双击：下钻（仅可下钻层级） */
 function drillDownFor(p){
+  ensurePanelOpen();   /* 下钻：自动展开面板 */
   if(currentLevel==="world"){
     const c=p.data&&p.data.cn; if(!c) return;
     if(c[2]==="CN") loadChina();
@@ -1483,6 +1513,10 @@ window.addEventListener("load", ()=>{
   chart = echarts.init(document.getElementById("chart"));
   chart.on("click", onChartClick);
   chart.on("dblclick", onChartDblClick);   // 双击下钻（单击已防抖 260ms）
+
+  /* 面板折叠：世界层自动折叠成悬浮按钮；点击区域自动展开 */
+  document.getElementById("panelFold").addEventListener("click", ()=>togglePanel());
+  document.getElementById("panelFloat").addEventListener("click", ()=>togglePanel(false));
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){
