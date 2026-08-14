@@ -58,4 +58,5 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u ALL_PROXY -u al
 
 - `global-data-atlas-spec.md` — 需求规格 + DoD（验收标准）
 - `global-data-atlas-v2-plan.md` — V2/V3 规划与决策记录
+- `FEATURES.md` — 功能清单（当前状态，无规划项）
 - `design-brief.md` — 视觉设计规范
