@@ -1,9 +1,7 @@
 name = "global-data-atlas"
 compatibility_date = "2024-01-01"
 
-# Cloudflare Pages 静态站点部署配置
+# Cloudflare Pages 静态站点部署配置（wrangler 4.x 格式）
 # 部署命令: npx wrangler pages deploy dist --project-name=global-data-atlas
-# 或通过 Cloudflare Dashboard → Pages → 连接此目录
+pages_build_output_dir = "./dist"
 
-[site]
-bucket = "./dist"
