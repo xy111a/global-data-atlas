@@ -224,17 +224,17 @@
         <div class="breadcrumb" id="crumb">世界</div>
       </div>
       <div class="tb-actions">
-        <input id="search" placeholder="搜索国家 / 省份 / 城市…" />
-        <select id="yearSel">
+        <input id="search" placeholder="搜索国家 / 省份 / 城市…" aria-label="搜索国家、省份或城市" />
+        <select id="yearSel" aria-label="选择年份">
           <option value="2025" selected>2025</option>
           <option value="2024">2024</option>
           <option value="2023">2023</option>
         </select>
         <button class="btn" id="cmpBtn" title="显示/隐藏对比列表；在区域面板点『＋ 加入对比』收集条目">🔍 对比</button>
-        <button class="btn" id="backBtn">← 返回世界</button>
+        <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
-    <div class="seg" id="metricSeg"></div>
+    <div class="seg" id="metricSeg" role="group" aria-label="选择指标"></div>
   </header>
   <div id="main">
     <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
