@@ -204,6 +204,15 @@
   .rank-item .rk{color:var(--pink);font-weight:600;width:18px;text-align:center;font-variant-numeric:var(--num);}
   .rank-item .rn{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rank-item .rv{color:var(--cyan);font-size:12px;white-space:nowrap;flex:0 1 auto;max-width:45%;text-align:right;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:var(--num);}  /* 窄面板下不挤占名称（P2） */
+  /* ===== Footer 数据来源汇总（DoD 交付项） ===== */
+  footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 18px;
+    padding:8px 20px;border-top:1px solid var(--line);
+    background:color-mix(in oklab, var(--bg) 72%, transparent);
+    font-size:11.5px;color:var(--muted);line-height:1.6;}
+  .footer-sources{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 13px;}
+  .footer-sources b{color:var(--text);font-weight:600;letter-spacing:.4px;}
+  .footer-sources span{opacity:.82;}
+  .footer-note{opacity:.7;text-align:right;}
 </style>
 </head>
 <body>
@@ -246,6 +255,17 @@
     <div id="fatal"></div>
     <button id="panelFloat" title="展开数据面板" aria-label="展开数据面板">📊 数据面板</button>
   </div>
+  <footer>
+    <div class="footer-sources">
+      <b>数据来源</b>
+      <span>World Bank · 国家 GDP/人口/面积 + 扩展指标（2000–2024）</span>
+      <span>维基百科 · 中国省/市 GDP（五经普修订）</span>
+      <span>BEA + Census · 美国州</span>
+      <span>日本内阁府 · 都道府县（2021）</span>
+      <span>DataV GeoAtlas · 中国行政区边界</span>
+    </div>
+    <div class="footer-note">货币统一折算人民币（逐年平均汇率）· 各面板标注实际年份 · 单击查看数据 / 双击下钻</div>
+  </footer>
 </div>
 
 <script src="vendor/echarts.min.js"></script>
