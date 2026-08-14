@@ -256,7 +256,6 @@
 <script src="vendor/cn/city_index.js"></script>
 <script src="vendor/cn/city_ts.js"></script>
 <script src="vendor/countries_wb.js"></script>
-<script src="vendor/ext_indicators.js"></script>
 <script src="vendor/fxrate.js"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script>
@@ -1530,10 +1529,13 @@ window.addEventListener("load", ()=>{
   renderWorld2D();          // 默认 2D 平面地图
   renderRank();
 
-  document.getElementById("metricSeg").addEventListener("click", e=>{
+  document.getElementById("metricSeg").addEventListener("click", async e=>{
     const b=e.target.closest("button"); if(!b)return;
     if(b.disabled) return;   // 当前层级不可用的指标不可点击
-    metric=b.dataset.m; [...e.currentTarget.children].forEach(x=>x.classList.toggle("active",x===b));
+    const m=b.dataset.m;
+    // E2: EXT 扩展指标（scope=world）按需加载 ext_indicators.js（首屏省 669KB）
+    if(metricScope(m)==="world" && !window.EXT){ try{ await loadScript("vendor/ext_indicators.js"); }catch(e){ showBanner("扩展指标数据加载失败"); return; } }
+    metric=m; [...e.currentTarget.children].forEach(x=>x.classList.toggle("active",x===b));
     if(currentLevel==="world"){ renderWorld2D(); if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }   // 切维度：恢复面板区域并跟随刷新
     else if(currentLevel==="china"){ loadChina(); if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }
     else if(currentLevel==="province"){ if(currentProvName && currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
