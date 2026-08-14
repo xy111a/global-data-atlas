@@ -862,9 +862,22 @@ function showCountry(c){
     {label:"面积", value:fmtArea(a), delta:delta(cGrowth(iso2,2000,"area"),fmtGrowth)},
   ];
   const insight=[];
+  /* 核心经济洞察（四维）：GDP总量（不变价/PPP）+ 人均GDP + 人口 —— 用户看全球经济发展最关心 */
+  const econRows=[
+    {label:"GDP 较2000 实际增长（不变价）", val:gKd},
+    {label:"GDP 较2000 实际增长（PPP）", val:gPp},
+    {label:"人均GDP 较2000 增长", val:reg.growth("gdpcap",2000)},
+    {label:"人口 较2000 增长", val:cGrowth(iso2,2000,"pop")}
+  ];
+  const pushEcon=(rows, excludePpp)=>{
+    rows.forEach(r=>{
+      if(r.val==null) return;
+      if(excludePpp && r.label.indexOf("PPP")>=0) return;
+      insight.push({label:r.label, value:fmtGrowth(r.val), cls:r.val>=0?"pos":"neg"});
+    });
+  };
   if(metric==="gdp"){
-    insight.push({label:"较2000年 实际增长（不变价）", value:gKd!=null?fmtGrowth(gKd):"—", cls:gKd!=null?(gKd>=0?"pos":"neg"):""});
-    insight.push({label:"较2000年 实际增长（PPP不变价）", value:gPp!=null?fmtGrowth(gPp):"—", cls:gPp!=null?(gPp>=0?"pos":"neg"):""});
+    pushEcon(econRows, false);
   } else {
     const mv=regGet(reg,metric,y);
     const ey=reg.extYear?reg.extYear(metric,y):null;
@@ -873,7 +886,8 @@ function showCountry(c){
     const card={label, value:metricFmt(metric,mv), delta:mg!=null?delta(mg,v=>fmtGrowthFor(metric,v)):null};
     const others=stats.filter(s=>s.label!==label);   // 当前维度卡替换/去重，避免重复
     stats=[card, ...others];
-    insight.push({label:"较2000年 "+(metric==="life"?"变化":"增长"), value:mg!=null?fmtGrowthFor(metric,mg):"—", cls:mg!=null?(mg>=0?"pos":"neg"):""});
+    if(mg!=null) insight.push({label:"较2000年 "+(metric==="life"?"变化":"增长"), value:fmtGrowthFor(metric,mg), cls:mg>=0?"pos":"neg"});
+    pushEcon(econRows, true);   // 非 GDP 视图：去掉 PPP 行，保留 不变价/人均/人口，避免洞察区过长
   }
   const tr=reg.series(metric);
   renderDashboard({
@@ -996,6 +1010,8 @@ function currencyTag(m){
 /* ============== 2D 世界地图（默认，无需 WebGL） ============== */
 function renderWorld2D(){
   currentLevel="world";
+  /* E2b: 后台预加载 EXT 扩展指标（不阻塞首屏渲染），使国家面板四维洞察（人均GDP增长）即点即用 */
+  if(!window.EXT){ loadScript("vendor/ext_indicators.js").catch(()=>{}); }
   const geo = worldGeo;
   const data = geo.features.map(f=>{
     const nm=f.properties.name; const c=wbForMapName(nm);
