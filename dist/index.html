@@ -539,9 +539,11 @@ const US_STATES_GDP = {
   "North Dakota":{gdp:0.07,pop:783926,area:183108},
   "Alaska":{gdp:0.063,pop:733406,area:1723337}
 };
-/* 州 GDP 由 美元万亿 折算为 人民币元，与世界/中国单位统一（作为无时序州的兜底值） */
+/* 州 GDP 快照（美元万亿）——作为 US_TS 缺失时的兜底；仅缺失时才折算（消除正常路径死计算） */
 const RATE23 = (window.FXRATE && window.FXRATE["2023"]) || USD_CNY;  // 美国州为2023单年数据，用当年汇率折算
-Object.keys(US_STATES_GDP).forEach(k=> US_STATES_GDP[k].gdp = US_STATES_GDP[k].gdp*RATE23*1e12);
+if(!window.US_TS){
+  Object.keys(US_STATES_GDP).forEach(k=> US_STATES_GDP[k].gdp = US_STATES_GDP[k].gdp*RATE23*1e12);
+}
 /* M5 单数据源：用 BEA 序列 2023 现值覆盖快照 gdp（消除双份存储差异，fallback 时也用现价口径） */
 if(window.US_TS){
   Object.keys(US_STATES_GDP).forEach(k=>{
@@ -838,6 +840,7 @@ function updateBackBtn(){
 /* 统一返回逻辑：面包屑/返回按钮共用（L6/I2 修复）——走 LAYERS 注册表 */
 function goLevel(level){
   const L=LAYERS[level]; if(L&&L.render) L.render();
+  saveState();   // 优化3：层级变化保存 URL 状态
 }
 function showLoading(b){ document.getElementById("loading").style.display=b?"flex":"none"; }
 function showBanner(t){ document.getElementById("banner").textContent=t; }
@@ -993,6 +996,7 @@ function renderDashboard(cfg){
   document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
   if(cfg.trendHTML){ document.getElementById("trend").innerHTML=cfg.trendHTML; }
   else document.getElementById("trend").innerHTML="";
+  if(typeof saveState==="function") saveState();   // 优化3：面板区域变化保存 URL 状态（lastShown 已由 showXxxPanel 设置）
 }
 /* T1: 货币标签按指标动态（避免「人民币(CNY)」与 USD 人均GDP 矛盾）；返回纯文本由 renderDashboard 统一包 tag */
 function currencyTag(m){
@@ -1004,6 +1008,8 @@ function currencyTag(m){
 /* ============== 2D 世界地图（默认，无需 WebGL） ============== */
 function renderWorld2D(){
   currentLevel="world";
+  /* 状态残留清理：进入世界层时清空省级/欧盟状态（防御隐式依赖） */
+  currentProvName=""; currentProvAdcode=""; currentProvData=[]; currentNUTS="";
   /* E2b: 后台预加载 EXT 扩展指标（不阻塞首屏渲染），使国家面板四维洞察（人均GDP增长）即点即用 */
   if(!window.EXT){ loadScript("vendor/ext_indicators.js").catch(()=>{}); }
   const geo = worldGeo;
@@ -1042,6 +1048,8 @@ function renderWorld2D(){
 /* ============== 中国（2D 省→市 下钻） ============== */
 async function loadChina(){
   showLoading(true);
+  /* 状态残留清理：进入中国省级列表层时清空省级下钻状态与欧盟状态 */
+  currentProvName=""; currentProvAdcode=""; currentProvData=[]; currentNUTS="";
   if(metricScope(metric)==="world"){ showGeneric("中国 · 省","", metricUnavailableMsg(metric)); renderRank(); showLoading(false); return; }
   if(!window.CN_GEO){ try{ await loadScript("vendor/cn/100000.js"); }catch(e){} }   // 懒加载（E1）
   try{
@@ -1104,6 +1112,7 @@ function loadCnProvGeo(adcode){
 }
 async function loadProvince(short, adcode){
   showLoading(true);
+  currentNUTS="";   /* 状态残留清理：进入省级层时清空欧盟状态（省状态由本函数设置） */
   if(metricScope(metric)==="world"){ showGeneric(short+" · 地级市","", metricUnavailableMsg(metric)); renderRank(); showLoading(false); return; }
   if(adcode==="710000"){ showGeneric(short+" · 台湾","暂无下级行政区边界","DataV 未提供台湾市县级 GeoJSON，仅展示省级面板。点返回按钮回到省级列表。"); showLoading(false); return; }
   if(adcode==="810000"||adcode==="820000"){   // 港澳：有区级边界（本地 810000.js/820000.js），无省级 GDP 序列
@@ -1206,6 +1215,8 @@ function showCityPanel(cityName, adcode, parentAdcode){
 /* ============== 美国州级下钻 ============== */
 async function loadUS(){
   if(metricScope(metric)==="world"){ showGeneric("美国 · 州","", metricUnavailableMsg(metric)); renderRank(); return; }   // 守卫在前：不改变 currentLevel（S2 修复）
+  /* 状态残留清理：进入美国州层时清空省级/欧盟状态 */
+  currentProvName=""; currentProvAdcode=""; currentProvData=[]; currentNUTS="";
   if(!window.US_GEO){ try{ await loadScript("vendor/us-states.js"); }catch(e){} }   // 懒加载（E1）
   currentLevel="us";
   const gj = window.US_GEO; if(!gj){ showGeneric("美国","州边界未加载","vendor/us-states.js 缺失"); return; }
@@ -1242,6 +1253,8 @@ async function loadUS(){
 /* 日本都道府县层（F3）：单年数据（2021 GDP / 2023 人口 / 面积），无多年序列与 EXT 指标 */
 async function loadJapan(){
   if(metricScope(metric)==="world"){ showGeneric("日本 · 都道府县","", metricUnavailableMsg(metric)); renderRank(); return; }   // 守卫在前：不改变 currentLevel（S2 修复）
+  /* 状态残留清理：进入日本县层时清空省级/欧盟状态 */
+  currentProvName=""; currentProvAdcode=""; currentProvData=[]; currentNUTS="";
   if(!window.JP_GEO){ try{ await loadScript("vendor/japan.js"); }catch(e){} }   // 懒加载（E1）
   currentLevel="japan";
   const gj = window.JP_GEO; if(!gj){ showGeneric("日本","都道府县边界未加载","vendor/japan.js 缺失"); return; }
@@ -1429,6 +1442,48 @@ const LAYERS = {
   }
 };
 function layerGet(){ return LAYERS[currentLevel]||null; }
+/* ============== URL 状态持久化（优化3）：hash 保存/恢复 层级·指标·年份·面板·对比 ==============
+   用 history.replaceState 避免历史堆积；saveState 在层级/指标/年份/对比/面板变化时调用，
+   restoreState 在 load 时恢复（无 hash 或无效则返回 false 走默认世界视图）。 */
+function saveState(){
+  try{
+    const s={level:currentLevel, metric, year:dataYear};
+    if(lastShown){
+      const ls=lastShown;
+      if(ls.type==="country"&&ls.data) s.sel="country:"+ls.data[2];
+      else if(ls.type==="prov"&&ls.short) s.sel="prov:"+ls.short;
+      else if(ls.type==="usstate"&&ls.nm) s.sel="usstate:"+ls.nm;
+      else if(ls.type==="jppref"&&ls.nm) s.sel="jppref:"+ls.nm;
+      else if(ls.type==="nutspref"&&ls.nm) s.sel="nutspref:"+ls.nm;
+    }
+    if(cmpList.length) s.cmp=cmpList.map(it=>it.t+":"+it.k).join(",");
+    const target="#"+new URLSearchParams(s).toString();
+    if(location.hash!==target) history.replaceState(null,"",target);
+  }catch(e){ /* hash 保存失败不影响功能 */ }
+}
+async function restoreState(){
+  const h=location.hash.slice(1); if(!h) return false;
+  const p=new URLSearchParams(h);
+  const lvl=p.get("level"), m=p.get("metric"), yr=p.get("year");
+  if(m&&METRICS[m]){ metric=m; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===m)); }
+  if(yr&&!isNaN(+yr)) dataYear=yr;
+  if(!(lvl&&LAYERS[lvl])) return false;
+  try{ await LAYERS[lvl].render(); }catch(e){ return false; }
+  // 恢复面板区域（lastShown 语义，供切指标/年份时跟随刷新）
+  const sel=p.get("sel");
+  if(sel){
+    const i=sel.indexOf(":"); const t=sel.slice(0,i), k=sel.slice(i+1);
+    if(t==="country"){ const c=COUNTRIES.find(x=>x[2]===k)||BY_EN[k]; if(c) showCountry(c); }
+    else if(t==="prov"){ const pk=Object.keys(CN).find(x=>x===k); if(pk) showProvincePanel(pk); }
+    else if(t==="usstate"){ if(US_STATES_GDP[k]) showUSStatePanel(k); }
+    else if(t==="jppref"){ if(window.JP_METRICS&&JP_METRICS[k]) showJapanPrefPanel(k); }
+    else if(t==="nutspref"){ if(window.EU_METRICS&&EU_METRICS[k]) showNUTSPanel(k); }
+  }
+  // 恢复对比列表
+  const cmp=p.get("cmp");
+  if(cmp){ cmpList=[]; cmp.split(",").forEach(c=>{ const i=c.indexOf(":"); if(i>0){ const t=c.slice(0,i), k=c.slice(i+1); cmpList.push({t,k,name:k}); } }); if(cmpList.length){ cmpMode=true; updateCompare(); } }
+  return true;
+}
 /* regNUTS：NUTS2 区域 reg 接口（单年快照 2023，与日本一致） */
 function regNUTS(nid){
   const d=window.EU_METRICS&&window.EU_METRICS[nid]; if(!d) return null;
@@ -1442,6 +1497,8 @@ function regNUTS(nid){
 }
 async function loadNUTS(cc){
   if(metricScope(metric)==="world"){ showGeneric(euCCName(cc)+" · NUTS2","", metricUnavailableMsg(metric)); renderRank(); return; }   // 守卫在前：不改变 currentLevel
+  /* 状态残留清理：进入欧盟 NUTS2 层时清空省级状态（currentNUTS 由本函数设置） */
+  currentProvName=""; currentProvAdcode=""; currentProvData=[];
   if(!window["EU_"+cc+"_GEO"]){ try{ await loadScript("vendor/eu/"+cc.toLowerCase()+".js"); }catch(e){} }   // 懒加载边界（E1）
   if(!window.EU_METRICS){ try{ await loadScript("vendor/eu/eu_metrics.js"); }catch(e){} }   // 懒加载指标
   currentLevel="nuts"; currentNUTS=cc;
@@ -1571,6 +1628,7 @@ function cmpToggle(it){
   if(i>=0) cmpList.splice(i,1); else cmpList.push(it);
   if(cmpList.length) cmpMode=true; else cmpMode=false;   // 有对比项自动展示列表
   updateCompare();
+  saveState();   // 优化3：对比变化保存 URL 状态
 }
 /* 统一对比刷新：展示列表 + ≥2 项自动渲染对比图（跟随维度）；<2 项清空对比图 */
 function updateCompare(){
@@ -1600,7 +1658,7 @@ function cmpRender(){
     el.onclick=()=>{ const [t,k]=el.dataset.k.split(":"); cmpToggle({t,k,name:""}); };
   });
 }
-function cmpClear(){ cmpList=[]; cmpMode=false; updateCompare(); document.getElementById("trend").innerHTML=""; }
+function cmpClear(){ cmpList=[]; cmpMode=false; updateCompare(); document.getElementById("trend").innerHTML=""; saveState(); }   // 优化3：对比清空保存 URL 状态
 function cmpHandleClick(type, name, key, pa){
   cmpToggle({t:type, name, k:key, pa});
   return true;
@@ -1657,8 +1715,7 @@ window.addEventListener("load", ()=>{
   const gj = window.WORLD_GEO;
   if(gj){ worldGeo=gj; echarts.registerMap("world", gj); }
   else { showBanner("警告：world.js 未加载，世界地图不可用"); }
-  renderWorld2D();          // 默认 2D 平面地图
-  renderRank();
+  restoreState().then(ok=>{ if(!ok){ renderWorld2D(); renderRank(); } });   // 优化3：有 URL 状态则恢复视图（层级/指标/年份/面板/对比），否则默认世界
 
   document.getElementById("metricSeg").addEventListener("click", async e=>{
     const b=e.target.closest("button"); if(!b)return;
@@ -1670,6 +1727,7 @@ window.addEventListener("load", ()=>{
     const L=layerGet(); if(L){ L.render(); L.restore(); }   // 切维度：重绘当前层 + 恢复面板区域并跟随刷新（统一走 LAYERS）
     renderRank();
     updateCompare();   // 维度切换：对比值/图跟随刷新
+    saveState();   // 优化3：指标变化保存 URL 状态
   });
   /* 年份选择器 (C) — 多年度由 World Bank(2000-2024) 驱动 */
   (function(){
@@ -1691,6 +1749,7 @@ window.addEventListener("load", ()=>{
   document.getElementById("yearSel").addEventListener("change", e=>{
     dataYear = e.target.value;
     redrawByYear();
+    saveState();   // 优化3：年份变化保存 URL 状态
   });
   document.getElementById("backBtn").addEventListener("click", ()=>{
     // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致（走 LAYERS.back）
