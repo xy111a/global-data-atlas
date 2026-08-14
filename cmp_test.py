@@ -48,3 +48,21 @@ dom3 = dump(make_variant("cmp3.html", trigger3), 13)
 i=dom3.find('compareBox'); box3=dom3[i:i+3000] if i>=0 else ""
 ok4 = "California" in box3 and "Texas" in box3
 print(f"4. 州对比: {'✅' if ok4 else '❌'} California+Texas在对比框")
+
+# 4. 中国城市对比（city 类型：key=adcode, pa=parentAdcode）
+trigger4 = ("loadChina();setTimeout(function(){loadProvince('浙江','330000');setTimeout(function(){"
+            "cmpMode=true;cmpHandleClick('city','杭州市','330100',330000);"
+            "cmpHandleClick('city','宁波市','330200',330000);cmpRender();},1800)},1200)")
+dom4 = dump(make_variant("cmp4.html", trigger4), 16)
+i=dom4.find('compareBox'); box4=dom4[i:i+3000] if i>=0 else ""
+ok5 = "杭州" in box4 and "宁波" in box4
+print(f"5. 城市对比: {'✅' if ok5 else '❌'} 杭州+宁波在对比框")
+
+# 5. 日本县对比（jppref 类型）
+trigger5 = ("loadJapan();setTimeout(function(){"
+            "cmpMode=true;cmpHandleClick('jppref','东京都','东京都');"
+            "cmpHandleClick('jppref','大阪府','大阪府');cmpRender();},2200)")
+dom5 = dump(make_variant("cmp5.html", trigger5), 16)
+i=dom5.find('compareBox'); box5=dom5[i:i+3000] if i>=0 else ""
+ok6 = "东京都" in box5 and "大阪府" in box5
+print(f"6. 日本县对比: {'✅' if ok6 else '❌'} 东京都+大阪府在对比框")

@@ -38,6 +38,7 @@ shot("o1_2d.png", "file://" + os.path.abspath(SRC), wait=9)
 shot("o2_china.png", make_variant("t_china.html", "loadChina()"), wait=12)
 shot("o3_zj.png", make_variant("t_zj.html", "loadChina();loadProvince('浙江','330000')"), wait=13)
 shot("o4_us.png", make_variant("t_us.html", "loadUS()"), wait=12)
+shot("o5_japan.png", make_variant("t_japan.html", "loadJapan()"), wait=16)   # 懒加载 3MB japan.js 需更久
 
 # --- DOM verification of CN multi-year functions (no screenshot needed) ---
 def dump_dom(name, url, wait=9):
@@ -74,5 +75,27 @@ pres = [m for m in re.findall(r'<pre id="testout">(.*?)</pre>', dom, re.S)
 if not pres:
     pres = [m for m in re.findall(r'<pre id="testout">(.*?)</pre>', dom, re.S) if 'P2024' in m]
 if pres: print("    " + pres[-1][:700])
+
+# --- DOM verification of Japan prefecture panel (F3 层级回归) ---
+jp_verify_js = (
+    "loadJapan();"
+    "setTimeout(function(){"
+    "var out=[];"
+    "var d=window.JP_METRICS&&window.JP_METRICS['东京都'];"
+    "out.push('JP县数='+(window.JP_METRICS?Object.keys(window.JP_METRICS).length:0));"
+    "out.push('东京都GDP='+(d?(d.gdp/1e8).toFixed(0)+'亿':'-'));"
+    "showJapanPrefPanel('东京都');"
+    "var pn=document.getElementById('pName').textContent;"
+    "out.push('面板='+pn);"
+    "document.body.insertAdjacentHTML('beforeend','<pre id=\"jpout\">JPVERIFY '+out.join(' ; ')+'</pre>');"
+    "}, 2500);"
+)
+jpurl = make_variant("t_jp_verify.html", jp_verify_js)
+jpdom = dump_dom("jp_verify_dom.html", jpurl, wait=18)
+jptag = "JPVERIFY" in jpdom
+print("  " + ("OK " if jptag else "FAIL") + " jp_verify DOM captured")
+jppres = [m for m in re.findall(r'<pre id="jpout">(.*?)</pre>', jpdom, re.S)
+          if m.startswith('JPVERIFY ')]
+if jppres: print("    " + jppres[-1][:300])
 
 print("\nDone ->", os.path.abspath(OUT))
