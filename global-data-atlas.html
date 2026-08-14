@@ -825,27 +825,19 @@ function updateMetricButtons(){
       const gdpBtn=seg.querySelector('button[data-m="gdp"]');
       if(gdpBtn){ gdpBtn.classList.add("active"); gdpBtn.disabled=false; gdpBtn.classList.remove("disabled"); }
       const level=currentLevel;
-      if(level==="china"){ loadChina(); if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }   // M3: 自动切回 gdp 后恢复面板（与 setMetric 一致）
-      else if(level==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
-      else if(level==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
-      else if(level==="nuts"){ loadNUTS(currentNUTS||"DE"); if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
+      const L=LAYERS[level]; if(L){ L.render(); L.restore(); }   // M3: 自动切回 gdp 后恢复面板（统一走 LAYERS）
     }
   });
 }
 /* 返回按钮动态文字：显示上一级名称 */
 function updateBackBtn(){
   const b=document.getElementById("backBtn"); if(!b) return;
-  const map={province:"← 返回中国", china:"← 返回世界", us:"← 返回世界", japan:"← 返回世界", nuts:"← 返回世界"};
-  b.textContent=map[currentLevel]||"← 返回世界";
+  const L=layerGet(); const bl=L?LAYERS[L.back]:null;
+  b.textContent="← 返回"+(bl?bl.label:"世界");
 }
-/* 统一返回逻辑：面包屑/返回按钮共用（L6/I2 修复） */
+/* 统一返回逻辑：面包屑/返回按钮共用（L6/I2 修复）——走 LAYERS 注册表 */
 function goLevel(level){
-  if(level==="world"){ renderWorld2D(); }
-  else if(level==="china"){ if(currentLevel!=="china") loadChina(); }
-  else if(level==="us"){ if(currentLevel!=="us") loadUS(); }
-  else if(level==="japan"){ if(currentLevel!=="japan") loadJapan(); }
-  else if(level==="nuts"){ if(currentNUTS) loadNUTS(currentNUTS); }
-  else if(level==="province"){ if(currentProvName&&currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); }
+  const L=LAYERS[level]; if(L&&L.render) L.render();
 }
 function showLoading(b){ document.getElementById("loading").style.display=b?"flex":"none"; }
 function showBanner(t){ document.getElementById("banner").textContent=t; }
@@ -1371,6 +1363,72 @@ const DRILLABLE = {
   AT: { load: ()=>loadNUTS("AT"), label: "奥地利" }
 };
 function euCCName(cc){ const d=DRILLABLE[cc]; return d?d.label:cc; }
+/* ============== LAYERS 层级注册表（架构重构） ==============
+   所有层级行为收敛为一份配置：render(重绘) / click(单击面板) / drill(双击下钻) /
+   rank(排行 items) / restore(切指标/年份后恢复面板) / back(返回上级)。
+   加新层只需注册 1 条 + 写 1 个 render 函数，不再改散落的 if-else。 */
+const LAYERS = {
+  world: {
+    label:"世界", back:"world",
+    render:()=>renderWorld2D(),
+    click(p){ const c=p.data&&p.data.cn; if(c) showCountry(c); },   // 所有国家（含 CN/US/JP/EU）单击都显示面板
+    drill(p){ const c=p.data&&p.data.cn; if(!c) return;
+      const d=DRILLABLE[c[2]];
+      if(d) d.load();
+      else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟8国）。单击查看国家详情，或返回世界选择其他区域。"); },
+    rank:()=>COUNTRIES.map(c=>{ const r=regCountry(c[2]); return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country"]; }).filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
+    restore(){ if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }
+  },
+  china: {
+    label:"中国", back:"world",
+    render:()=>loadChina(),
+    click(p){ const nm=normProv(p.name); if(PROV_ADCODE[nm]) showProvincePanel(nm); },
+    drill(p){ const nm=normProv(p.name); const adcode=PROV_ADCODE[nm]; if(adcode) loadProvince(nm, adcode); },
+    rank:()=>{ const MUNI=["上海","北京","天津","重庆"];   // 直辖市不加"省"
+      return Object.keys(CN).map(k=>{ const r=regProv(k), v=regGet(r,metric,dataYear); return [MUNI.includes(k)?k:k+"省",k,v,"prov"]; })
+        .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]); },
+    restore(){ if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }
+  },
+  province: {
+    label:"省级", back:"china",
+    render:()=>{ if(currentProvName&&currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); },   // 无省级上下文时回退中国层（与旧分支一致）
+    click(p){ const d=p.data; if(d&&d.cm) showCityPanel(d.name, d.adcode, d.parentAdcode); },
+    drill:null,
+    rank:()=>currentProvData.filter(d=>d.cm)
+      .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),   // L1: null 过滤（与其余分支一致）
+    restore(){ if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
+  },
+  us: {
+    label:"美国", back:"world",
+    render:()=>loadUS(),
+    click(p){ showUSStatePanel(p.name); },
+    drill:null,
+    rank:()=>Object.keys(US_STATES_GDP).map(k=>{ const r=regUSState(k); return [k,k,regGet(r,metric,dataYear),"usstate"]; })
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
+    restore(){ if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
+  },
+  japan: {
+    label:"日本", back:"world",
+    render:()=>loadJapan(),
+    click(p){ showJapanPrefPanel(p.name); },
+    drill:null,
+    rank:()=>Object.keys(window.JP_METRICS||{}).map(k=>{ const r=regJapanPref(k); return [k,k,regGet(r,metric,dataYear),"jppref"]; })
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
+    restore(){ if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
+  },
+  nuts: {
+    label:"欧盟", back:"world",
+    render:()=>loadNUTS(currentNUTS||"DE"),
+    click(p){ const d=p.data; if(d&&d.nid) showNUTSPanel(d.nid); },
+    drill:null,
+    rank:()=>Object.keys(window.EU_METRICS||{}).filter(k=>(window.EU_METRICS[k]||{}).cc===currentNUTS)
+      .map(k=>{ const r=regNUTS(k); const v=r?regGet(r,metric,dataYear):null; return [r?r.name:k,k,v,"nutspref"]; })
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),   // NUTS2 排行（当前国家）
+    restore(){ if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
+  }
+};
+function layerGet(){ return LAYERS[currentLevel]||null; }
 /* regNUTS：NUTS2 区域 reg 接口（单年快照 2023，与日本一致） */
 function regNUTS(nid){
   const d=window.EU_METRICS&&window.EU_METRICS[nid]; if(!d) return null;
@@ -1435,36 +1493,9 @@ function showNUTSPanel(nid){
 function renderRank(){
   const box=document.getElementById("rank");
   let items=[], unit=metricLabel(metric);
-  if(currentLevel==="us"){
-    items=Object.keys(US_STATES_GDP).map(k=>{
-      const r=regUSState(k);
-      return [k,k,regGet(r,metric,dataYear),"usstate"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
-  } else if(currentLevel==="japan"){
-    items=Object.keys(window.JP_METRICS||{}).map(k=>{
-      const r=regJapanPref(k);
-      return [k,k,regGet(r,metric,dataYear),"jppref"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
-  } else if(currentLevel==="nuts"){
-    items=Object.keys(window.EU_METRICS||{}).filter(k=>(window.EU_METRICS[k]||{}).cc===currentNUTS)
-      .map(k=>{ const r=regNUTS(k); const v=r?regGet(r,metric,dataYear):null; return [r?r.name:k,k,v,"nutspref"]; })
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);   // NUTS2 排行（当前国家）
-  } else if(currentLevel==="province"){
-    items=currentProvData.filter(d=>d.cm)
-      .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);   // L1: null 过滤（与其余分支一致）
-  } else if(currentLevel==="china"){
-    const MUNI=["上海","北京","天津","重庆"];   // 直辖市不加"省"
-    items=Object.keys(CN).map(k=>{
-      const r=regProv(k), v=regGet(r,metric,dataYear);
-      return [MUNI.includes(k)?k:k+"省",k,v,"prov"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
-  } else if(currentLevel==="world"){
-    items=COUNTRIES.map(c=>{
-      const r=regCountry(c[2]);
-      return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country"];})
-      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
-  } else { box.innerHTML=""; return; }
+  const L=layerGet();
+  if(L&&L.rank){ items=L.rank(); }
+  else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
   const fmt=v=> metricFmt(metric,v);
   box.innerHTML=`<div class="rank-title">${esc(unit)} · 排行 · ${dataYear}（全量，可滚动）</div>`+items.map((it,i)=>
@@ -1586,37 +1617,15 @@ function onChartDblClick(p){
   if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
   drillDownFor(p);
 }
-/* 单击：显示该区域内容（不下钻） */
+/* 单击：显示该区域内容（不下钻）——统一走 LAYERS 注册表 */
 function showContentFor(p){
   ensurePanelOpen();   /* 单击区域：自动展开面板看数据 */
-  if(currentLevel==="world"){
-    const c=p.data&&p.data.cn; if(!c) return;
-    showCountry(c);   // 所有国家（含 CN/US/JP）单击都显示面板
-  } else if(currentLevel==="china"){
-    const nm=normProv(p.name); if(PROV_ADCODE[nm]) showProvincePanel(nm);
-  } else if(currentLevel==="us"){
-    showUSStatePanel(p.name);
-  } else if(currentLevel==="japan"){
-    showJapanPrefPanel(p.name);
-  } else if(currentLevel==="nuts"){
-    const d=p.data; if(d&&d.nid) showNUTSPanel(d.nid);
-  } else if(currentLevel==="province"){
-    const d=p.data; if(d&&d.cm) showCityPanel(d.name, d.adcode, d.parentAdcode);
-  }
+  const L=layerGet(); if(L&&L.click) L.click(p);
 }
-/* 双击：下钻（仅可下钻层级） */
+/* 双击：下钻（仅可下钻层级）——统一走 LAYERS 注册表 */
 function drillDownFor(p){
   ensurePanelOpen();   /* 下钻：自动展开面板 */
-  if(currentLevel==="world"){
-    const c=p.data&&p.data.cn; if(!c) return;
-    const d=DRILLABLE[c[2]];
-    if(d) d.load();   // 泛化下钻：中国/美国/日本/欧盟8国
-    else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟8国）。单击查看国家详情，或返回世界选择其他区域。");   // 双击语义=下钻：无下钻数据时明确提示，不退化显示面板
-  } else if(currentLevel==="china"){
-    const nm=normProv(p.name); const adcode=PROV_ADCODE[nm];
-    if(adcode) loadProvince(nm, adcode);
-  }
-  /* us / japan / nuts / province 层无下一级，双击忽略 */
+  const L=layerGet(); if(L&&L.drill) L.drill(p);
 }
 
 /* ============== 启动 ============== */
@@ -1658,12 +1667,7 @@ window.addEventListener("load", ()=>{
     // E2: EXT 扩展指标（scope=world）按需加载 ext_indicators.js（首屏省 669KB）
     if(metricScope(m)==="world" && !window.EXT){ try{ await loadScript("vendor/ext_indicators.js"); }catch(e){ showBanner("扩展指标数据加载失败"); return; } }
     metric=m; [...e.currentTarget.children].forEach(x=>x.classList.toggle("active",x===b));
-    if(currentLevel==="world"){ renderWorld2D(); if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }   // 切维度：恢复面板区域并跟随刷新
-    else if(currentLevel==="china"){ loadChina(); if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }
-    else if(currentLevel==="province"){ if(currentProvName && currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
-    else if(currentLevel==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
-    else if(currentLevel==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
-    else if(currentLevel==="nuts"){ loadNUTS(currentNUTS||"DE"); if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
+    const L=layerGet(); if(L){ L.render(); L.restore(); }   // 切维度：重绘当前层 + 恢复面板区域并跟随刷新（统一走 LAYERS）
     renderRank();
     updateCompare();   // 维度切换：对比值/图跟随刷新
   });
@@ -1681,12 +1685,7 @@ window.addEventListener("load", ()=>{
   })();
   /* 按当前 dataYear 重绘当前层（年份下拉/播放动画共用） */
   function redrawByYear(){
-    if(currentLevel==="world"){ renderWorld2D(); if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }   // 切年份：恢复面板区域并跟随刷新
-    else if(currentLevel==="china"){ loadChina(); if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }
-    else if(currentLevel==="province" && currentProvName){ loadProvince(currentProvName, currentProvAdcode); if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
-    else if(currentLevel==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
-    else if(currentLevel==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
-    else if(currentLevel==="nuts"){ loadNUTS(currentNUTS||"DE"); if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
+    const L=layerGet(); if(L){ L.render(); L.restore(); }   // 切年份：重绘当前层 + 恢复面板区域（统一走 LAYERS）
     renderRank();
   }
   document.getElementById("yearSel").addEventListener("change", e=>{
@@ -1694,13 +1693,10 @@ window.addEventListener("load", ()=>{
     redrawByYear();
   });
   document.getElementById("backBtn").addEventListener("click", ()=>{
-    // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致
-    if(currentLevel==="province") goLevel("china");
-    else if(currentLevel==="china") goLevel("world");
-    else if(currentLevel==="us") goLevel("world");
-    else if(currentLevel==="japan") goLevel("world");
-    else if(currentLevel==="nuts") goLevel("world");
-    else goLevel("world");   // world 层：回到世界（重绘无副作用）
+    // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致（走 LAYERS.back）
+    const L=layerGet();
+    if(L) goLevel(L.back);
+    else goLevel("world");
   });
   /* ESC 键返回上一级 */
   window.addEventListener("keydown", e=>{ if(e.key==="Escape" && !(e.target&&e.target.tagName==="INPUT")){ document.getElementById("backBtn").click(); } });   // L4: 搜索框聚焦时 ESC 不触发返回
