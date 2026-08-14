@@ -115,17 +115,29 @@ for ad, o in CITY.items():
 check("量级[城市GDP≤2万亿]", not viol, f"超界: {viol[:5]}")
 
 # ---------- 3. 逐年校验 ----------
-def growth_check(name, series, lo=-0.35, hi=1.2):
-    """series: {year: value}，检查逐年增长率区间 + 年份连续性"""
+def growth_check(name, series):
+    """series: {year: value}，检查增长率区间 + 年份连续性。
+       连续年份（间隔=1）：逐年增长率须在 [-35%, +120%]（覆盖危机/高速年）。
+       稀疏年份（间隔>1，如省/市序列仅 2000/2010/2020-2025）：缺年是设计，
+       不告警；增长率按年均(CAGR)折算后须在 [-30%, +30%]，避免把 10 年
+       累计增长（如宁夏 2000→2010 累计 436%）误报为越界。"""
     ys = sorted(int(k) for k in series)
     if not ys: return
     for a, b in zip(ys, ys[1:]):
-        if b - a > 1:
-            warn.append(f"逐年[{name}]: {a}→{b} 缺 {b-a-1} 年")
-        if series[str(a)] and series[str(b)] and series[str(a)] > 0:
-            r = series[str(b)]/series[str(a)] - 1
-            if not (lo <= r <= hi):
-                warn.append(f"逐年[{name}]: {a}→{b} 增长 {r*100:.0f}%（越界）")
+        span = b - a
+        va, vb = series[str(a)], series[str(b)]
+        if not (va and vb and va > 0):
+            if span > 1:
+                print(f"  信息[稀疏序列 {name}]: {a}→{b} 间隔 {span} 年")
+            continue
+        if span == 1:
+            r = vb/va - 1
+            if not (-0.35 <= r <= 1.2):
+                warn.append(f"增长[{name}]: {a}→{b} {r*100:.0f}%（越界）")
+        else:
+            cagr = (vb/va) ** (1/span) - 1
+            if not (-0.30 <= cagr <= 0.30):
+                warn.append(f"增长[{name}]: {a}→{b} 年均 {cagr*100:.0f}%（越界，累计{(vb/va-1)*100:.0f}%）")
 
 for iso in list(WB)[:50]:
     y = WB[iso]['years']
