@@ -45,5 +45,9 @@ step "L3d 四维经济洞察（econ_insight）"
 python3 econ_insight_check.py > /tmp/econ.log 2>&1 && grep -q "人均GDP" /tmp/econ.log || { echo "  ✗ 四维洞察失败:"; tail -8 /tmp/econ.log; exit 1; }
 echo "  ✓ L3d 通过"; PASS=$((PASS+1))
 
+step "L3e 欧盟 NUTS2 下钻（eu_test）"
+python3 eu_test.py > /tmp/eu.log 2>&1 && grep -q "LEVEL=nuts" /tmp/eu.log || { echo "  ✗ 欧盟下钻失败:"; tail -8 /tmp/eu.log; exit 1; }
+echo "  ✓ L3e 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"
