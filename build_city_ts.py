@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 """解析维基城市 GDP wikitext（2020 链接式 + 2012 纯文本式）→ 城市多年 GDP（亿元）
    输出 vendor/cn/city_ts.js
+   输入：中文维基「中华人民共和国城市地区生产总值列表」的 wikitext 快照，
+   默认读 /tmp/citygdp_wt.txt，可用环境变量 CITYGDP_WT 指定路径。
 """
-import re, json
+import re, json, os, sys
 
-wt = open('/tmp/citygdp_wt.txt', encoding='utf-8').read()
+WT = os.environ.get('CITYGDP_WT', '/tmp/citygdp_wt.txt')
+if not os.path.exists(WT):
+    sys.exit(
+        f"错误：维基快照缺失 {WT}\n"
+        "获取方式：打开中文维基「中华人民共和国城市地区生产总值列表」→ 编辑 → 复制 wikitext，"
+        f"保存为 {WT}（或设置环境变量 CITYGDP_WT 指定路径）后重跑。"
+    )
+wt = open(WT, encoding='utf-8').read()
 year_pat = re.compile(r'\n=+(\d{4})年=+\n')
 matches = list(year_pat.finditer(wt))
 sections = {}

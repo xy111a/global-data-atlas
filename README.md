@@ -32,7 +32,9 @@ python3 -m http.server 8000   # 访问 http://localhost:8000
 |---|---|---|
 | 国家 GDP/人口/面积 + 扩展指标 | `fetch_wb_indicators.py` / `fetch_ext_data.py` / `fetch_ext_merge.py` | World Bank API，需出网 |
 | 中国省级序列 | `build_cn_prov.js` | 维基解析 |
-| 中国城市序列/索引 | `build_city_ts.py`（依赖维基快照）/ `build_city_index.py`（本地，可复现） | |
+| 中国城市序列/索引 | `build_city_ts.py`（依赖维基快照 `CITYGDP_WT`，默认 `/tmp/citygdp_wt.txt`，缺失时脚本会提示获取方式）/ `build_city_index.py`（本地，可复现） | |
+
+> ⚠️ **数据更新注意事项**：`fetch_ext_data.py` / `fetch_ext_merge.py` 会**直接覆盖** `vendor/ext_indicators.js`，执行前先备份（脚本会打印警告）。
 | 美国州 | `build_bea_states.js` | BEA API |
 | 日本县 | `build_japan.py` | |
 | 中文名同步 | `patch_cn_names.py` → `sync_cn_to_wb.py` | |

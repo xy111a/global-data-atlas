@@ -87,6 +87,7 @@ def main():
 
     js = "/* 扩展指标（World Bank）：trade贸易占GDP% / health医疗支出占GDP% / edu教育支出占GDP% / life预期寿命 / gdpcap人均GDP(2015不变价USD) */\n"
     js += "window.EXT = " + json.dumps(final, ensure_ascii=False, separators=(',', ':')) + ";\n"
+    print("⚠️ 将覆盖 vendor/ext_indicators.js（建议先备份：cp vendor/ext_indicators.js /tmp/）")
     with open('vendor/ext_indicators.js', 'w', encoding='utf-8') as f:
         f.write(js)
     print("已写入 vendor/ext_indicators.js", os.path.getsize('vendor/ext_indicators.js'), "bytes")
