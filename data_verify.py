@@ -191,7 +191,7 @@ src_eu = open(os.path.join(os.path.dirname(__file__), 'vendor', 'eu', 'eu_metric
 m_eu = re.search(r'window\.EU_METRICS=(\{.*\})', src_eu, re.S)
 EU_M = json.loads(m_eu.group(1)) if m_eu else {}
 check("覆盖[欧盟NUTS2区域]", 140 <= len(EU_M) <= 160, f"{len(EU_M)} 区域")
-eu_gdp_ok = all(0 < v['gdp'] < 2e13 for v in EU_M.values())   # GDP 0~2万亿 元 量级
+eu_gdp_ok = all(v['gdp'] is None or 0 < v['gdp'] < 2e13 for v in EU_M.values())   # GDP 0~2万亿 元（部分区域 Eurostat 缺 GDP=null）
 check("量级[欧盟NUTS2 GDP]", eu_gdp_ok, "")
 eu_pop_ok = all(1e4 < v['pop'] < 2e7 for v in EU_M.values())  # 人口 1万~2000万
 check("量级[欧盟NUTS2 人口]", eu_pop_ok, "")

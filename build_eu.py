@@ -98,9 +98,9 @@ def main():
             for nid in ids:
                 g = gdp_by_id.get(nid)
                 p = pop_by_id.get(nid)
-                if g is None or p is None:
-                    continue
-                metrics[nid] = {"name": names[nid], "cc": cc, "gdp": float(g), "pop": float(p)}
+                if g is None and p is None:
+                    continue   # 完全无数据（Eurostat 缺失）跳过
+                metrics[nid] = {"name": names[nid], "cc": cc, "gdp": g, "pop": p}   # gdp/pop 可单缺（如 NL31/NL33 无 GDP），面板显示"—"
             time.sleep(0.5)   # 限流礼貌间隔
 
     # ---------- 3. 汇率 EUR/CNY（Frankfurter=ECB，年度均值） ----------
@@ -141,8 +141,8 @@ def main():
     for nid, m in metrics.items():
         out_m[nid] = {
             "name": m["name"], "cc": m["cc"],
-            "gdp": m["gdp"] * 1e6 * rate,   # 百万欧元 → 元（×1e6 × EUR/CNY）
-            "pop": int(m["pop"]), "area": m.get("area", 0),
+            "gdp": (m["gdp"] * 1e6 * rate) if m["gdp"] is not None else None,   # 百万欧元 → 元；Eurostat 缺 GDP 保留 null
+            "pop": int(m["pop"]) if m["pop"] is not None else None, "area": m.get("area", 0),
             "year": YEAR
         }
     js_m = ("/* 欧盟 NUTS2 单年快照（Eurostat " + str(YEAR) + "）：gdp=元(人民币, EUR/CNY=" + f"{rate:.4f}" + "), pop=人, area=km² */\n"

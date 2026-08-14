@@ -15,3 +15,6 @@ dist/vendor/cn/*.json
 # 数据修复备份
 *.bak
 .DS_Store
+
+# Python 缓存
+__pycache__/
