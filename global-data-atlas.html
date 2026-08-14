@@ -828,13 +828,14 @@ function updateMetricButtons(){
       if(level==="china"){ loadChina(); if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }   // M3: 自动切回 gdp 后恢复面板（与 setMetric 一致）
       else if(level==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
       else if(level==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
+      else if(level==="nuts"){ loadNUTS(currentNUTS||"DE"); if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
     }
   });
 }
 /* 返回按钮动态文字：显示上一级名称 */
 function updateBackBtn(){
   const b=document.getElementById("backBtn"); if(!b) return;
-  const map={province:"← 返回中国", china:"← 返回世界", us:"← 返回世界", japan:"← 返回世界"};
+  const map={province:"← 返回中国", china:"← 返回世界", us:"← 返回世界", japan:"← 返回世界", nuts:"← 返回世界"};
   b.textContent=map[currentLevel]||"← 返回世界";
 }
 /* 统一返回逻辑：面包屑/返回按钮共用（L6/I2 修复） */
@@ -843,6 +844,7 @@ function goLevel(level){
   else if(level==="china"){ if(currentLevel!=="china") loadChina(); }
   else if(level==="us"){ if(currentLevel!=="us") loadUS(); }
   else if(level==="japan"){ if(currentLevel!=="japan") loadJapan(); }
+  else if(level==="nuts"){ if(currentNUTS) loadNUTS(currentNUTS); }
   else if(level==="province"){ if(currentProvName&&currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); }
 }
 function showLoading(b){ document.getElementById("loading").style.display=b?"flex":"none"; }
@@ -1352,6 +1354,83 @@ function showProvincePanel(short){
   else document.getElementById("trend").innerHTML="";
 }
 
+/* ============== 欧盟 NUTS2 省级（Phase E 试点 8 国） ============== */
+let currentNUTS="";   // 当前下钻的欧盟国家代码
+/* DRILLABLE 注册表：国家 ISO2 → 下钻加载函数（泛化下钻，替代硬编码 CN/US/JP 判断） */
+const DRILLABLE = {
+  CN: { load: ()=>loadChina(),  label: "中国" },
+  US: { load: ()=>loadUS(),     label: "美国" },
+  JP: { load: ()=>loadJapan(),  label: "日本" },
+  DE: { load: ()=>loadNUTS("DE"), label: "德国" },
+  FR: { load: ()=>loadNUTS("FR"), label: "法国" },
+  IT: { load: ()=>loadNUTS("IT"), label: "意大利" },
+  ES: { load: ()=>loadNUTS("ES"), label: "西班牙" },
+  NL: { load: ()=>loadNUTS("NL"), label: "荷兰" },
+  PL: { load: ()=>loadNUTS("PL"), label: "波兰" },
+  BE: { load: ()=>loadNUTS("BE"), label: "比利时" },
+  AT: { load: ()=>loadNUTS("AT"), label: "奥地利" }
+};
+function euCCName(cc){ const d=DRILLABLE[cc]; return d?d.label:cc; }
+/* regNUTS：NUTS2 区域 reg 接口（单年快照 2023，与日本一致） */
+function regNUTS(nid){
+  const d=window.EU_METRICS&&window.EU_METRICS[nid]; if(!d) return null;
+  return {
+    name:d.name, cn:d.name, cc:d.cc,
+    years:()=>[d.year],   // 单年快照
+    ext(){ return null; },
+    get(m){ return m==="gdp"?d.gdp:m==="pop"?d.pop:(m==="area"?d.area:null); },
+    growth(){ return null; }, gdpSeries(){ return null; }, series(){ return null; }
+  };
+}
+async function loadNUTS(cc){
+  if(metricScope(metric)==="world"){ showGeneric(euCCName(cc)+" · NUTS2","", metricUnavailableMsg(metric)); renderRank(); return; }   // 守卫在前：不改变 currentLevel
+  if(!window["EU_"+cc+"_GEO"]){ try{ await loadScript("vendor/eu/"+cc.toLowerCase()+".js"); }catch(e){} }   // 懒加载边界（E1）
+  if(!window.EU_METRICS){ try{ await loadScript("vendor/eu/eu_metrics.js"); }catch(e){} }   // 懒加载指标
+  currentLevel="nuts"; currentNUTS=cc;
+  const gj=window["EU_"+cc+"_GEO"]; if(!gj){ showGeneric(euCCName(cc),"边界未加载","vendor/eu/"+cc.toLowerCase()+".js 缺失"); return; }
+  echarts.registerMap("nuts-"+cc, gj);
+  const data=gj.features.map(f=>{
+    const nid=f.properties.NUTS_ID;
+    const r=regNUTS(nid);
+    return {name:f.properties.NUTS_NAME, value:r?regGet(r,metric,dataYear)||0:0, reg:r, nid};
+  });
+  const vals=data.map(d=>d.value).filter(v=>v>0);
+  const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
+  chart.clear();
+  chart.setOption({
+    backgroundColor:"#05060a",
+    tooltip:{trigger:"item", formatter:p=>{ const r=p.data&&p.data.reg;
+      if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无指标数据</span>`;
+      return `<b>${p.name}</b> · ${r.years()[0]}<br/>GDP ${fmtGDP(r.get("gdp"))}<br/>人口 ${fmtPop(r.get("pop"))}<br/>面积 ${fmtArea(r.get("area"))}`;}},
+    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 2023",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
+    series:[{type:"map",map:"nuts-"+cc,roam:false,data,label:{show:false},
+      emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+  });
+  setCrumbPath([{label:"世界", level:"world"},{label:euCCName(cc), level:"nuts"}]);
+  showGeneric(euCCName(cc)+" · NUTS2 省级","共 "+gj.features.length+" 个大区；单击查看数据",
+    `欧盟 ${euCCName(cc)} NUTS2 省级（Eurostat ${(window.EU_RATE||"")?"2023":""} 单年快照）：GDP 现价欧元按 EUR/CNY ${window.EU_RATE||"—"} 折算人民币。人口/面积同源单年。年份切换不生效。`);
+  document.getElementById("trend").innerHTML="";
+  renderRank();
+}
+function showNUTSPanel(nid){
+  lastShown={type:"nutspref", nm:nid};
+  const r=regNUTS(nid); if(!r) return;
+  const cards=metricCards([
+      {label:"GDP (2023)", value:fmtGDP(r.get("gdp"))},
+      {label:"人口 (2023)", value:fmtPop(r.get("pop"))},
+      {label:"面积", value:fmtArea(r.get("area"))}
+    ], [],
+    metric==="pop"?{label:"人口 (2023)", value:fmtPop(r.get("pop"))}:metric==="area"?{label:"面积", value:fmtArea(r.get("area"))}:null);
+  renderDashboard({
+    name:r.name, en:euCCName(r.cc)+" · NUTS2", level:"欧盟省级",
+    tags:["来源：Eurostat","GDP 2023 · 欧元折算人民币"],
+    stats:cards.stats, insight:cards.insight,
+    actionsHTML:`<button class="btn" onclick="cmpHandleClick('nutspref','${r.name.replace(/'/g,"")}','${nid}')">＋ 加入对比</button>`
+  });
+  document.getElementById("trend").innerHTML="";
+}
+
 /* ============== 排行榜 + 搜索 ============== */
 function renderRank(){
   const box=document.getElementById("rank");
@@ -1366,6 +1445,10 @@ function renderRank(){
       const r=regJapanPref(k);
       return [k,k,regGet(r,metric,dataYear),"jppref"];})
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);
+  } else if(currentLevel==="nuts"){
+    items=Object.keys(window.EU_METRICS||{}).filter(k=>(window.EU_METRICS[k]||{}).cc===currentNUTS)
+      .map(k=>{ const r=regNUTS(k); const v=r?regGet(r,metric,dataYear):null; return [r?r.name:k,k,v,"nutspref"]; })
+      .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]);   // NUTS2 排行（当前国家）
   } else if(currentLevel==="province"){
     items=currentProvData.filter(d=>d.cm)
       .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
@@ -1390,11 +1473,12 @@ function renderRank(){
   box.querySelectorAll(".rank-item").forEach(el=>{
     el.onclick=()=>{
       const t=el.dataset.type, k=el.dataset.key;
-      if(t==="country"){ const c=BY_EN[k]; if(!c)return; if(c[2]==="CN")loadChina(); else if(c[2]==="US")loadUS(); else showCountry(c); }
+      if(t==="country"){ const c=BY_EN[k]; if(!c)return; const d=DRILLABLE[c[2]]; if(d) d.load(); else showCountry(c); }   // 泛化下钻
       else if(t==="prov"){ if(currentLevel!=="china") loadChina(); setTimeout(()=>showProvincePanel(k), currentLevel==="china"?0:700); }
       else if(t==="city"){ showCityPanel(it[0], it[4], it[5]); }
       else if(t==="usstate"){ if(currentLevel!=="us"){ loadUS(); setTimeout(()=>showUSStatePanel(k),80); } else showUSStatePanel(k); }
       else if(t==="jppref"){ if(currentLevel!=="japan"){ loadJapan(); setTimeout(()=>showJapanPrefPanel(k),80); } else showJapanPrefPanel(k); }
+      else if(t==="nutspref"){ if(currentLevel!=="nuts"){ loadNUTS(currentNUTS||"DE"); setTimeout(()=>showNUTSPanel(k),80); } else showNUTSPanel(k); }
     };
     el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); el.onclick(); } });   // P1b: 键盘可操作排行
   });
@@ -1403,9 +1487,8 @@ function doSearch(q){
   q=(q||"").trim().toLowerCase(); if(!q) return;
   const c=COUNTRIES.find(x=>x[0].toLowerCase().includes(q)||x[1].toLowerCase().includes(q));
   if(c){
-    if(c[2]==="CN") loadChina();
-    else if(c[2]==="US") loadUS();
-    else if(c[2]==="JP") loadJapan();
+    const d=DRILLABLE[c[2]];
+    if(d) d.load();   // 泛化下钻
     else { renderWorld2D(); showCountry(c); }   // M4: 第三国先回世界层再显示面板，避免层级错位
     return;
   }
@@ -1439,6 +1522,8 @@ function cmpGetData(it){
     base={g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
   else if(it.t==="usstate"){ base={g:usGdpY(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
   else if(it.t==="jppref"){ const d=window.JP_METRICS&&window.JP_METRICS[it.k]; if(!d) return null;
+    base={g:d.gdp, p:d.pop, a:d.area}; }
+  else if(it.t==="nutspref"){ const d=window.EU_METRICS&&window.EU_METRICS[it.k]; if(!d) return null;
     base={g:d.gdp, p:d.pop, a:d.area}; }
   else if(it.t==="city"){ const cm=getCityMetric(it.k, it.pa); if(!cm) return null;
     base={g:cm.gdp, p:cm.pop, a:cm.area}; }   // 数据已由 city_metrics.js 折算为元/人（L5: 传 parentAdcode 支持直辖市兜底）
@@ -1513,6 +1598,8 @@ function showContentFor(p){
     showUSStatePanel(p.name);
   } else if(currentLevel==="japan"){
     showJapanPrefPanel(p.name);
+  } else if(currentLevel==="nuts"){
+    const d=p.data; if(d&&d.nid) showNUTSPanel(d.nid);
   } else if(currentLevel==="province"){
     const d=p.data; if(d&&d.cm) showCityPanel(d.name, d.adcode, d.parentAdcode);
   }
@@ -1522,15 +1609,14 @@ function drillDownFor(p){
   ensurePanelOpen();   /* 下钻：自动展开面板 */
   if(currentLevel==="world"){
     const c=p.data&&p.data.cn; if(!c) return;
-    if(c[2]==="CN") loadChina();
-    else if(c[2]==="US") loadUS();
-    else if(c[2]==="JP") loadJapan();
-    else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（仅 中国/美国/日本 可双击下钻）。单击查看国家详情，或返回世界选择其他区域。");   // 双击语义=下钻：无下钻数据时明确提示，不退化显示面板
+    const d=DRILLABLE[c[2]];
+    if(d) d.load();   // 泛化下钻：中国/美国/日本/欧盟8国
+    else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟8国）。单击查看国家详情，或返回世界选择其他区域。");   // 双击语义=下钻：无下钻数据时明确提示，不退化显示面板
   } else if(currentLevel==="china"){
     const nm=normProv(p.name); const adcode=PROV_ADCODE[nm];
     if(adcode) loadProvince(nm, adcode);
   }
-  /* us / japan / province 层无下一级，双击忽略 */
+  /* us / japan / nuts / province 层无下一级，双击忽略 */
 }
 
 /* ============== 启动 ============== */
@@ -1577,6 +1663,7 @@ window.addEventListener("load", ()=>{
     else if(currentLevel==="province"){ if(currentProvName && currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
     else if(currentLevel==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
     else if(currentLevel==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
+    else if(currentLevel==="nuts"){ loadNUTS(currentNUTS||"DE"); if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
     renderRank();
     updateCompare();   // 维度切换：对比值/图跟随刷新
   });
@@ -1599,6 +1686,7 @@ window.addEventListener("load", ()=>{
     else if(currentLevel==="province" && currentProvName){ loadProvince(currentProvName, currentProvAdcode); if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
     else if(currentLevel==="us"){ loadUS(); if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
     else if(currentLevel==="japan"){ loadJapan(); if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
+    else if(currentLevel==="nuts"){ loadNUTS(currentNUTS||"DE"); if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
     renderRank();
   }
   document.getElementById("yearSel").addEventListener("change", e=>{
@@ -1611,6 +1699,7 @@ window.addEventListener("load", ()=>{
     else if(currentLevel==="china") goLevel("world");
     else if(currentLevel==="us") goLevel("world");
     else if(currentLevel==="japan") goLevel("world");
+    else if(currentLevel==="nuts") goLevel("world");
     else goLevel("world");   // world 层：回到世界（重绘无副作用）
   });
   /* ESC 键返回上一级 */

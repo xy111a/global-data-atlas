@@ -37,6 +37,7 @@ python3 -m http.server 8000   # 访问 http://localhost:8000
 > ⚠️ **数据更新注意事项**：`fetch_ext_data.py` / `fetch_ext_merge.py` 会**直接覆盖** `vendor/ext_indicators.js`，执行前先备份（脚本会打印警告）。
 | 美国州 | `build_bea_states.js` | BEA API |
 | 日本县 | `build_japan.py` | |
+| 欧盟 NUTS2（8 国试点） | `build_eu.py` | Eurostat GISCO 边界 + nama_10r_2gdp/demo_r_pjanaggr3 API + Frankfurter(ECB) 汇率；先下载边界 GeoJSON（脚本注释有命令） |
 | 中文名同步 | `patch_cn_names.py` → `sync_cn_to_wb.py` | |
 
 构建后需同步 `dist/`（`cp global-data-atlas.html dist/ && cp global-data-atlas.html dist/index.html`）。
