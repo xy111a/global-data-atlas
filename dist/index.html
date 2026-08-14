@@ -859,7 +859,7 @@ function showCountry(c){
   const tr=reg.series(metric);
   renderDashboard({
     name:c[0], en:c[1]+" · "+y, level:"国家",
-    tags:[currencyTag(metric).replace(/<[^>]+>/g,""), sourceTag("wb").replace(/<[^>]+>/g,""), `年份 ${y}`].filter(Boolean),
+    tags:[currencyTag(metric), "来源：World Bank", `年份 ${y}`].filter(Boolean),
     stats, insight,
     trendHTML: tr?`<div class="rank-title">${c[0]} · ${metricLabel(metric)} 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`:null,
     actionsHTML:`<button class="btn" onclick="cmpHandleClick('country','${c[0]}','${iso2}')">＋ 加入对比</button>`
@@ -875,30 +875,6 @@ function showGeneric(name,sub,hint){
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
 }
 /* ============== 时间趋势（Phase D 洞察） ============== */
-/* 渲染迷你折线图：series = [{name, years:[...], values:[...]}]；单位 formatter 复用 fmtGDP/fmtPop */
-function renderTrend(series, title, fmt){
-  const box=document.getElementById("trend"); if(!box) return;
-  if(!series || !series.length){ box.innerHTML=""; return; }
-  const yrs=series[0].years||[];
-  box.innerHTML=`<div class="rank-title">${title||"时间趋势"}${yrs.length?" · "+yrs[0]+"→"+yrs[yrs.length-1]:""}</div><div id="trendChart" style="height:150px;width:100%;"></div>`;   // L7: 标题年份随实际序列
-  const tc=echarts.init(document.getElementById("trendChart"));
-  tc.setOption({
-    backgroundColor:"transparent",
-    tooltip:{trigger:"axis", formatter:ps=>{
-      const y=ps[0].axisValue; let rows=[`<b>${y}</b>`];
-      ps.forEach(p=>{ rows.push(`${p.seriesName}: <b style="color:${p.color}">${fmt?fmt(p.value):p.value}</b>`); });
-      return rows.join("<br/>"); }},
-    grid:{left:10,right:14,top:16,bottom:22,containLabel:true},
-    xAxis:{type:"category",data:series[0].years,axisLabel:{color:"#7f93a8",fontSize:10}},
-    yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>fmt?fmt(v).replace("¥",""):v},
-      splitLine:{lineStyle:{color:"#0e2233"}}},
-    series:series.map(s=>({name:s.name,type:"line",smooth:true,showSymbol:false,
-      data:s.values,lineStyle:{width:2,color:"#00F0FF"},itemStyle:{color:"#00F0FF"},
-      areaStyle:{color:"rgba(0,240,255,0.08)"}}))
-  });
-  tc.on("click",()=>{}); // 保留引用避免被 GC
-  window.__trendChart=tc;
-}
 /* 仪表盘趋势图：容器（#trendChart）已由 renderDashboard 写入，只做 echarts 渲染 */
 function renderTrendChart(series, fmt){
   const el=document.getElementById("trendChart"); if(!el) return;
@@ -964,16 +940,7 @@ function renderTrendCompare(entries, title, fmt){
   });
   window.__trendChart=tc;
 }
-/* 数据来源标注（Phase C 可信度） */
-function sourceTag(src){
-  const map={
-    wb:"World Bank", wiki:"维基百科（五经普修订）", bea:"BEA + Census",
-    city:"公开整理近似值", japan:"日本内阁府（県民経済計算）", mix:"多来源混合"
-  };
-  const t=map[src]||"公开整理";
-  const color=src==="wb"?"#00F0FF":(src==="bea"?"#00F0FF":(src==="wiki"?"#ffd166":(src==="city"?"#FF2E93":"#7f93a8")));
-  return `<span class="tag" style="color:${color};border-color:${color}33;">来源：${t}</span>`;
-}
+/* 数据来源标注：各面板直接传「来源：xxx」纯文本，由 renderDashboard 统一包 tag */
 /* ===== 区域仪表盘统一渲染（V3） =====
    cfg = {name, en, level, tags[], stats[], insight[], trendHTML, actionsHTML}
    stats[i] = {label, value, cls, delta}   delta = {txt, dir:up|down|flat|null}
@@ -1000,10 +967,10 @@ function renderDashboard(cfg){
   if(cfg.trendHTML){ document.getElementById("trend").innerHTML=cfg.trendHTML; }
   else document.getElementById("trend").innerHTML="";
 }
-/* T1: 货币标签按指标动态（避免「人民币(CNY)」与 USD 人均GDP 矛盾） */
+/* T1: 货币标签按指标动态（避免「人民币(CNY)」与 USD 人均GDP 矛盾）；返回纯文本由 renderDashboard 统一包 tag */
 function currencyTag(m){
-  if(m==="gdp") return `<span class="tag">货币：人民币(CNY)</span>`;
-  if(m==="gdpcap") return `<span class="tag">货币：USD(2015不变价)</span>`;
+  if(m==="gdp") return "货币：人民币(CNY)";
+  if(m==="gdpcap") return "货币：USD(2015不变价)";
   return "";   // pop/area/%/岁 等无量纲指标不标货币
 }
 
@@ -1038,7 +1005,6 @@ function renderWorld2D(){
   showGeneric("世界地图","单击国家查看数据；双击中国/美国/日本下钻",
     "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
   renderRank();
-  /* 洞察：各国较2000年实际增长对比（不变价 GDP） */
   /* 洞察：各国较2000年增长/变化对比（跟随当前维度） */
   const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
   renderTrendCompare(comp, "较2000年 "+(metric==="gdp"?"实际增长":(metric==="life"?"变化":metricLabel(metric)+"增长"))+"", v=>fmtGrowthFor(metric,v));
@@ -1087,13 +1053,6 @@ function getCityMetric(adcode, parentAdcode){
   if(!cm && parentAdcode) cm = window.CITY_METRICS[parentAdcode];
   return cm;
 }
-function cityMetricVal(cm, m){ m=m||metric;
-  if(!cm) return 0;
-  if(m==="gdp") return cm.gdp||0;   // 数据已由 city_metrics.js 末尾折算为元
-  if(m==="pop") return cm.pop||0;   // 已折算为人
-  return cm.area||0;
-}
-/* 按需加载省级边界（Phase B）：file:// 下动态 script 标签（fetch 会被 CORS 拦截） */
 /* E1: 按层懒加载脚本（避免首屏 7MB 同步阻塞；重复调用只加载一次） */
 const __scripts={};
 function loadScript(src){
@@ -1176,7 +1135,7 @@ async function loadProvince(short, adcode){
     const m=CN[short];
     showGeneric(short+" · 地级市", m?`GDP ${fmtGDP(cnGdpRMB(short,dataYear)??0)} · 人口 ${fmtPop(m.pop*1e4)} · 面积 ${fmtArea(m.area)}`:"",
       `共 ${data.length} 个地级行政区。颜色按市级「${metricLabel()}」着色；已覆盖 ${data.filter(d=>d.cm).length} 个城市公开指标，其余显示“暂无细分指标”。46 个主要城市含多年 GDP 序列（维基/统计局口径）${metric==="gdp"?"，切换年份或单击查看趋势":"，仅 GDP 维度有多年序列"}；其余城市为单年值（约2023）。`);   // L4: 文案跟随维度
-    document.getElementById("trend").innerHTML="";  // 市级无多年序列，不显示趋势
+    document.getElementById("trend").innerHTML="";  // 省级列表层不显示单市趋势（单击城市查看）
   }catch(e){ showGeneric("加载失败",String(e),"请检查网络。"); }
   renderRank();
   showLoading(false);
