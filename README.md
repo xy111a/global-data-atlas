@@ -23,7 +23,8 @@ python3 -m http.server 8000   # 访问 http://localhost:8000
 ## 测试（门禁）
 
 ```bash
-./run_all_tests.sh    # 6/6：L1 语法 / L2 数据自洽 / L3a 回归截图 / L3b 对比 / L3c 扩展指标 / L3d 四维洞察
+./run_all_tests.sh    # 7/7：L1 语法 / L2 数据自洽（含欧盟）/ L3a 回归截图 / L3b 对比 / L3c 扩展指标 / L3d 四维洞察 / L3e 欧盟下钻
+# 补充（按需）：eu_edge_test.py 欧盟边界行为（指标守卫/年份/对比趋势/移动端）、econ_insight_check.py 四维洞察
 ```
 
 ## 数据构建（数据更新流程）
