@@ -41,5 +41,9 @@ step "L3c 扩展指标（ext_test）"
 python3 ext_test.py > /tmp/ext.log 2>&1 && tail -2 /tmp/ext.log || { echo "  ✗ EXT 失败:"; tail -5 /tmp/ext.log; exit 1; }
 echo "  ✓ L3c 通过"; PASS=$((PASS+1))
 
+step "L3d 四维经济洞察（econ_insight）"
+python3 econ_insight_check.py > /tmp/econ.log 2>&1 && grep -q "人均GDP" /tmp/econ.log || { echo "  ✗ 四维洞察失败:"; tail -8 /tmp/econ.log; exit 1; }
+echo "  ✓ L3d 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"
