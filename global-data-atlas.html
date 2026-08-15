@@ -248,9 +248,11 @@
     <!-- I5: 缩放已锁死（roam:false），无需恢复视图按钮 -->
     <div id="panel">
       <button id="panelFold" title="收起面板" aria-label="收起数据面板">▸</button>
-      <h2 id="pName">世界地图</h2>
-      <div class="sub" id="pSub">加载中…</div>
-      <div class="hint" id="pHint"></div>
+      <details class="fold" open id="introFold"><summary id="introSum">简介</summary>
+        <h2 id="pName">世界地图</h2>
+        <div class="sub" id="pSub">加载中…</div>
+        <div class="hint" id="pHint"></div>
+      </details>
       <div id="pActions"></div>
       <div id="pMetrics"></div>
       <div id="trend" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:10px;"></div>
@@ -501,12 +503,11 @@ function showGeneric(name,sub,hint){
   document.getElementById("pActions").innerHTML="";   // 清操作按钮（防上一区域"加入对比"残留）
   document.getElementById("trend").innerHTML="";   // 清理趋势区残留（L1 修复）
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
-  /* 规范：总览空标题时隐藏标题区/指标区空 div（避免占位空洞）；有提示时恢复显示 */
-  const empty = !name;
-  ["pName","pSub","pHint","pActions","pMetrics"].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.style.display = empty ? "none" : "";
-  });
+  /* 简介折叠块：summary 跟随当前名称（层级名/单元名/提示名） */
+  const sum=document.getElementById("introSum");
+  if(sum) sum.textContent="简介 · "+(name||"区域");
+  /* 恢复简介块显示（统一：总览/详情/错误均显示，可折叠） */
+  document.getElementById("introFold").open=true;
 }
 /* ============== 时间趋势（Phase D 洞察） ============== */
 /* 仪表盘趋势图：容器（#trendChart）已由 renderDashboard 写入，只做 echarts 渲染 */
@@ -584,11 +585,10 @@ function foldTrend(html){
   });
 }
 function renderDashboard(cfg){
-  /* 恢复标题区/指标区显示（总览空标题时被 showGeneric 隐藏） */
-  ["pName","pSub","pHint","pActions","pMetrics"].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.style.display="";
-  });
+  /* 简介折叠块 summary 跟随单元名 */
+  const isum=document.getElementById("introSum");
+  if(isum) isum.textContent="简介 · "+(cfg.name||"区域");
+  document.getElementById("introFold").open=true;
   document.getElementById("pName").textContent=cfg.name;   // textContent 天然防注入
   document.getElementById("pSub").textContent=cfg.en||"";
   const tags=(cfg.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
@@ -639,7 +639,7 @@ function renderWorld2D(){
   });
   setCrumbPath([{label:"世界", level:"world"}]);
   ensurePanelOpen();   /* 世界层保留面板：显示各国排行 + 增长洞察（不折叠） */
-  showGeneric("");   // 世界层总览：不显示标题/提示，面板只留「排行 + 增长对比」
+  showGeneric("世界");   // 总览简介：层级名（可折叠）
   renderRank();
   /* 洞察：各国较2000年增长/变化对比（跟随当前维度） */
   const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
@@ -675,7 +675,7 @@ async function loadChina(){
         label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"}]);
-    showGeneric("");   // 中国层总览：不显示标题/提示（与世界层一致）
+    showGeneric("中国");   // 总览简介：层级名
     /* 洞察：各省较2000年名义增长（仅 GDP 有多年序列；pop/area 为单年常量无增长） */
     if(metric==="gdp"){
       const comp=Object.keys(CN).map(k=>({name:k, val:cnNominalGrowth(k,2000)})).filter(e=>e.val!=null);
@@ -768,7 +768,7 @@ async function loadProvince(short, adcode){
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"},{label:short, level:"province"}]);
     const m=CN[short];
-    showGeneric("");   // 省级总览：不显示标题/提示
+    showGeneric(short+" · 地级市");   // 总览简介：层级名
     document.getElementById("trend").innerHTML="";  // 省级列表层不显示单市趋势（单击城市查看）
   }catch(e){ showGeneric("加载失败",String(e),"请检查网络。"); }
   renderRank();
@@ -836,7 +836,7 @@ async function loadUS(){
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
-  showGeneric("");   // 美国层总览：不显示标题/提示
+  showGeneric("美国 · 州");   // 总览简介：层级名
   /* 洞察：各州较2000年名义增长（仅 GDP 有多年序列；pop/area 单年常量） */
   if(metric==="gdp"){
     const comp=Object.keys(US_STATES_GDP).map(k=>({name:k, val:usNominalGrowth(k,2000)})).filter(e=>e.val!=null);
@@ -871,7 +871,7 @@ async function loadJapan(){
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"日本", level:"japan"}]);
-  showGeneric("");   // 日本层总览：不显示标题/提示
+  showGeneric("日本 · 都道府县");   // 总览简介：层级名
   document.getElementById("trend").innerHTML="";   // 县级无多年序列
   renderRank();
 }
@@ -1100,7 +1100,7 @@ async function loadNUTS(cc){
       emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"},{label:euCCName(cc), level:"nuts"}]);
-  showGeneric("");   // 欧盟层总览：不显示标题/提示
+  showGeneric(euCCName(cc)+" · NUTS2");   // 总览简介：层级名
   document.getElementById("trend").innerHTML="";
   renderRank();
 }
