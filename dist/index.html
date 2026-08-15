@@ -240,6 +240,10 @@
           <option value="2024">2024</option>
           <option value="2023">2023</option>
         </select>
+        <select id="curSel" aria-label="货币单位" title="GDP 显示币种（人民币/美元切换）">
+          <option value="CNY">¥ 人民币</option>
+          <option value="USD">$ 美元</option>
+        </select>
         <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
@@ -270,7 +274,7 @@
       <b>数据来源</b>
       <span>World Bank · 维基 · BEA · 日本内阁府 · Eurostat · DataV</span>
     </div>
-    <div class="footer-note"><span style="opacity:1;color:var(--cyan);">数据更新于 2026-08</span> · 货币统一折算人民币（逐年平均汇率）· <a href="about.html" style="color:var(--cyan);text-decoration:none;">数据来源与口径详见「关于」</a></div>
+    <div class="footer-note"><span style="opacity:1;color:var(--cyan);">数据更新于 2026-08</span> · GDP 支持人民币/美元切换（逐年平均汇率折算）· <a href="about.html" style="color:var(--cyan);text-decoration:none;">数据来源与口径详见「关于」</a></div>
   </footer>
 </div>
 
@@ -345,7 +349,8 @@ if(window.US_TS){
     const ts=window.US_TS[k];
     if(ts && ts.years && ts.years["2023"]!=null){
       const r=(window.FXRATE&&window.FXRATE["2023"])||USD_CNY;
-      US_STATES_GDP[k].gdp = ts.years["2023"] * r * 1e6;   // 百万USD → 人民币元
+      US_STATES_GDP[k].gdpUsdM = ts.years["2023"];          // 保留 USD 百万（供 USD 显示兜底）
+      US_STATES_GDP[k].gdp = ts.years["2023"] * r * 1e6;    // 人民币元（CNY 兜底）
     }
   });
 }
@@ -523,7 +528,7 @@ function renderTrendChart(series, fmt){
       return rows.join("<br/>"); }},
     grid:{left:10,right:14,top:16,bottom:22,containLabel:true},
     xAxis:{type:"category",data:series[0].years,axisLabel:{color:"#7f93a8",fontSize:10}},
-    yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>fmt?fmt(v).replace("¥",""):v},
+    yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>fmt?fmt(v).replace(/[¥$]/,""):v},
       splitLine:{lineStyle:{color:"#0e2233"}}},
     series:series.map(s=>({name:s.name,type:"line",smooth:true,showSymbol:false,
       data:s.values,lineStyle:{width:2,color:"#00F0FF"},itemStyle:{color:"#00F0FF"},
@@ -767,7 +772,7 @@ async function loadProvince(short, adcode){
         const cm=d.cm;
         if(!cm) return `<b>${d.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
         const r=cm?regCity(cm, d.adcode):null;
-        const gv=r?r.get("gdp", dataYear):cm.gdp;
+        const gv=r?r.get("gdp", dataYear):gdpApply(cm.gdp,"CNY",2023);
         return `<b>${d.name}</b><br/>GDP${r&&r.years().length?" ("+dataYear+")":""} ${fmtGDP(gv)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;}},
       visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},   // L2: 省 GDP 稀疏回退/人口单年，不写死 dataYear
         textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>fmtBy(v)}:{show:false},
@@ -837,9 +842,12 @@ async function loadUS(){
     backgroundColor:"#05060a",
     tooltip:{trigger:"item", formatter:p=>{ const r=p.data&&p.data.reg;
       if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
-      const yg=regGet(r,"gdp",dataYear), ut=usGdpUsdT(p.name,dataYear);
+      const yg=regGet(r,"gdp",dataYear);
+      const refTxt = window.CURRENCY==="USD"
+        ? `人民币现价约 ${fmtGDP(usGdpY(p.name,dataYear))}`
+        : `美元现价约 ${usGdpUsdT(p.name,dataYear)!=null?usGdpUsdT(p.name,dataYear).toFixed(2):(US_STATES_GDP[p.name].gdp/RATE23/1e12).toFixed(2)} 万亿`;
       return `<b>${p.name}</b> · ${usGdpYear(p.name,dataYear)}<br/>GDP ${fmtGDP(yg)}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`
-        +`<br/><span style="color:#7f93a8">美元现价约 ${(ut!=null?ut:(US_STATES_GDP[p.name].gdp/RATE23/1e12)).toFixed(2)} 万亿</span>`;}},
+        +`<br/><span style="color:#7f93a8">${refTxt}</span>`;}},
     visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
     series:[{type:"map",map:"us",roam:false,data,label:{show:false},
@@ -907,11 +915,11 @@ function showJapanPrefPanel(nm){
 function showUSStatePanel(nm){
   lastShown={type:"usstate", nm};
   const s=US_STATES_GDP[nm]; if(!s) return;
-  const gy=usGdpYear(nm,dataYear), yg=usGdpY(nm,dataYear), ng=usNominalGrowth(nm,2000);
+  const gy=usGdpYear(nm,dataYear), yg=usGdpDisplay(nm,dataYear), ng=usNominalGrowth(nm,2000);
   const popY=(s.popYear||2023);
   const delta=(v,fmt)=>v==null?null:{txt:fmt(v),dir:v>=0?"up":"down"};
   const baseStats=[
-      {label:"GDP ("+gy+")", value:fmtGDP(yg!=null?yg:s.gdp), delta:delta(ng,fmtGrowth)},
+      {label:"GDP ("+gy+")", value:fmtGDP(yg), delta:delta(ng,fmtGrowth)},
       {label:"人口 ("+popY+")", value:fmtPop(s.pop)},
       {label:"面积", value:fmtArea(s.area)}
     ];
@@ -1068,9 +1076,16 @@ function layerGet(){ return LAYERS[currentLevel]||null; }
 /* ============== URL 状态持久化（优化3）：hash 保存/恢复 层级·指标·年份·面板·对比 ==============
    用 history.replaceState 避免历史堆积；saveState 在层级/指标/年份/对比/面板变化时调用，
    restoreState 在 load 时恢复（无 hash 或无效则返回 false 走默认世界视图）。 */
+/* ===== 货币切换（GDP 人民币/美元）：顶层函数，saveState/restoreState 与 load 回调共用 ===== */
+function setCurrency(cur){
+  if(cur!=="USD"&&cur!=="CNY") cur="CNY";
+  window.CURRENCY=cur;
+  const sel=document.getElementById("curSel"); if(sel) sel.value=cur;
+}
 function saveState(){
   try{
     const s={level:currentLevel, metric, year:dataYear};
+    if(window.CURRENCY==="USD") s.cur="usd";   // 货币切换持久化（默认 CNY 不占 URL）
     if(lastShown){
       const ls=lastShown;
       if(ls.type==="country"&&ls.data) s.sel="country:"+ls.data[2];
@@ -1086,6 +1101,7 @@ function saveState(){
 async function restoreState(){
   const h=location.hash.slice(1); if(!h) return false;
   const p=new URLSearchParams(h);
+  if(p.get("cur")==="usd") setCurrency("USD");   // 恢复货币（在渲染前，GDP 折算/标签随币种）
   const lvl=p.get("level"), m=p.get("metric"), yr=p.get("year");
   if(m&&METRICS[m]){ metric=m; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===m)); }
   if(yr&&!isNaN(+yr)) dataYear=yr;
@@ -1149,7 +1165,7 @@ function showNUTSPanel(nid){
     metric==="pop"?{label:"人口 (2023)", value:fmtPop(r.get("pop"))}:metric==="area"?{label:"面积", value:fmtArea(r.get("area"))}:null);
   renderDashboard({
     name:r.name, en:euCCName(r.cc)+" · NUTS2", level:"欧盟省级",
-    tags:["来源：Eurostat","GDP 2023 · 欧元折算人民币"],
+    tags:["来源：Eurostat","GDP 2023 · 欧元折算"+(window.CURRENCY==="USD"?"美元":"人民币")],
     stats:cards.stats, insight:cards.insight,
   });
   document.getElementById("trend").innerHTML="";
@@ -1318,6 +1334,13 @@ window.addEventListener("load", ()=>{
     dataYear = e.target.value;
     redrawByYear();
     saveState();   // 优化3：年份变化保存 URL 状态
+  });
+  /* 货币切换事件：只影响 GDP 显示（格式化/折算），人口面积等无量纲不受影响 */
+  document.getElementById("curSel").addEventListener("change", e=>{
+    setCurrency(e.target.value);
+    const L=layerGet(); if(L){ L.render(); L.restore(); }   // 重绘当前层 + 恢复面板（GDP 数值/标签随币种更新）
+    renderRank();
+    saveState();
   });
   document.getElementById("backBtn").addEventListener("click", ()=>{
     // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致（走 LAYERS.back）

@@ -89,6 +89,18 @@ window.METRICS = {
   }
 };
 window.USD_CNY = 7.2;
+/* ===== 双币显示（GDP 人民币/美元切换） =====
+   CURRENCY: "CNY" | "USD"；gdpRate(y)=USD→CNY 系数（逐年 FXRATE，缺失兜底 7.2）；
+   gdpApply(v, from, y)：把基准币种值折算到当前显示币种（from="USD"|"CNY"）。
+   各层 reg.get("gdp") 统一经 gdpApply 返回显示币种值，趋势序列同样处理。 */
+window.CURRENCY = "CNY";
+window.gdpRate = y => (window.FXRATE && window.FXRATE[y]) || window.USD_CNY;
+window.gdpApply = (v, from, y) => {
+  if (v == null || isNaN(v)) return null;
+  if (window.CURRENCY === from) return v;
+  const r = window.gdpRate(y);
+  return from === "USD" ? v * r : v / r;
+};
 window.CN = {
   "广东":{pop:12706,area:179725,"adcode":440000},
   "江苏":{pop:8526,area:107200,"adcode":320000},
@@ -204,7 +216,7 @@ function cMetric(iso2, m, year){
   if(pick==null) return null;
   let v = m==="gdp" ? o.years[pick].gdp : m==="pop" ? o.years[pick].pop : o.years[pick].area;
   if(v==null) return null;
-  if(m==="gdp"){ const rate = (window.FXRATE && window.FXRATE[pick]) || USD_CNY; v = v * rate; }   // USD → CNY(元)，按实际采用年份的逐年平均市场汇率
+  if(m==="gdp"){ v = gdpApply(v, "USD", pick); }   // 国家基准币种 USD → 按当前币种折算
   return v;
 }
 function cYear(iso2){
@@ -258,6 +270,13 @@ function usGdpY(name, year){               // 返回 人民币元 (按逐年汇�
   const r = (window.FXRATE && window.FXRATE[y]) || USD_CNY;
   return m * r * 1e6;
 }
+function usGdpDisplay(name, year){         // 返回 当前显示币种 的州 GDP（USD 元 或 CNY 元）
+  const s = US_STATES_GDP[name]; if(!s) return null;
+  const y = usGdpYear(name, year), usd = usGdpUsdM(name, y);
+  if(usd!=null) return gdpApply(usd*1e6, "USD", y);            // 基准 USD（BEA 序列）
+  const fb = s.gdpUsdM!=null ? s.gdpUsdM*1e6 : s.gdp;           // 兜底：优先 USD 百万，退 CNY
+  return gdpApply(fb, s.gdpUsdM!=null ? "USD" : "CNY", 2023);
+}
 function usGdpYear(name, year){            // 实际采用的年份（usGdpUsdM 回退后）
   const ts = window.US_TS && window.US_TS[name];
   if(!ts || !ts.years) return year;
@@ -300,7 +319,7 @@ function cnNominalGrowth(short, baseYear){ // 较基准年 名义(现价)增长,
   if(b==null || e==null || b===0) return null;
   return e/b - 1;
 }
-function fmtGDP(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e12)return "¥"+(v/1e12).toFixed(2)+" 万亿"; if(v>=1e8)return "¥"+(v/1e8).toFixed(2)+" 亿"; if(v>=1e4)return "¥"+(v/1e4).toFixed(1)+" 万"; return "¥"+v.toFixed(0); }
+function fmtGDP(v){ if(v==null||isNaN(v)) return "—"; const s=(window.CURRENCY==="USD")?"$":"¥"; if(v>=1e12)return s+(v/1e12).toFixed(2)+" 万亿"; if(v>=1e8)return s+(v/1e8).toFixed(2)+" 亿"; if(v>=1e4)return s+(v/1e4).toFixed(1)+" 万"; return s+v.toFixed(0); }
 function fmtPop(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e8)return (v/1e8).toFixed(2)+" 亿人"; if(v>=1e4)return (v/1e4).toFixed(2)+" 万人"; return v.toLocaleString()+" 人"; }
 function fmtArea(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e4)return (v/1e4).toFixed(2)+" 万平方千米"; return v.toLocaleString()+" 平方千米"; }
 function normProv(n){ return n.replace(/(省|市|自治区|特别行政区|壮族|回族|维吾尔)/g,"").trim(); }
@@ -375,7 +394,7 @@ function regProv(short){
     years:()=>Object.keys((window.CN_TS&&window.CN_TS[short]&&window.CN_TS[short].gdpRMB)||{}).map(Number).sort((a,b)=>a-b),
     ext(){ return null; },   // 省级无 World Bank 扩展指标
     get(m,year){
-      if(m==="gdp") return cnGdpRMB(short,year);
+      if(m==="gdp") return gdpApply(cnGdpRMB(short,year), "CNY", cnGdpYear(short,year));   // 省基准 CNY → 按当前币种折算
       const o=window.CN_TS&&window.CN_TS[short];
       if(m==="pop") return (o&&o.pop&&o.pop["2023"])||(CN[short]&&CN[short].pop*1e4)||null;
       if(m==="area") return (o&&o.area!=null)?o.area:(CN[short]&&CN[short].area)||null;
@@ -393,7 +412,10 @@ function regUSState(nm){
     ext(){ return null; },   // 州级无 World Bank 扩展指标
     get(m,year){
       const s=US_STATES_GDP[nm]; if(!s) return null;
-      if(m==="gdp"){ const y=usGdpY(nm,year); return y!=null?y:s.gdp; }
+      if(m==="gdp"){ const y=usGdpYear(nm,year); const usd=usGdpUsdM(nm,y);
+        if(usd!=null) return gdpApply(usd*1e6,"USD",y);                    // 州基准 USD（序列）
+        const fb=s.gdpUsdM!=null?s.gdpUsdM*1e6:s.gdp;                      // 兜底：优先 USD 百万，退 CNY
+        return gdpApply(fb, s.gdpUsdM!=null?"USD":"CNY", 2023); }
       if(m==="pop") return s.pop;
       if(m==="area") return s.area;
       return null;
@@ -415,13 +437,13 @@ function regCity(cm, adcode){
     get(m, year){
       if(m==="gdp"){
         if(ts){
-          if(!year || year==="2023") return cm.gdp;          // 默认/2023 → 单年值（已折算元）
+          if(!year || year==="2023") return gdpApply(cm.gdp, "CNY", 2023);          // 默认/2023 → 单年值（基准 CNY）
           const y=+year;
-          if(ts[y]!=null) return ts[y]*1e8;                  // 序列年 → 亿元×1e8=元
+          if(ts[y]!=null) return gdpApply(ts[y]*1e8, "CNY", y);                  // 序列年 → 亿元×1e8=元
           const near = ylist.length? ylist.reduce((a,b)=>Math.abs(b-y)<Math.abs(a-y)?b:a) : null;
-          return near!=null && ts[near]!=null ? ts[near]*1e8 : cm.gdp;
+          return near!=null && ts[near]!=null ? gdpApply(ts[near]*1e8, "CNY", near) : gdpApply(cm.gdp, "CNY", 2023);
         }
-        return cm.gdp;
+        return gdpApply(cm.gdp, "CNY", 2023);
       }
       return m==="pop"?cm.pop:(m==="area"?cm.area:null);
     },
@@ -434,7 +456,7 @@ function regCity(cm, adcode){
       return (ts[hi]-bv)/bv;
     },
     gdpSeries(){ if(!ts) return null;
-      return {years:ylist, values:ylist.map(y=>ts[y]*1e8)}; },
+      return {years:ylist, values:ylist.map(y=>gdpApply(ts[y]*1e8,"CNY",y))}; },
     series(m){ return m==="gdp"?this.gdpSeries():null; }   // 城市仅 GDP 序列（city_ts 46 城）
   };
 }
@@ -444,7 +466,7 @@ function regJapanPref(nm){
     name:nm, cn:nm,
     years:()=>[],   // 县级无多年序列（单年数据）
     ext(){ return null; },
-    get(m){ return m==="gdp"?d.gdp:m==="pop"?d.pop:(m==="area"?d.area:null); },
+    get(m){ return m==="gdp"?gdpApply(d.gdp,"CNY",d.year||2021):m==="pop"?d.pop:(m==="area"?d.area:null); },
     growth(){ return null; }, gdpSeries(){ return null; }
   };
 }
@@ -454,7 +476,7 @@ function regNUTS(nid){
     name:d.name, cn:d.name, cc:d.cc,
     years:()=>[d.year],   // 单年快照
     ext(){ return null; },
-    get(m){ return m==="gdp"?d.gdp:m==="pop"?d.pop:(m==="area"?d.area:null); },
+    get(m){ return m==="gdp"?gdpApply(d.gdp,"CNY",d.year):m==="pop"?d.pop:(m==="area"?d.area:null); },
     growth(){ return null; }, gdpSeries(){ return null; }, series(){ return null; }
   };
 }
@@ -463,23 +485,23 @@ function countryTrend(iso2){
   const o=window.WB&&window.WB[iso2]; if(!o||!o.years) return null;
   const ys=Object.keys(o.years).map(Number).filter(y=>o.years[y].gdp!=null).sort((a,b)=>a-b);
   if(ys.length<2) return null;
-  const vals=ys.map(y=>o.years[y].gdp*((window.FXRATE&&window.FXRATE[y])||USD_CNY));
+  const vals=ys.map(y=>gdpApply(o.years[y].gdp,"USD",y));
   return {years:ys, values:vals};
 }
 function provTrend(short){
   const o=window.CN_TS&&window.CN_TS[short]; if(!o||!o.gdpRMB) return null;
   const ys=Object.keys(o.gdpRMB).map(Number).sort((a,b)=>a-b);
   if(ys.length<2) return null;
-  return {years:ys, values:ys.map(y=>o.gdpRMB[y])};
+  return {years:ys, values:ys.map(y=>gdpApply(o.gdpRMB[y],"CNY",y))};
 }
 function usTrend(name){
   const ts=window.US_TS&&window.US_TS[name]; if(!ts||!ts.years) return null;
   const ys=Object.keys(ts.years).map(Number).filter(y=>ts.years[y]!=null).sort((a,b)=>a-b);
   if(ys.length<2) return null;
-  return {years:ys, values:ys.map(y=>ts.years[y]*((window.FXRATE&&window.FXRATE[y])||USD_CNY)*1e6)};
+  return {years:ys, values:ys.map(y=>gdpApply(ts.years[y]*1e6,"USD",y))};
 }
 function currencyTag(m){
-  if(m==="gdp") return "货币：人民币(CNY)";
+  if(m==="gdp") return "货币："+(window.CURRENCY==="USD"?"美元(USD)":"人民币(CNY)");
   if(m==="gdpcap") return "货币：USD(2015不变价)";
   return "";   // pop/area/%/岁 等无量纲指标不标货币
 }
@@ -491,7 +513,7 @@ function getCityMetric(adcode, parentAdcode){
 function euCCName(cc){ const d=DRILLABLE[cc]; return d?d.label:cc; }
 function fmtBy(v,m){ m=m||metric; return metricFmt(m,v); }
 function usVal(nm,m){ const s=US_STATES_GDP[nm]; if(!s) return 0; m=m||metric;
-  if(m==="gdp"){ const y=usGdpY(nm,dataYear); return y==null? s.gdp : y; }
+  if(m==="gdp") return usGdpDisplay(nm,dataYear);
   return m==="pop"?s.pop : s.area; }
 function cmpGetData(it){
   const y=dataYear;
@@ -499,7 +521,7 @@ function cmpGetData(it){
   if(it.t==="country"){ base={g:cMetric(it.k,"gdp",y), p:cMetric(it.k,"pop",y), a:cMetric(it.k,"area",y)}; }
   else if(it.t==="prov"){ const g=cnGdpRMB(it.k,y), o=window.CN_TS&&window.CN_TS[it.k];
     base={g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
-  else if(it.t==="usstate"){ base={g:usGdpY(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
+  else if(it.t==="usstate"){ base={g:usGdpDisplay(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
   else if(it.t==="jppref"){ const d=window.JP_METRICS&&window.JP_METRICS[it.k]; if(!d) return null;
     base={g:d.gdp, p:d.pop, a:d.area}; }
   else if(it.t==="nutspref"){ const d=window.EU_METRICS&&window.EU_METRICS[it.k]; if(!d) return null;

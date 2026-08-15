@@ -52,6 +52,9 @@ echo "  ✓ L3e 通过"; PASS=$((PASS+1))
 step "L3f URL 状态持久化（url_state_test）"
 python3 tests/url_state_test.py > /tmp/url.log 2>&1 && grep -q "restore: OK" /tmp/url.log || { echo "  ✗ URL 持久化失败:"; tail -8 /tmp/url.log; exit 1; }
 echo "  ✓ L3f 通过"; PASS=$((PASS+1))
+step "L3g 双币切换（cur_test）"
+python3 tests/cur_test.py > /tmp/cur.log 2>&1 && tail -1 /tmp/cur.log || { echo "  ✗ 双币失败:"; tail -5 /tmp/cur.log; exit 1; }
+echo "  ✓ L3g 通过"; PASS=$((PASS+1))
 
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

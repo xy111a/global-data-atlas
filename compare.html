@@ -70,6 +70,10 @@
     <input id="addInput" placeholder="搜索添加区域（国家/省/州/县/城市）…" aria-label="搜索添加对比区域" />
     <div class="seg" id="metricSeg"></div>
     <select id="yearSel" aria-label="选择年份"></select>
+    <select id="curSel" aria-label="货币单位" title="GDP 显示币种（人民币/美元切换）">
+      <option value="CNY">¥ 人民币</option>
+      <option value="USD">$ 美元</option>
+    </select>
     <a class="btn" href="global-data-atlas.html">← 返回地图</a>
   </header>
   <div id="main">
@@ -222,7 +226,7 @@ function renderChart(){
       legend:{textStyle:{color:"#9fb3c8"},top:0},
       grid:{left:70,right:24,top:32,bottom:36,containLabel:true},
       xAxis:{type:"category",data:allYears,axisLabel:{color:"#7f93a8",fontSize:10}},
-      yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>metricFmt(metric,v).replace("¥","")},
+      yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>metricFmt(metric,v).replace(/[¥$]/,"")},
         splitLine:{lineStyle:{color:"#0e2233"}}},
       series:series.map((s,i)=>({name:s.name,type:"line",smooth:true,showSymbol:false,
         data:allYears.map(y=>{ const idx=s.years.indexOf(y); return idx>=0?s.values[idx]:null; }),
@@ -320,6 +324,13 @@ function initYear(){
 
 window.addEventListener("load",()=>{
   initMetrics(); initYear();
+  // 货币切换：?cur=usd 恢复 + select 切换（GDP 格式化走 app-core.js 的 fmtGDP/gdpApply，随 CURRENCY 联动）
+  const curP=new URLSearchParams(location.search).get("cur");
+  if(curP==="usd"){ window.CURRENCY="USD"; document.getElementById("curSel").value="USD"; }
+  document.getElementById("curSel").addEventListener("change",e=>{
+    window.CURRENCY=e.target.value;
+    renderList(); renderChart(); renderUnitList();
+  });
   parseAddParam();
   renderList(); renderChart(); renderUnitList();
   document.getElementById("levelSel").addEventListener("change",()=>{ renderUnitList(); });

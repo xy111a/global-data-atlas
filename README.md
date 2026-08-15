@@ -72,4 +72,4 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u ALL_PROXY -u al
 ## 已知限制
 
 - 地图下钻依赖鼠标双击（ECharts canvas），**暂不支持键盘下钻**；键盘可操作范围：排行项 Enter/Space、ESC 返回、搜索 Enter
-- 数据源为公开整理近似值，货币统一折算人民币（逐年平均汇率），口径详见「关于」页
+- 数据源为公开整理近似值，GDP 支持人民币/美元切换（逐年平均汇率折算），口径详见「关于」页
