@@ -319,7 +319,8 @@ function cnNominalGrowth(short, baseYear){ // 较基准年 名义(现价)增长,
   if(b==null || e==null || b===0) return null;
   return e/b - 1;
 }
-function fmtGDP(v){ if(v==null||isNaN(v)) return "—"; const s=(window.CURRENCY==="USD")?"$":"¥"; if(v>=1e12)return s+(v/1e12).toFixed(2)+" 万亿"; if(v>=1e8)return s+(v/1e8).toFixed(2)+" 亿"; if(v>=1e4)return s+(v/1e4).toFixed(1)+" 万"; return s+v.toFixed(0); }
+function fmtMoney(v, s){ if(v==null||isNaN(v)) return "—"; if(v>=1e12)return s+(v/1e12).toFixed(2)+" 万亿"; if(v>=1e8)return s+(v/1e8).toFixed(2)+" 亿"; if(v>=1e4)return s+(v/1e4).toFixed(1)+" 万"; return s+v.toFixed(0); }
+function fmtGDP(v){ return fmtMoney(v, (window.CURRENCY==="USD")?"$":"¥"); }
 function fmtPop(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e8)return (v/1e8).toFixed(2)+" 亿人"; if(v>=1e4)return (v/1e4).toFixed(2)+" 万人"; return v.toLocaleString()+" 人"; }
 function fmtArea(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e4)return (v/1e4).toFixed(2)+" 万平方千米"; return v.toLocaleString()+" 平方千米"; }
 function normProv(n){ return n.replace(/(省|市|自治区|特别行政区|壮族|回族|维吾尔)/g,"").trim(); }

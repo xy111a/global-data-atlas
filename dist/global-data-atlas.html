@@ -844,7 +844,7 @@ async function loadUS(){
       if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
       const yg=regGet(r,"gdp",dataYear);
       const refTxt = window.CURRENCY==="USD"
-        ? `人民币现价约 ${fmtGDP(usGdpY(p.name,dataYear))}`
+        ? `人民币现价约 ${fmtMoney(usGdpY(p.name,dataYear), "¥")}`
         : `美元现价约 ${usGdpUsdT(p.name,dataYear)!=null?usGdpUsdT(p.name,dataYear).toFixed(2):(US_STATES_GDP[p.name].gdp/RATE23/1e12).toFixed(2)} 万亿`;
       return `<b>${p.name}</b> · ${usGdpYear(p.name,dataYear)}<br/>GDP ${fmtGDP(yg)}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`
         +`<br/><span style="color:#7f93a8">${refTxt}</span>`;}},
