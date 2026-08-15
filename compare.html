@@ -308,8 +308,13 @@ function initMetrics(){
 }
 function initYear(){
   const sel=document.getElementById("yearSel");
-  const yrs=[2024,2023,2022,2021,2020,2019,2018,2017,2016,2015,2014,2013,2012,2011,2010];
-  sel.innerHTML=yrs.map(y=>`<option value="${y}"${y===2023?" selected":""}>${y}</option>`).join("");
+  // 与主页面一致：动态从 WB 数据生成（2000-2024）+ 省级 2025 初核；缺 2025 的国家按最近年回退
+  const yrs=new Set();
+  Object.values(window.WB||{}).forEach(o=>Object.keys(o.years||{}).forEach(y=>yrs.add(+y)));
+  const arr=[...yrs].sort((a,b)=>b-a);
+  if(!arr.includes(2025)) arr.unshift(2025);
+  sel.innerHTML=arr.map(y=>`<option value="${y}"${y===2025?" selected":""}>${y}</option>`).join("");
+  dataYear="2025";
   sel.addEventListener("change",e=>{ dataYear=e.target.value; renderList(); renderChart(); });
 }
 
