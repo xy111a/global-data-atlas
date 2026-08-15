@@ -617,7 +617,7 @@ function renderWorld2D(){
   });
   setCrumbPath([{label:"世界", level:"world"}]);
   ensurePanelOpen();   /* 世界层保留面板：显示各国排行 + 增长洞察（不折叠） */
-  showGeneric("世界地图");   // 世界层总览不显示提示文字（更纯粹；操作靠地图交互与面包屑）
+  showGeneric("");   // 世界层总览：不显示标题/提示，面板只留「排行 + 增长对比」
   renderRank();
   /* 洞察：各国较2000年增长/变化对比（跟随当前维度） */
   const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
