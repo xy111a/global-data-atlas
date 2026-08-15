@@ -42,6 +42,13 @@
     width:20px;height:20px;cursor:pointer;font-size:11px;}
   .cmp-item .nm{flex:1;color:var(--text);}
   .cmp-item .val{color:var(--cyan);font-variant-numeric:var(--num);font-size:12px;}
+  /* 层级单元选择列表 */
+  .unit{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;
+    border-bottom:1px solid var(--line-soft);color:var(--text);}
+  .unit:hover{background:var(--hover);}
+  .unit.added{color:var(--cyan);background:rgba(0,240,255,.06);}
+  .unit .uval{margin-left:auto;color:var(--muted);font-variant-numeric:var(--num);font-size:11.5px;}
+  .unit .ucheck{color:var(--cyan);font-size:11px;}
   .empty{color:var(--muted);font-size:12px;padding:20px 0;text-align:center;line-height:1.8;}
   #chart-area{flex:1;display:flex;flex-direction:column;min-width:0;padding:12px 18px;}
   #chartBox{flex:1;min-height:0;}
@@ -67,10 +74,23 @@
   </header>
   <div id="main">
     <div id="list">
-      <h3>对比列表（N 项）</h3>
+      <h3>选择对比单元</h3>
+      <select id="levelSel" aria-label="选择层级" style="width:100%;background:#0a1520;color:#9fb3c8;border:1px solid #1d5a72;border-radius:8px;padding:6px 8px;font-size:12.5px;margin-bottom:8px;">
+        <option value="country">🌍 国家（World Bank）</option>
+        <option value="prov">🇨🇳 中国省级</option>
+        <option value="usstate">🇺🇸 美国州</option>
+        <option value="jppref">🇯🇵 日本都道府县</option>
+        <option value="nutspref">🇪🇺 欧盟 NUTS2</option>
+        <option value="city">🏙 中国地级市</option>
+      </select>
+      <div id="addbar">
+        <input id="addInput" placeholder="搜索当前层级…" aria-label="搜索当前层级单元" />
+      </div>
       <div id="addResults" style="display:none;margin-bottom:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;"></div>
+      <div id="unitList" style="max-height:32vh;overflow-y:auto;margin-bottom:12px;border:1px solid var(--line-soft);border-radius:8px;"></div>
+      <h3 id="cmpHead">对比列表（0 项）</h3>
       <div id="cmpItems"></div>
-      <div class="empty" id="emptyTip">暂无对比项<br/>从地图页点「📊 加入对比」带过来，<br/>或在上方搜索添加。</div>
+      <div class="empty" id="emptyTip">暂无对比项<br/>在上方按层级点选单元，<br/>或从地图页「📊 加入对比」带过来。</div>
     </div>
     <div id="chart-area">
       <div id="chartBox"><div id="trendChart"></div></div>
@@ -123,11 +143,54 @@ function seriesFor(it){
   try{ return r.series(metric); }catch(e){ return null; }
 }
 
+/* ---------- 层级单元选择（按层级浏览添加对比单元） ---------- */
+function unitKey(t,k,pa){ return pa!=null ? t+":"+k+":"+pa : t+":"+k; }
+function isAdded(t,k){ return cmpList.some(x=>x.t===t&&x.k===k); }
+function renderUnitList(){
+  const lv=document.getElementById("levelSel").value;
+  const box=document.getElementById("unitList");
+  const q=(document.getElementById("addInput").value||"").trim().toLowerCase();
+  let items=[];
+  if(lv==="country"){
+    items=COUNTRIES.map(c=>[c[0], unitKey("country",c[2]), regGet(regCountry(c[2]),metric,dataYear)]);
+  } else if(lv==="prov"){
+    items=Object.keys(CN).map(k=>[k, unitKey("prov",k), regGet(regProv(k),metric,dataYear)]);
+  } else if(lv==="usstate"){
+    items=Object.keys(US_STATES_GDP).map(k=>[k, unitKey("usstate",k), regGet(regUSState(k),metric,dataYear)]);
+  } else if(lv==="jppref"){
+    items=Object.keys(JP_METRICS).map(k=>[k, unitKey("jppref",k), regGet(regJapanPref(k),metric,dataYear)]);
+  } else if(lv==="nutspref"){
+    items=Object.keys(EU_METRICS).map(k=>[EU_METRICS[k].name, unitKey("nutspref",k), regGet(regNUTS(k),metric,dataYear)]);
+  } else if(lv==="city"){
+    items=window.CITY_INDEX.map(x=>[x[0], unitKey("city",x[1],x[2]), (getCityMetric(x[1],x[2])||{}).gdp||null]);
+  }
+  if(q) items=items.filter(it=>it[0].toLowerCase().includes(q));
+  items.sort((a,b)=>(b[2]||-1)-(a[2]||-1));
+  if(!items.length){ box.innerHTML=`<div class="empty">当前层级无「${esc(q)||"数据"}」</div>`; return; }
+  box.innerHTML=items.map(it=>{
+    const parts=it[1].split(":"); const t=parts[0], k=parts.slice(1).join(":");
+    const added=isAdded(t,k);
+    return `<div class="unit${added?" added":""}" data-key="${it[1]}" title="点击${added?"移除":"加入"}对比">
+      <span>${esc(it[0])}</span>
+      <span class="uval">${it[2]!=null?esc(metricFmt(metric,it[2])):"—"}</span>
+      <span class="ucheck">${added?"✓":""}</span></div>`;
+  }).join("");
+  box.querySelectorAll(".unit").forEach(el=>{
+    el.onclick=()=>{
+      const parts=el.dataset.key.split(":");
+      const t=parts[0], k=parts.slice(1,-(parts.length>2?1:0)).join(":")||parts[1];
+      const pa=parts.length>2?+parts[parts.length-1]:undefined;
+      const idx=cmpList.findIndex(x=>x.t===t&&x.k===k);
+      if(idx>=0) cmpList.splice(idx,1); else addItem(t,k,pa);
+      renderList(); renderChart(); renderUnitList();
+    };
+  });
+}
 /* ---------- 渲染 ---------- */
 function renderList(){
   const box=document.getElementById("cmpItems");
   const tip=document.getElementById("emptyTip");
-  document.querySelector("#list h3").textContent="对比列表（"+cmpList.length+" 项）";
+  document.getElementById("cmpHead").textContent="对比列表（"+cmpList.length+" 项）";
   tip.style.display = cmpList.length ? "none" : "block";
   box.innerHTML = cmpList.map((it,i)=>{
     const d=cmpGetData(it);
@@ -240,7 +303,7 @@ function initMetrics(){
     const b=e.target.closest("button"); if(!b) return;
     metric=b.dataset.m;
     [...seg.children].forEach(x=>x.classList.toggle("active",x===b));
-    renderList(); renderChart();
+    renderList(); renderChart(); renderUnitList();
   });
 }
 function initYear(){
@@ -253,8 +316,10 @@ function initYear(){
 window.addEventListener("load",()=>{
   initMetrics(); initYear();
   parseAddParam();
-  renderList(); renderChart();
-  document.getElementById("addInput").addEventListener("keydown",e=>{ if(e.key==="Enter") doAddSearch(e.target.value); });
+  renderList(); renderChart(); renderUnitList();
+  document.getElementById("levelSel").addEventListener("change",()=>{ renderUnitList(); });
+  document.getElementById("addInput").addEventListener("keydown",e=>{ if(e.key==="Enter") renderUnitList(); });
+  document.getElementById("addInput").addEventListener("input",()=>{ renderUnitList(); });
   document.getElementById("addInput").addEventListener("blur",()=>setTimeout(()=>{ document.getElementById("addResults").style.display="none"; },200));
   window.addEventListener("resize",()=>{ const c=echarts.getInstanceByDom(document.getElementById("trendChart")); if(c) c.resize(); });
 });

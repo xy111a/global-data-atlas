@@ -37,7 +37,7 @@ setTimeout(function(){
 var first=document.querySelector('#addResults [data-add]');
 if(first){ first.click(); }
 setTimeout(function(){
-document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({h:document.querySelector('#list h3').textContent})+'</pre>');
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({h:document.getElementById('cmpHead').textContent})+'</pre>');
 },400);
 },400);
 }catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
@@ -57,7 +57,7 @@ addItem('country','CN'); addItem('country','IN');
 setTimeout(function(){
 var del=document.querySelector('.cmp-item .del'); if(del){ del.click(); }
 setTimeout(function(){
-document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({h:document.querySelector('#list h3').textContent})+'</pre>');
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({h:document.getElementById('cmpHead').textContent})+'</pre>');
 },300);
 },300);
 }catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
