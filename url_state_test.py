@@ -47,7 +47,7 @@ html = open("global-data-atlas.html", encoding="utf-8").read()
 inject2 = """<script>window.addEventListener('load',function(){
 var t=0;var iv=setInterval(function(){t++;
 if(currentLevel!=='world'||t>15){clearInterval(iv);
-var o=[];o.push('LEVEL='+currentLevel+'|面板='+document.getElementById('pName').textContent);
+var o=[];o.push('LEVEL='+currentLevel+'|面板='+document.getElementById('introSum').textContent);
 o.push('指标='+metric+'|年份='+dataYear);
 document.body.insertAdjacentHTML('beforeend','<pre id="st">VERIFY>' + o.join(' || ') + '</pre>');
 }},1000)});</script>"""

@@ -30,7 +30,7 @@ out.push('trade按钮disabled='+ (tb?tb.disabled:'无按钮'));
 // 年份切换（单年数据应无变化但重绘正常）
 var ys=document.getElementById('yearSel'); ys.value='2020'; 
 var ev=new Event('change'); ys.dispatchEvent(ev);
-setTimeout(function(){ out.push('切年后LEVEL='+currentLevel+'|面板='+document.getElementById('pName').textContent); 
+setTimeout(function(){ out.push('切年后LEVEL='+currentLevel+'|面板='+document.getElementById('introSum').textContent); 
 document.body.insertAdjacentHTML('beforeend','<pre id="eu2">VERIFY '+out.join(' || ')+'</pre>'); },800);
 },2500);"""
 dom1 = dump(make_variant("eu_edge1.html", TRIGGER1, 15), 15)

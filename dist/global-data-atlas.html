@@ -248,8 +248,8 @@
     <!-- I5: 缩放已锁死（roam:false），无需恢复视图按钮 -->
     <div id="panel">
       <button id="panelFold" title="收起面板" aria-label="收起数据面板">▸</button>
-      <details class="fold" open id="introFold"><summary id="introSum">简介</summary>
-        <h2 id="pName">世界地图</h2>
+      <details class="fold" open id="introFold"><summary id="introSum">世界</summary>
+        <h2 id="pName" style="display:none"></h2>
         <div class="sub" id="pSub">加载中…</div>
         <div class="hint" id="pHint"></div>
       </details>
@@ -496,17 +496,15 @@ function showCountry(c){
   if(tr){ renderTrendChart([{name:c[0], years:tr.years, values:tr.values}], METRICS[metric].fmt); }
 }
 function showGeneric(name,sub,hint){
-  document.getElementById("pName").textContent=name;
   document.getElementById("pSub").textContent=sub||"";
   document.getElementById("pMetrics").innerHTML="";
   document.getElementById("pHint").innerHTML=hint||"";
   document.getElementById("pActions").innerHTML="";   // 清操作按钮（防上一区域"加入对比"残留）
   document.getElementById("trend").innerHTML="";   // 清理趋势区残留（L1 修复）
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
-  /* 简介折叠块：summary 跟随当前名称（层级名/单元名/提示名） */
+  /* 简介折叠块：summary 直接显示单元名（世界/中国/…），pName 隐藏由 summary 承担 */
   const sum=document.getElementById("introSum");
-  if(sum) sum.textContent="简介 · "+(name||"区域");
-  /* 恢复简介块显示（统一：总览/详情/错误均显示，可折叠） */
+  if(sum) sum.textContent=name||"区域";
   document.getElementById("introFold").open=true;
 }
 /* ============== 时间趋势（Phase D 洞察） ============== */
@@ -585,11 +583,11 @@ function foldTrend(html){
   });
 }
 function renderDashboard(cfg){
-  /* 简介折叠块 summary 跟随单元名 */
+  /* 简介折叠块：summary 直接显示单元名，pName 隐藏 */
   const isum=document.getElementById("introSum");
-  if(isum) isum.textContent="简介 · "+(cfg.name||"区域");
+  if(isum) isum.textContent=cfg.name||"区域";
   document.getElementById("introFold").open=true;
-  document.getElementById("pName").textContent=cfg.name;   // textContent 天然防注入
+  document.getElementById("pSub").textContent=cfg.en||"";
   document.getElementById("pSub").textContent=cfg.en||"";
   const tags=(cfg.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   document.getElementById("pHint").innerHTML=`<span class="dash-level">${esc(cfg.level||"区域")}</span> ${tags}`;
