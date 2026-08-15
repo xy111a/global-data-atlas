@@ -12,6 +12,10 @@ for f in global-data-atlas.html compare.html about.html; do
 done
 cp global-data-atlas.html dist/index.html
 
+echo "── 同步 vendor → dist/vendor ──"
+mkdir -p dist/vendor
+cp -R vendor/. dist/vendor/
+
 echo "── md5 校验 ──"
 ok=1
 for f in global-data-atlas.html compare.html about.html; do
@@ -20,6 +24,12 @@ for f in global-data-atlas.html compare.html about.html; do
 done
 s=$(md5 -q global-data-atlas.html); d=$(md5 -q dist/index.html)
 if [ "$s" = "$d" ]; then echo "  ✓ index.html 一致"; else echo "  ✗ index.html 漂移"; ok=0; fi
+# vendor 关键文件抽查（HTML 按需加载的脚本/数据）
+for f in vendor/app-core.js vendor/eu/eu_metrics.js vendor/world.js; do
+  rel="${f#vendor/}"
+  s=$(md5 -q "$f"); d=$(md5 -q "dist/vendor/$rel")
+  if [ "$s" = "$d" ]; then echo "  ✓ $rel 一致"; else echo "  ✗ $rel 漂移"; ok=0; fi
+done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
 if [ "$1" = "--deploy" ]; then

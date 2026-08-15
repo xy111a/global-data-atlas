@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""构建欧盟 NUTS2 省级数据（Phase E 试点 8 国）：
+"""构建欧盟 NUTS2 省级数据（EU27 全量）：
    边界拆分（Eurostat GISCO NUTS2 GeoJSON）+ GDP（nama_10r_2gdp）+ 人口（demo_r_pjanaggr3）
    + EUR/CNY 汇率（Frankfurter=ECB）→ vendor/eu/{cc}.js（边界）+ vendor/eu/eu_metrics.js（指标）
 
@@ -12,7 +12,9 @@ import json, os, sys, math, urllib.request, urllib.parse, argparse, time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EU_DIR = os.path.join(ROOT, "vendor", "eu")
-COUNTRIES = ["DE", "FR", "IT", "ES", "NL", "PL", "BE", "AT"]
+# EU27（希腊在 Eurostat 用 EL；CY/MT/LU 为全国单区 NUTS2）
+COUNTRIES = ["AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR", "HU",
+             "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"]
 YEAR = 2023   # 单年快照（与日本/城市单年模式一致）
 
 def fetch(url, timeout=60, retries=3):

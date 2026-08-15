@@ -185,25 +185,29 @@ check("覆盖[地图可着色]", matched >= 200, f"{matched}/{len(WORLD['feature
 ext_countries = sum(1 for iso in EXT if any(EXT[iso].get(m) for m in ('trade','health','edu')))
 check("覆盖[EXT 国家]", ext_countries >= 180, f"{ext_countries}")
 
-# ---------- 4f 欧盟 NUTS2（Phase E） ----------
+# ---------- 4f 欧盟 NUTS2（EU27） ----------
+EU27 = ["AT","BE","BG","CY","CZ","DE","DK","EE","EL","ES","FI","FR","HR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"]
 eu_files = os.listdir('vendor/eu')
 eu_js = [f for f in eu_files if f.endswith('.js') and f != 'eu_metrics.js']
-check("覆盖[欧盟边界文件]", len(eu_js) == 8, f"{len(eu_js)}/8（DE FR IT ES NL PL BE AT）")
+check("覆盖[欧盟边界文件]", len(eu_js) == 27, f"{len(eu_js)}/27（EU27 全量）")
+missing_eu = [cc.lower() for cc in EU27 if f"{cc.lower()}.js" not in eu_js]
+check("覆盖[欧盟27国文件齐全]", not missing_eu, f"缺失: {missing_eu or '无'}")
 src_eu = open('vendor/eu/eu_metrics.js', encoding='utf-8').read()
 m_eu = re.search(r'window\.EU_METRICS=(\{.*\})', src_eu, re.S)
 EU_M = json.loads(m_eu.group(1)) if m_eu else {}
-check("覆盖[欧盟NUTS2区域]", 140 <= len(EU_M) <= 160, f"{len(EU_M)} 区域")
+check("覆盖[欧盟NUTS2区域]", 230 <= len(EU_M) <= 260, f"{len(EU_M)} 区域")
 eu_gdp_ok = all(v['gdp'] is None or 0 < v['gdp'] < 2e13 for v in EU_M.values())   # GDP 0~2万亿 元（部分区域 Eurostat 缺 GDP=null）
 check("量级[欧盟NUTS2 GDP]", eu_gdp_ok, "")
 eu_pop_ok = all(1e4 < v['pop'] < 2e7 for v in EU_M.values())  # 人口 1万~2000万
 check("量级[欧盟NUTS2 人口]", eu_pop_ok, "")
-# 边界 NUTS_ID 与指标键一致性（抽查 DE）
-src_de = open('vendor/eu/de.js', encoding='utf-8').read()
-m_de = re.search(r'window\.EU_DE_GEO=(\{.*\})', src_de, re.S)
-DE_GEO = json.loads(m_de.group(1))
-de_ids = {f['properties']['NUTS_ID'] for f in DE_GEO['features']}
-de_metric = {k for k, v in EU_M.items() if v.get('cc') == 'DE'}
-check("交叉[德国边界vs指标]", de_ids == de_metric, f"边界{len(de_ids)} vs 指标{len(de_metric)}")
+# 边界 NUTS_ID 与指标键一致性（抽查 DE 与新国家 EL）
+for cc in ("DE", "EL"):
+    src_geo = open(f'vendor/eu/{cc.lower()}.js', encoding='utf-8').read()
+    m_geo = re.search(r'window\.EU_' + cc + r'_GEO=(\{.*\})', src_geo, re.S)
+    GEO = json.loads(m_geo.group(1))
+    geo_ids = {f['properties']['NUTS_ID'] for f in GEO['features']}
+    metric_ids = {k for k, v in EU_M.items() if v.get('cc') == cc}
+    check(f"交叉[{cc} 边界vs指标]", geo_ids == metric_ids, f"边界{len(geo_ids)} vs 指标{len(metric_ids)}")
 
 # ---------- 输出 ----------
 print(f"\n=== 校验结果: OK {len(ok)} | WARN {len(warn)} | ERROR {len(err)} ===")

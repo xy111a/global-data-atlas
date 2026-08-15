@@ -961,21 +961,42 @@ function showProvincePanel(short){
   else document.getElementById("trend").innerHTML="";
 }
 
-/* ============== 欧盟 NUTS2 省级（Phase E 试点 8 国） ============== */
+/* ============== 欧盟 NUTS2 省级（EU27 全量） ============== */
 let currentNUTS="";   // 当前下钻的欧盟国家代码
-/* DRILLABLE 注册表：国家 ISO2 → 下钻加载函数（泛化下钻，替代硬编码 CN/US/JP 判断） */
+/* DRILLABLE 注册表：国家 ISO2 → 下钻加载函数（泛化下钻，替代硬编码 CN/US/JP 判断）
+   Eurostat 用 EL（希腊）；世界地图 WB 数据用 GR，注册别名指向 EL */
 const DRILLABLE = {
   CN: { load: ()=>loadChina(),  label: "中国" },
   US: { load: ()=>loadUS(),     label: "美国" },
   JP: { load: ()=>loadJapan(),  label: "日本" },
+  AT: { load: ()=>loadNUTS("AT"), label: "奥地利" },
+  BE: { load: ()=>loadNUTS("BE"), label: "比利时" },
+  BG: { load: ()=>loadNUTS("BG"), label: "保加利亚" },
+  CY: { load: ()=>loadNUTS("CY"), label: "塞浦路斯" },
+  CZ: { load: ()=>loadNUTS("CZ"), label: "捷克" },
   DE: { load: ()=>loadNUTS("DE"), label: "德国" },
-  FR: { load: ()=>loadNUTS("FR"), label: "法国" },
-  IT: { load: ()=>loadNUTS("IT"), label: "意大利" },
+  DK: { load: ()=>loadNUTS("DK"), label: "丹麦" },
+  EE: { load: ()=>loadNUTS("EE"), label: "爱沙尼亚" },
+  EL: { load: ()=>loadNUTS("EL"), label: "希腊" },
+  GR: { load: ()=>loadNUTS("EL"), label: "希腊" },   /* WB ISO 别名 */
   ES: { load: ()=>loadNUTS("ES"), label: "西班牙" },
+  FI: { load: ()=>loadNUTS("FI"), label: "芬兰" },
+  FR: { load: ()=>loadNUTS("FR"), label: "法国" },
+  HR: { load: ()=>loadNUTS("HR"), label: "克罗地亚" },
+  HU: { load: ()=>loadNUTS("HU"), label: "匈牙利" },
+  IE: { load: ()=>loadNUTS("IE"), label: "爱尔兰" },
+  IT: { load: ()=>loadNUTS("IT"), label: "意大利" },
+  LT: { load: ()=>loadNUTS("LT"), label: "立陶宛" },
+  LU: { load: ()=>loadNUTS("LU"), label: "卢森堡" },
+  LV: { load: ()=>loadNUTS("LV"), label: "拉脱维亚" },
+  MT: { load: ()=>loadNUTS("MT"), label: "马耳他" },
   NL: { load: ()=>loadNUTS("NL"), label: "荷兰" },
   PL: { load: ()=>loadNUTS("PL"), label: "波兰" },
-  BE: { load: ()=>loadNUTS("BE"), label: "比利时" },
-  AT: { load: ()=>loadNUTS("AT"), label: "奥地利" }
+  PT: { load: ()=>loadNUTS("PT"), label: "葡萄牙" },
+  RO: { load: ()=>loadNUTS("RO"), label: "罗马尼亚" },
+  SE: { load: ()=>loadNUTS("SE"), label: "瑞典" },
+  SI: { load: ()=>loadNUTS("SI"), label: "斯洛文尼亚" },
+  SK: { load: ()=>loadNUTS("SK"), label: "斯洛伐克" }
 };
 
 /* ============== LAYERS 层级注册表（架构重构） ==============
@@ -990,7 +1011,7 @@ const LAYERS = {
     drill(p){ const c=p.data&&p.data.cn; if(!c) return;
       const d=DRILLABLE[c[2]];
       if(d) d.load();
-      else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟8国）。单击查看国家详情，或返回世界选择其他区域。"); },
+      else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟27国）。单击查看国家详情，或返回世界选择其他区域。"); },
     rank:()=>COUNTRIES.map(c=>{ const r=regCountry(c[2]); return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country"]; }).filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
     restore(){ if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }
   },
