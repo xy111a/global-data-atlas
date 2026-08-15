@@ -26,31 +26,31 @@ EOF
 echo "  ✓ L1 通过"; PASS=$((PASS+1))
 
 step "L2 数据自洽校验"
-python3 data_verify.py > /tmp/verify.log 2>&1 && tail -1 /tmp/verify.log || { echo "  ✗ 数据自洽失败:"; grep ✗ /tmp/verify.log | head -5; exit 1; }
+python3 tests/data_verify.py > /tmp/verify.log 2>&1 && tail -1 /tmp/verify.log || { echo "  ✗ 数据自洽失败:"; grep ✗ /tmp/verify.log | head -5; exit 1; }
 echo "  ✓ L2 通过"; PASS=$((PASS+1))
 
 step "L3a 回归截图（offline_test）"
-python3 offline_test.py > /tmp/offline.log 2>&1 && grep -c "OK" /tmp/offline.log || { echo "  ✗ 回归失败:"; grep -E "FAIL|Error" /tmp/offline.log | head -5; exit 1; }
+python3 tests/offline_test.py > /tmp/offline.log 2>&1 && grep -c "OK" /tmp/offline.log || { echo "  ✗ 回归失败:"; grep -E "FAIL|Error" /tmp/offline.log | head -5; exit 1; }
 echo "  ✓ L3a 通过"; PASS=$((PASS+1))
 
 step "L3b 对比模式（cmp_test）"
-python3 cmp_test.py > /tmp/cmp.log 2>&1 && tail -2 /tmp/cmp.log || { echo "  ✗ 对比失败:"; tail -5 /tmp/cmp.log; exit 1; }
+python3 tests/test_compare.py > /tmp/cmp.log 2>&1 && tail -2 /tmp/cmp.log || { echo "  ✗ 对比失败:"; tail -5 /tmp/cmp.log; exit 1; }
 echo "  ✓ L3b 通过"; PASS=$((PASS+1))
 
 step "L3c 扩展指标（ext_test）"
-python3 ext_test.py > /tmp/ext.log 2>&1 && tail -2 /tmp/ext.log || { echo "  ✗ EXT 失败:"; tail -5 /tmp/ext.log; exit 1; }
+python3 tests/ext_test.py > /tmp/ext.log 2>&1 && tail -2 /tmp/ext.log || { echo "  ✗ EXT 失败:"; tail -5 /tmp/ext.log; exit 1; }
 echo "  ✓ L3c 通过"; PASS=$((PASS+1))
 
 step "L3d 四维经济洞察（econ_insight）"
-python3 econ_insight_check.py > /tmp/econ.log 2>&1 && grep -q "人均GDP" /tmp/econ.log || { echo "  ✗ 四维洞察失败:"; tail -8 /tmp/econ.log; exit 1; }
+python3 tests/econ_insight_check.py > /tmp/econ.log 2>&1 && grep -q "人均GDP" /tmp/econ.log || { echo "  ✗ 四维洞察失败:"; tail -8 /tmp/econ.log; exit 1; }
 echo "  ✓ L3d 通过"; PASS=$((PASS+1))
 
 step "L3e 欧盟 NUTS2 下钻（eu_test）"
-python3 eu_test.py > /tmp/eu.log 2>&1 && grep -q "LEVEL=nuts" /tmp/eu.log || { echo "  ✗ 欧盟下钻失败:"; tail -8 /tmp/eu.log; exit 1; }
+python3 tests/eu_test.py > /tmp/eu.log 2>&1 && grep -q "LEVEL=nuts" /tmp/eu.log || { echo "  ✗ 欧盟下钻失败:"; tail -8 /tmp/eu.log; exit 1; }
 echo "  ✓ L3e 通过"; PASS=$((PASS+1))
 
 step "L3f URL 状态持久化（url_state_test）"
-python3 url_state_test.py > /tmp/url.log 2>&1 && grep -q "restore: OK" /tmp/url.log || { echo "  ✗ URL 持久化失败:"; tail -8 /tmp/url.log; exit 1; }
+python3 tests/url_state_test.py > /tmp/url.log 2>&1 && grep -q "restore: OK" /tmp/url.log || { echo "  ✗ URL 持久化失败:"; tail -8 /tmp/url.log; exit 1; }
 echo "  ✓ L3f 通过"; PASS=$((PASS+1))
 
 echo ""

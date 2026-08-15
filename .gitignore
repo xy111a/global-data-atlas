@@ -18,3 +18,7 @@ dist/vendor/cn/*.json
 
 # Python 缓存
 __pycache__/
+
+# 审计截图/报告与归档脚本：出库但保留本地（历史已入库，可随时找回）
+.audit/
+scripts_archive/

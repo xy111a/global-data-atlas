@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""compare.html 独立对比页测试：?add 参数 / 图表渲染 / 搜索添加 / 删除
-   （原主页面内嵌对比已抽取为独立对比页，测试随之迁移）"""
+"""compare.html 独立对比页测试（合并自 cmp_test / cmp_page_test / cmp_units_test）：
+   ?add 参数 / 搜索添加 / 删除 / 轨迹图容器 / 层级点选"""
 import subprocess, os, re
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -71,6 +71,37 @@ check("删除项", out3 and "1 项" in out3, f"({out3[:40] if out3 else '未获�
 
 # 4. 轨迹图表：2 项多年序列 → trendChart 有 series（canvas 存在且 hint 更新）
 check("轨迹图容器", "trendChart" in dom1 and "canvas" in dom1, "(2 项自动出图)")
+
+# 5. 层级点选（合并自 cmp_units_test）：默认国家层 → 切省级 → 点选广东 → 已选标记 → 国家层搜索过滤
+inject5 = """<script>window.addEventListener('load',function(){setTimeout(function(){
+try{
+var out=[];
+// 1. 默认国家层：单元列表应含 214 项（含中国）
+out.push('默认国家层单元数='+document.querySelectorAll('#unitList .unit').length);
+// 2. 切到省级层
+document.getElementById('levelSel').value='prov';
+document.getElementById('levelSel').dispatchEvent(new Event('change'));
+out.push('省级单元数='+document.querySelectorAll('#unitList .unit').length);
+// 3. 点选广东加入
+var gd=Array.from(document.querySelectorAll('#unitList .unit')).find(u=>u.textContent.includes('广东'));
+if(gd) gd.click();
+out.push('点选后列表='+document.getElementById('cmpHead').textContent);
+out.push('广东已选标记='+(document.querySelector('#unitList .unit.added')?'有':'无'));
+// 4. 切回国家层，搜索过滤
+document.getElementById('levelSel').value='country';
+document.getElementById('levelSel').dispatchEvent(new Event('change'));
+document.getElementById('addInput').value='印度';
+document.getElementById('addInput').dispatchEvent(new Event('input'));
+out.push('国家层搜索印度='+document.querySelectorAll('#unitList .unit').length+'项');
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify(out)+'</pre>');
+}catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
+},1000);});</script>"""
+html5 = open("compare.html", encoding="utf-8").read().replace("</body>", inject5 + "\n</body>")
+p5 = os.path.join("atlas_test", "cmp_units.html")
+open(p5, "w", encoding="utf-8").write(html5)
+dom5 = dump("file://" + os.path.abspath(p5), 12)
+out5 = runtime_out(dom5)
+check("层级点选", bool(out5) and "广东已选标记=有" in out5, f"({(out5 or '未获取')[:80]})")
 
 print(f"\n对比页测试: {ok}/{total} 通过")
 exit(0 if ok == total else 1)
