@@ -49,5 +49,9 @@ step "L3e 欧盟 NUTS2 下钻（eu_test）"
 python3 eu_test.py > /tmp/eu.log 2>&1 && grep -q "LEVEL=nuts" /tmp/eu.log || { echo "  ✗ 欧盟下钻失败:"; tail -8 /tmp/eu.log; exit 1; }
 echo "  ✓ L3e 通过"; PASS=$((PASS+1))
 
+step "L3f URL 状态持久化（url_state_test）"
+python3 url_state_test.py > /tmp/url.log 2>&1 && grep -q "restore: OK" /tmp/url.log || { echo "  ✗ URL 持久化失败:"; tail -8 /tmp/url.log; exit 1; }
+echo "  ✓ L3f 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"
