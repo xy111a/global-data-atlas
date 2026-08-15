@@ -501,6 +501,12 @@ function showGeneric(name,sub,hint){
   document.getElementById("pActions").innerHTML="";   // 清操作按钮（防上一区域"加入对比"残留）
   document.getElementById("trend").innerHTML="";   // 清理趋势区残留（L1 修复）
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
+  /* 规范：总览空标题时隐藏标题区/指标区空 div（避免占位空洞）；有提示时恢复显示 */
+  const empty = !name;
+  ["pName","pSub","pHint","pActions","pMetrics"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display = empty ? "none" : "";
+  });
 }
 /* ============== 时间趋势（Phase D 洞察） ============== */
 /* 仪表盘趋势图：容器（#trendChart）已由 renderDashboard 写入，只做 echarts 渲染 */
@@ -578,6 +584,11 @@ function foldTrend(html){
   });
 }
 function renderDashboard(cfg){
+  /* 恢复标题区/指标区显示（总览空标题时被 showGeneric 隐藏） */
+  ["pName","pSub","pHint","pActions","pMetrics"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display="";
+  });
   document.getElementById("pName").textContent=cfg.name;   // textContent 天然防注入
   document.getElementById("pSub").textContent=cfg.en||"";
   const tags=(cfg.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
