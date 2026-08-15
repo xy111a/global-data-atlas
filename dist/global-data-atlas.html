@@ -120,6 +120,9 @@
   .metric .v.pink{color:var(--pink);}
   .hint{font-size:12px;color:var(--muted);line-height:1.7;border-bottom:1px dashed var(--line-soft);
     padding-bottom:12px;margin-bottom:10px;}   /* 上移到指标卡上方：来源/年份标签在顶部 */
+  /* 简介块内 pHint（三卡下方）：改为上分隔线 + 间距（与数值区分隔） */
+  #introFold .hint{border-bottom:none;padding-bottom:0;margin-bottom:0;border-top:1px dashed var(--line-soft);
+    padding-top:10px;margin-top:8px;}
   #loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     background:rgba(5,6,10,0.7);color:var(--cyan);font-size:14px;z-index:5;}
   #banner{position:absolute;right:16px;bottom:16px;left:auto;font-size:12px;color:var(--muted);
@@ -135,11 +138,11 @@
   .dash-title-row h2{margin:0;}
   .dash-level{font-size:11px;color:var(--cyan);border:1px solid var(--line-bright);border-radius:10px;padding:1px 8px;font-weight:500;}
   .dash-tags{display:flex;gap:6px;flex-wrap:wrap;}
-  .dash-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;}
-  .dash-stat{background:rgba(10,16,26,.4);border:1px solid var(--line-soft);border-radius:var(--r-md);padding:10px 12px;
-    display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}   /* 3 列固定：窄面板不换行 */
+  .dash-stat{background:rgba(10,16,26,.4);border:1px solid var(--line-soft);border-radius:var(--r-md);padding:8px 6px;
+    min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:4px;}
   .dash-stat .k{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .dash-stat .v{font-size:18px;font-weight:600;color:var(--cyan);font-variant-numeric:var(--num);line-height:1.2;
+  .dash-stat .v{font-size:clamp(13px,1.9vw,18px);font-weight:600;color:var(--cyan);font-variant-numeric:var(--num);line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:var(--glow-sm);}
   .dash-stat .v.gold{color:var(--gold);}
   .dash-stat .v.pink{color:var(--pink);}
