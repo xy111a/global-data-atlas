@@ -228,7 +228,6 @@
   <header>
     <div class="tb-main">
       <div class="brand">
-        <h1>全球数据地图</h1>
         <div class="breadcrumb" id="crumb">世界</div>
       </div>
       <div class="tb-actions">
@@ -585,9 +584,10 @@ function renderDashboard(cfg){
   document.getElementById("pSub").textContent=cfg.en||"";
   const tags=(cfg.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   document.getElementById("pHint").innerHTML=`<span class="dash-level">${esc(cfg.level||"区域")}</span> ${tags}`;
-  document.getElementById("pMetrics").innerHTML=`<div class="dash-stats">${(cfg.stats||[]).map(s=>
-    `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
-    (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div>`+
+  document.getElementById("pMetrics").innerHTML=
+    `<details class="fold" open><summary>指标</summary><div class="dash-stats">${(cfg.stats||[]).map(s=>
+      `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
+      (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div></details>`+
     ((cfg.insight&&cfg.insight.length)?`<details class="fold" open><summary>洞察 · 增长</summary><div class="dash-insight">${cfg.insight.map(i=>
       `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div></details>`:"");
   document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
