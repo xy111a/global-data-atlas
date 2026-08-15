@@ -491,7 +491,6 @@ function showCountry(c){
     tags:[currencyTag(metric), "来源：World Bank", `年份 ${y}`].filter(Boolean),
     stats, insight,
     trendHTML: tr?`<div class="rank-title">${c[0]} · ${metricLabel(metric)} 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`:null,
-    actionsHTML:`<a class="btn" href="compare.html?add=country:${iso2}">📊 加入对比</a>`
   });
   if(tr){ renderTrendChart([{name:c[0], years:tr.years, values:tr.values}], METRICS[metric].fmt); }
 }
@@ -536,6 +535,9 @@ function renderTrendChart(series, fmt){
 function renderTrendCompare(entries, title, fmt){
   const box=document.getElementById("trend"); if(!box) return;
   if(!entries || !entries.length){ box.innerHTML=""; return; }
+  box.innerHTML=`<details class="fold" open><summary>${title||"增长对比"}</summary><div class="trend-scroll"><div id="trendChart" style="height:${Math.max(120,Math.min(entries.length,10)*20)}px;width:100%;"></div></div></details>`;
+  const d=box.querySelector("details");
+  if(d) d.addEventListener("toggle",()=>{ const c=window.__trendChart; if(c) setTimeout(()=>c.resize(),0); });
   const isGrowth = !fmt;                 // 默认按增长率渲染；传 fmt 则按绝对值（如 GDP 对比）
   const sorted=entries.slice().sort((a,b)=>b.val-a.val);   // 全量降序：第一名在前
   const H=Math.max(120,sorted.length*20);    // 图表全量高度，容器 CSS 滚动（与排行一致）
@@ -567,6 +569,17 @@ function metricCards(baseStats, baseInsight, cur){
   const others=baseStats.filter(s=>s.label!==card.label);   // 去重
   return {stats:[card,...others], insight:[{label:"较2000年 增长", value:"—（该维度无多年序列）", cls:""}]};
 }
+/* 趋势区折叠封装：内容包 <details>，收起/展开时 resize 图表（canvas 尺寸恢复） */
+function foldTrend(html){
+  const t=document.getElementById("trend");
+  t.innerHTML=`<details class="fold" open><summary>趋势</summary>${html||""}</details>`;
+  const d=t.querySelector("details");
+  if(d) d.addEventListener("toggle",()=>{
+    const el=document.getElementById("trendChart");
+    const c=window.__trendChart||(el&&echarts.getInstanceByDom(el));
+    if(c) setTimeout(()=>c.resize(),0);
+  });
+}
 function renderDashboard(cfg){
   document.getElementById("pName").textContent=cfg.name;   // textContent 天然防注入
   document.getElementById("pSub").textContent=cfg.en||"";
@@ -578,7 +591,7 @@ function renderDashboard(cfg){
     ((cfg.insight&&cfg.insight.length)?`<details class="fold" open><summary>洞察 · 增长</summary><div class="dash-insight">${cfg.insight.map(i=>
       `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div></details>`:"");
   document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
-  if(cfg.trendHTML){ document.getElementById("trend").innerHTML=cfg.trendHTML; }
+  if(cfg.trendHTML){ foldTrend(cfg.trendHTML); }
   else document.getElementById("trend").innerHTML="";
   if(typeof saveState==="function") saveState();   // 优化3：面板区域变化保存 URL 状态（lastShown 已由 showXxxPanel 设置）
 }
@@ -775,12 +788,11 @@ function showCityPanel(cityName, adcode, parentAdcode){
     tags:[hasTS?"来源：维基（国家统计局口径）":"来源：公开整理近似值", hasTS?`GDP ${dataYear} · 序列 ${yrs[0]}–${yrs[yrs.length-1]}`:"约2023", hasTS?"多年序列":"单年快照"],
     stats:cards.stats, insight:cards.insight,
     trendHTML:null,
-    actionsHTML:`<a class="btn" href="compare.html?add=city:${adcode}:${parentAdcode||0}">📊 加入对比</a>`
   });
   /* 多年序列城市 → GDP 趋势图（仅 GDP 维度；其他维度无序列不渲染） */
   if(hasTS && metric==="gdp"){
     const ser=r.gdpSeries();
-    document.getElementById("trend").innerHTML=`<div class="rank-title">${cityName} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`;
+    foldTrend(`<div class="rank-title">${cityName} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`);
     renderTrendChart([{name:cityName, years:ser.years, values:ser.values}], fmtGDP);
   } else {
     document.getElementById("trend").innerHTML="";  // 城市无多年序列/非 GDP 维度
@@ -871,7 +883,6 @@ function showJapanPrefPanel(nm){
     name:nm, en:"日本都道府县", level:"都道府县",
     tags:["来源：日本内阁府（県民経済計算）","GDP 2021 / 人口 2023","单年快照"],
     stats:cards.stats, insight:cards.insight,
-    actionsHTML:`<a class="btn" href="compare.html?add=jppref:${nm}">📊 加入对比</a>`
   });
   document.getElementById("trend").innerHTML="";   // 县级无多年序列
 }
@@ -894,10 +905,9 @@ function showUSStatePanel(nm){
     tags:[`来源：BEA + Census`,`GDP ${gy} · 人口 ${popY}`],
     stats:cards.stats, insight:cards.insight,
     trendHTML:null,
-    actionsHTML:`<a class="btn" href="compare.html?add=usstate:${nm}">📊 加入对比</a>`
   });
   const tr=usTrend(nm);
-  if(tr && metric==="gdp"){ document.getElementById("trend").innerHTML=`<div class="rank-title">${nm} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`;
+  if(tr && metric==="gdp"){ foldTrend(`<div class="rank-title">${nm} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`);
     renderTrendChart([{name:nm, years:tr.years, values:tr.values}], fmtGDP); }   // M1: 仅 GDP 维度渲染趋势
   else document.getElementById("trend").innerHTML="";
 }
@@ -926,10 +936,9 @@ function showProvincePanel(short){
     tags:["来源：维基百科整理（官方公报/五经普修订）",`年份 ${gdY}`],
     stats:cards.stats, insight:cards.insight,
     trendHTML:null,
-    actionsHTML:`<a class="btn" href="compare.html?add=prov:${short}">📊 加入对比</a>`
   });
   const tr=provTrend(short);
-  if(tr && metric==="gdp"){ document.getElementById("trend").innerHTML=`<div class="rank-title">${short} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`;
+  if(tr && metric==="gdp"){ foldTrend(`<div class="rank-title">${short} · GDP 趋势</div><div id="trendChart" style="height:150px;width:100%;"></div>`);
     renderTrendChart([{name:short, years:tr.years, values:tr.values}], fmtGDP); }   // M1: 仅 GDP 维度渲染趋势（人口/面积无序列）
   else document.getElementById("trend").innerHTML="";
 }
@@ -1103,7 +1112,6 @@ function showNUTSPanel(nid){
     name:r.name, en:euCCName(r.cc)+" · NUTS2", level:"欧盟省级",
     tags:["来源：Eurostat","GDP 2023 · 欧元折算人民币"],
     stats:cards.stats, insight:cards.insight,
-    actionsHTML:`<a class="btn" href="compare.html?add=nutspref:${nid}">📊 加入对比</a>`
   });
   document.getElementById("trend").innerHTML="";
 }
