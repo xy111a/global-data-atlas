@@ -195,7 +195,7 @@
 @media(min-width:1600px){
   #panel{width:clamp(340px,22vw,460px);}   /* 宽屏放宽：排行/趋势更舒适 */
 }
-  #rank{margin-top:16px;border-top:1px dashed var(--line-soft);padding-top:12px;max-height:340px;overflow-y:auto;}   /* 全量排行可滚动（默认顶部） */
+  #rank{margin-top:4px;}   /* 排行已折叠为 details.fold（滚动交给 .rank-wrap） */
   .trend-scroll{max-height:360px;overflow-y:auto;}   /* 与 #rank 一致：容器 CSS 滚动，滚轮直接滚（默认显示头部） */
   .rank-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;font-weight:600;}
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
@@ -204,6 +204,14 @@
   .rank-item .rk{color:var(--pink);font-weight:600;width:18px;text-align:center;font-variant-numeric:var(--num);}
   .rank-item .rn{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rank-item .rv{color:var(--cyan);font-size:12px;white-space:nowrap;flex:0 1 auto;max-width:45%;text-align:right;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:var(--num);}  /* 窄面板下不挤占名称（P2） */
+  /* ===== 面板分级折叠（细节区收起，先核心后细节） ===== */
+  details.fold{margin-top:12px;border-top:1px dashed var(--line-soft);padding-top:8px;}
+  details.fold summary{cursor:pointer;font-size:12px;color:var(--muted);letter-spacing:.4px;
+    font-weight:600;list-style:none;user-select:none;padding:4px 2px;border-radius:6px;}
+  details.fold summary:hover{color:var(--cyan);}
+  details.fold summary::before{content:"▸ ";color:var(--cyan);}
+  details.fold[open] summary::before{content:"▾ ";}
+  .rank-wrap{max-height:300px;overflow-y:auto;margin-top:6px;}
   /* ===== Footer 数据来源汇总（DoD 交付项） ===== */
   footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 18px;
     padding:8px 20px;border-top:1px solid var(--line);
@@ -220,7 +228,7 @@
   <header>
     <div class="tb-main">
       <div class="brand">
-        <h1>全球数据地图<span class="en">GLOBAL DATA ATLAS</span></h1>
+        <h1>全球数据地图</h1>
         <div class="breadcrumb" id="crumb">世界</div>
       </div>
       <div class="tb-actions">
@@ -230,8 +238,7 @@
           <option value="2024">2024</option>
           <option value="2023">2023</option>
         </select>
-        <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比页</a>
-        <a class="btn" href="about.html" title="数据来源与口径说明">ℹ️ 关于</a>
+        <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
@@ -568,8 +575,8 @@ function renderDashboard(cfg){
   document.getElementById("pMetrics").innerHTML=`<div class="dash-stats">${(cfg.stats||[]).map(s=>
     `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
     (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div>`+
-    ((cfg.insight&&cfg.insight.length)?`<div class="dash-insight">${cfg.insight.map(i=>
-      `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div>`:"");
+    ((cfg.insight&&cfg.insight.length)?`<details class="fold" open><summary>洞察 · 增长</summary><div class="dash-insight">${cfg.insight.map(i=>
+      `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div></details>`:"");
   document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
   if(cfg.trendHTML){ document.getElementById("trend").innerHTML=cfg.trendHTML; }
   else document.getElementById("trend").innerHTML="";
@@ -610,8 +617,7 @@ function renderWorld2D(){
   });
   setCrumbPath([{label:"世界", level:"world"}]);
   ensurePanelOpen();   /* 世界层保留面板：显示各国排行 + 增长洞察（不折叠） */
-  showGeneric("世界地图","单击国家查看数据；双击中国/美国/日本下钻",
-    "货币统一为人民币(CNY)，汇率按所选年份逐年折算。年份下拉可切换 2000–2025 查看历年变迁（2025 为省级初核，国家/州按最近年回退）。点击中国可下钻省/市，点击美国可下钻各州。");
+  showGeneric("世界地图");   // 世界层总览不显示提示文字（更纯粹；操作靠地图交互与面包屑）
   renderRank();
   /* 洞察：各国较2000年增长/变化对比（跟随当前维度） */
   const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
@@ -1111,9 +1117,9 @@ function renderRank(){
   else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
   const fmt=v=> metricFmt(metric,v);
-  box.innerHTML=`<div class="rank-title">${esc(unit)} · 排行 · ${dataYear}（全量，可滚动）</div>`+items.map((it,i)=>
+  box.innerHTML=`<details class="fold" open><summary>排行 · ${esc(unit)} · ${dataYear}</summary><div class="rank-wrap">`+items.map((it,i)=>
     `<div class="rank-item" data-type="${it[3]}" data-key="${esc(it[1])}" tabindex="0" role="button" aria-label="${esc(it[0])} ${esc(fmt(it[2]))}">
-       <span class="rk">${i+1}</span><span class="rn">${esc(it[0])}</span><span class="rv">${esc(fmt(it[2]))}</span></div>`).join("");
+       <span class="rk">${i+1}</span><span class="rn">${esc(it[0])}</span><span class="rv">${esc(fmt(it[2]))}</span></div>`).join("")+`</div></details>`;
   box.querySelectorAll(".rank-item").forEach(el=>{
     el.onclick=()=>{
       const t=el.dataset.type, k=el.dataset.key;
