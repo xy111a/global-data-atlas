@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>关于 · 数据来源 · Global Data Atlas</title>
+<style>
+  :root{
+    --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
+    --cyan:#00F0FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
+    --hover:rgba(0,240,255,.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.75;}
+  body{background:radial-gradient(1100px 700px at 12% -8%, rgba(0,240,255,.05), transparent 60%),
+    radial-gradient(900px 600px at 108% 112%, rgba(255,46,147,.04), transparent 60%), var(--bg);}
+  .wrap{max-width:860px;margin:0 auto;padding:32px 24px 60px;}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:28px;flex-wrap:wrap;}
+  header h1{font-size:20px;margin:0;font-weight:600;}
+  header h1 .en{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px;}
+  .nav{margin-left:auto;display:flex;gap:10px;}
+  .btn{background:transparent;border:1px solid var(--line);color:var(--text);padding:6px 14px;
+    border-radius:8px;font-size:13px;text-decoration:none;}
+  .btn:hover{border-color:var(--cyan);}
+  h2{font-size:16px;color:var(--cyan);margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  h3{font-size:14px;margin:18px 0 8px;color:var(--text);}
+  p{font-size:13.5px;color:#c5d3e0;margin:6px 0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:500;font-size:12px;}
+  td:first-child{color:var(--cyan);white-space:nowrap;font-weight:500;}
+  .tag{display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;border:1px solid var(--line);color:var(--muted);margin-right:6px;}
+  .note{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding:8px 14px;margin:12px 0;
+    background:rgba(10,16,26,.4);border-radius:0 8px 8px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>关于 · 数据来源<span class="en">ABOUT &amp; DATA SOURCES</span></h1>
+    <div class="nav">
+      <a class="btn" href="global-data-atlas.html">← 数据地图</a>
+      <a class="btn" href="compare.html">对比页</a>
+    </div>
+  </header>
+
+  <h2>项目简介</h2>
+  <p>全球数据图谱（Global Data Atlas）是一个交互式全球行政区划数据地图：按行政层级下钻（世界 → 国家 → 中国省/市 · 美国州 · 日本县 · 欧盟 NUTS2），挂载公开经济数据（GDP / 人口 / 面积 + 8 项扩展指标），支持年份切换、指标切换与多区域对比。数据全部来自公开权威源，本页说明各数据来源、口径与诚实性处理。</p>
+
+  <h2>数据来源</h2>
+  <table>
+    <tr><th>层级</th><th>数据源</th><th>内容</th><th>更新</th></tr>
+    <tr><td>国家（214）</td><td>世界银行 World Bank</td><td>GDP/人口/面积 + 8 项扩展指标（贸易/医疗/教育/寿命/人均GDP/失业/互联网/军费）</td><td>2000–2024 逐年</td></tr>
+    <tr><td>中国省级（31）</td><td>维基百科（官方公报/五经普修订整理）</td><td>GDP 序列 + 人口 + 面积</td><td>2000/2010/2020–2025（2025 初核）</td></tr>
+    <tr><td>中国地级市（321）</td><td>公开整理近似值 + 维基</td><td>GDP/人口/面积</td><td>约 2023；46 城多年序列</td></tr>
+    <tr><td>美国州（51）</td><td>BEA（经济分析局）+ Census</td><td>GDP 序列 + 人口 + 面积</td><td>GDP 2000–2024；人口/面积单年</td></tr>
+    <tr><td>日本县（47）</td><td>日本内阁府（県民経済計算）</td><td>GDP/人口/面积</td><td>2021 单年</td></tr>
+    <tr><td>欧盟 NUTS2（8 国 154）</td><td>Eurostat（GISCO 边界 + 统计 API）</td><td>GDP/人口/面积</td><td>2023 单年</td></tr>
+    <tr><td>中国行政区边界</td><td>阿里云 DataV GeoAtlas</td><td>省/市边界 GeoJSON（GCJ-02）</td><td>季度更新</td></tr>
+  </table>
+
+  <h2>口径说明</h2>
+  <h3>货币</h3>
+  <p>国家/州 GDP 按<strong>逐年平均市场汇率</strong>折算人民币（World Bank PA.NUS.FCRF，2000–2024）；欧盟按 EUR/CNY 年均汇率（ECB 数据）折算。不使用固定汇率，避免早年低估。</p>
+  <h3>现价 vs 不变价</h3>
+  <p>地图上的 GDP 为<strong>现价</strong>（含通胀与汇率波动）；"较 2000 年实际增长"使用<strong>不变价</strong>序列（剔除通胀），两者分开标注。</p>
+  <h3>年份</h3>
+  <p>年份下拉 2000–2025（2025 为省级初核）。缺失年份自动回退到最近可得年并<strong>诚实标注</strong>实际采用年份。</p>
+
+  <h2>数据诚实性</h2>
+  <ul style="font-size:13.5px;color:#c5d3e0;">
+    <li>缺失数据不编造：显示"—"（如欧盟个别区域无 GDP、扩展指标部分国家缺项）。</li>
+    <li>稀疏年份序列（省/市）按年均增长率校验，不误报。</li>
+    <li>来源标签在各区域面板展示；本页为汇总说明。</li>
+  </ul>
+
+  <h2>局限与免责</h2>
+  <div class="note">
+    ① 数据为快照，更新时点见各数据源；② 维基来源为人工整理，个别数值可能有修订滞后；③ 中国市级指标为约 2023 近似值；④ 日本/欧盟/城市为单年快照（无多年免费接口）；⑤ 非下钻国家（如巴西/印度）无统一省级数据源，仅到国家层；⑥ 本工具仅供了解全球各地区经济概况，不构成任何统计或投资建议。
+  </div>
+
+  <p style="margin-top:40px;text-align:center;color:var(--muted);font-size:12px;">
+    Global Data Atlas · 数据快照截至 2026-08 · 构建脚本与数据校验见项目仓库
+  </p>
+</div>
+</body>
+</html>
