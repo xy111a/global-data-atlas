@@ -253,7 +253,6 @@
         <div class="sub" id="pSub">加载中…</div>
         <div class="hint" id="pHint"></div>
       </details>
-      <div id="pActions"></div>
       <div id="pMetrics"></div>
       <div id="trend" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:10px;"></div>
       <div id="rank"></div>
@@ -497,11 +496,11 @@ function showCountry(c){
 }
 function showGeneric(name,sub,hint){
   document.getElementById("pSub").textContent=sub||"";
-  document.getElementById("pMetrics").innerHTML="";
+  const pm=document.getElementById("pMetrics"); pm.innerHTML=""; pm.style.display="none";   // 清洞察并隐藏
   document.getElementById("pHint").innerHTML=hint||"";
-  document.getElementById("pActions").innerHTML="";   // 清操作按钮（防上一区域"加入对比"残留）
+  document.getElementById("pActions") && document.getElementById("pActions").remove();   // pActions 已移除（无操作按钮）
   const oldStats=document.getElementById("introStats"); if(oldStats) oldStats.remove();   // 清简介块三卡残留
-  document.getElementById("trend").innerHTML="";   // 清理趋势区残留（L1 修复）
+  document.getElementById("trend").innerHTML=""; document.getElementById("trend").style.display="none";   // 清趋势区并隐藏
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
   /* 简介折叠块：summary 直接显示单元名（世界/中国/…），pName 隐藏由 summary 承担 */
   const sum=document.getElementById("introSum");
@@ -539,7 +538,8 @@ function renderTrendChart(series, fmt){
 /* 总览层：按当前指标 TOP N 增长对比（条形） */
 function renderTrendCompare(entries, title, fmt){
   const box=document.getElementById("trend"); if(!box) return;
-  if(!entries || !entries.length){ box.innerHTML=""; return; }
+  if(!entries || !entries.length){ box.innerHTML=""; box.style.display="none"; return; }
+  box.style.display="";
   box.innerHTML=`<details class="fold" open><summary>${title||"增长对比"}</summary><div class="trend-scroll"><div id="trendChart" style="height:${Math.max(120,entries.length*20)}px;width:100%;"></div></div></details>`;
   const d=box.querySelector("details");
   if(d) d.addEventListener("toggle",()=>{ const c=window.__trendChart; if(c) setTimeout(()=>c.resize(),0); });
@@ -575,6 +575,7 @@ function metricCards(baseStats, baseInsight, cur){
 /* 趋势区折叠封装：内容包 <details>，收起/展开时 resize 图表（canvas 尺寸恢复） */
 function foldTrend(html){
   const t=document.getElementById("trend");
+  t.style.display="";
   t.innerHTML=`<details class="fold" open><summary>趋势</summary>${html||""}</details>`;
   const d=t.querySelector("details");
   if(d) d.addEventListener("toggle",()=>{
@@ -597,13 +598,14 @@ function renderDashboard(cfg){
       `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
       (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div>`;
   document.getElementById("pSub").insertAdjacentHTML("afterend", statsHTML);
-  /* pMetrics 只放洞察（指标已并入简介块） */
-  document.getElementById("pMetrics").innerHTML=
+  /* pMetrics 只放洞察（指标已并入简介块）；空则隐藏防占位 */
+  const pm=document.getElementById("pMetrics");
+  pm.innerHTML=
     ((cfg.insight&&cfg.insight.length)?`<details class="fold" open><summary>洞察 · 增长</summary><div class="dash-insight">${cfg.insight.map(i=>
       `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div></details>`:"");
-  document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
+  pm.style.display = pm.innerHTML.trim() ? "" : "none";
   if(cfg.trendHTML){ foldTrend(cfg.trendHTML); }
-  else document.getElementById("trend").innerHTML="";
+  else { const t=document.getElementById("trend"); t.innerHTML=""; t.style.display="none"; }   // 空则隐藏
   if(typeof saveState==="function") saveState();   // 优化3：面板区域变化保存 URL 状态（lastShown 已由 showXxxPanel 设置）
 }
 /* T1: 货币标签按指标动态（避免「人民币(CNY)」与 USD 人均GDP 矛盾）；返回纯文本由 renderDashboard 统一包 tag */
