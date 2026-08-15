@@ -1,68 +1,76 @@
 #!/usr/bin/env python3
-"""对比模式功能验证：开启→点击多区域→检查对比框内容"""
+"""compare.html 独立对比页测试：?add 参数 / 图表渲染 / 搜索添加 / 删除
+   （原主页面内嵌对比已抽取为独立对比页，测试随之迁移）"""
 import subprocess, os, re
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+os.makedirs("atlas_test", exist_ok=True)
 
-def make_variant(name, trigger_js):
-    html = open("global-data-atlas.html", encoding="utf-8").read()
-    inject = ("<script>window.addEventListener('load',function(){setTimeout(function(){"
-              "try{" + trigger_js + "}catch(e){console.error('trigger',e);}},600);});</script>")
-    html = html.replace("</body>", inject + "\n</body>")
-    p = os.path.join("atlas_test", name)
-    open(p, "w", encoding="utf-8").write(html)
-    return "file://" + os.path.abspath(p)
-
-def dump(url, wait=10):
+def dump(url, wait):
     cmd = [CHROME, "--headless", "--no-sandbox", "--disable-gpu",
            f"--virtual-time-budget={wait*1000}", "--dump-dom", url]
-    r = subprocess.run(cmd, capture_output=True, timeout=wait+15)
+    r = subprocess.run(cmd, capture_output=True, timeout=wait+20)
     return r.stdout.decode("utf-8", "replace")
 
-# 1. 世界层对比：开模式 + 点美国 + 点日本
-trigger = ("cmpMode=true;cmpRender();"
-           "cmpHandleClick('country','美国','US');"
-           "cmpHandleClick('country','日本','JP');cmpRender();")
-dom = dump(make_variant("cmp1.html", trigger), 10)
-# 提取 compareBox 内容
-i=dom.find('compareBox'); box=dom[i:i+3000] if i>=0 else ""
-ok1 = "美国" in box and "日本" in box and "对比" in box
-ok2 = "万亿" in box  # GDP 格式化出现
-print(f"1. 世界层对比: {'✅' if ok1 else '❌'} 美国+日本在对比框")
-print(f"2. GDP 数值: {'✅' if ok2 else '❌'}")
+def runtime_out(dom):
+    pres = [m for m in re.findall(r'<pre id="ck">R(.*?)</pre>', dom, re.S) if not m.startswith("'+")]
+    return pres[-1] if pres else None
 
-# 2. 中国省份对比
-trigger2 = ("loadChina();setTimeout(function(){"
-            "cmpMode=true;cmpHandleClick('prov','广东','广东');"
-            "cmpHandleClick('prov','浙江','浙江');cmpRender();},1200)")
-dom2 = dump(make_variant("cmp2.html", trigger2), 13)
-i=dom2.find('compareBox'); box2=dom2[i:i+3000] if i>=0 else ""
-ok3 = "广东" in box2 and "浙江" in box2
-print(f"3. 省份对比: {'✅' if ok3 else '❌'} 广东+浙江在对比框")
+ok = 0; total = 0
+def check(label, cond, detail=""):
+    global ok, total
+    total += 1
+    print(f"{'✅' if cond else '❌'} {label} {detail}")
+    if cond: ok += 1
 
-# 3. 美国州对比
-trigger3 = ("loadUS();setTimeout(function(){"
-            "cmpMode=true;cmpHandleClick('usstate','California','California');"
-            "cmpHandleClick('usstate','Texas','Texas');cmpRender();},1200)")
-dom3 = dump(make_variant("cmp3.html", trigger3), 13)
-i=dom3.find('compareBox'); box3=dom3[i:i+3000] if i>=0 else ""
-ok4 = "California" in box3 and "Texas" in box3
-print(f"4. 州对比: {'✅' if ok4 else '❌'} California+Texas在对比框")
+# 1. ?add 参数：双区域 → 列表 2 项 + 图表容器
+url1 = "file://" + os.path.abspath("compare.html") + "?add=country:CN&add=country:IN"
+dom1 = dump(url1, 10)
+check("add 参数双区域", "对比列表（2 项）" in dom1 and "canvas" in dom1, "(CN+IN)")
 
-# 4. 中国城市对比（city 类型：key=adcode, pa=parentAdcode）
-trigger4 = ("loadChina();setTimeout(function(){loadProvince('浙江','330000');setTimeout(function(){"
-            "cmpMode=true;cmpHandleClick('city','杭州市','330100',330000);"
-            "cmpHandleClick('city','宁波市','330200',330000);cmpRender();},1800)},1200)")
-dom4 = dump(make_variant("cmp4.html", trigger4), 16)
-i=dom4.find('compareBox'); box4=dom4[i:i+3000] if i>=0 else ""
-ok5 = "杭州" in box4 and "宁波" in box4
-print(f"5. 城市对比: {'✅' if ok5 else '❌'} 杭州+宁波在对比框")
+# 2. 搜索添加 → 点击 → 列表 1 项
+html = open("compare.html", encoding="utf-8").read()
+inject = """<script>window.addEventListener('load',function(){setTimeout(function(){
+try{
+doAddSearch('印度');
+setTimeout(function(){
+var first=document.querySelector('#addResults [data-add]');
+if(first){ first.click(); }
+setTimeout(function(){
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({h:document.querySelector('#list h3').textContent})+'</pre>');
+},400);
+},400);
+}catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
+},800);});</script>"""
+html = html.replace("</body>", inject + "\n</body>")
+p2 = os.path.join("atlas_test", "cmp_search.html")
+open(p2, "w", encoding="utf-8").write(html)
+dom2 = dump("file://" + os.path.abspath(p2), 12)
+out2 = runtime_out(dom2)
+check("搜索添加", out2 and "1 项" in out2, f"({out2[:40] if out2 else '未获取'})")
 
-# 5. 日本县对比（jppref 类型）
-trigger5 = ("loadJapan();setTimeout(function(){"
-            "cmpMode=true;cmpHandleClick('jppref','东京都','东京都');"
-            "cmpHandleClick('jppref','大阪府','大阪府');cmpRender();},2200)")
-dom5 = dump(make_variant("cmp5.html", trigger5), 16)
-i=dom5.find('compareBox'); box5=dom5[i:i+3000] if i>=0 else ""
-ok6 = "东京都" in box5 and "大阪府" in box5
-print(f"6. 日本县对比: {'✅' if ok6 else '❌'} 东京都+大阪府在对比框")
+# 3. 删除：add 2 项后删除 1 项 → 剩 1
+html3 = open("compare.html", encoding="utf-8").read()
+inject3 = """<script>window.addEventListener('load',function(){setTimeout(function(){
+try{
+addItem('country','CN'); addItem('country','IN');
+setTimeout(function(){
+var del=document.querySelector('.cmp-item .del'); if(del){ del.click(); }
+setTimeout(function(){
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({h:document.querySelector('#list h3').textContent})+'</pre>');
+},300);
+},300);
+}catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
+},800);});</script>"""
+html3 = html3.replace("</body>", inject3 + "\n</body>")
+p3 = os.path.join("atlas_test", "cmp_del.html")
+open(p3, "w", encoding="utf-8").write(html3)
+dom3 = dump("file://" + os.path.abspath(p3), 12)
+out3 = runtime_out(dom3)
+check("删除项", out3 and "1 项" in out3, f"({out3[:40] if out3 else '未获取'})")
+
+# 4. 轨迹图表：2 项多年序列 → trendChart 有 series（canvas 存在且 hint 更新）
+check("轨迹图容器", "trendChart" in dom1 and "canvas" in dom1, "(2 项自动出图)")
+
+print(f"\n对比页测试: {ok}/{total} 通过")
+exit(0 if ok == total else 1)

@@ -47,8 +47,10 @@ src = open('vendor/jp_metrics.js', encoding='utf-8').read()
 JP = eval(re.search(r'window\.JP_METRICS\s*=\s*(\{[\s\S]*\})', src).group(1))
 # 世界边界
 WORLD = json.load(open('vendor/world.json', encoding='utf-8'))
-# HTML（CN 常量、US_STATES_GDP 原始）
+# 主 HTML + app-core.js（CN 常量、US_STATES_GDP、EN_ALIAS 已抽取到 app-core.js，window 定义）
 html = open('global-data-atlas.html', encoding='utf-8').read()
+core_src = open('vendor/app-core.js', encoding='utf-8').read()
+both = html + "\n" + core_src
 
 print(f"数据加载: WB={len(WB)} EXT={len(EXT)} 省={len(CN_TS)} 城={len(CITY)} 城序={len(CITY_TS)} 州={len(US_TS)} 县={len(JP)} 边界={len(WORLD['features'])}")
 
@@ -151,14 +153,14 @@ for ad in list(CITY_TS)[:10]:
 
 # ---------- 4. 交叉校验 ----------
 # 4a 广东人口 CN 常量 vs CN_TS
-m = re.search(r'"广东":\{pop:(\d+)', html)
+m = re.search(r'"广东":\{pop:(\d+)', both)
 cn_const_gd = int(m.group(1)) if m else None
 ts_gd = CN_TS['广东']['pop']['2023']//10000
 check("交叉[广东人口]", cn_const_gd == ts_gd, f"CN常量={cn_const_gd}万 vs TS={ts_gd}万")
 
 # 4b 香港/澳门 adcode 存在
 for nm, ad in [('香港', 810000), ('澳门', 820000)]:
-    check(f"交叉[{nm} adcode]", re.search('"' + nm + '"\\]\\s*=\\s*' + str(ad), html) is not None, "")
+    check(f"交叉[{nm} adcode]", re.search('"' + nm + '"\\]\\s*=\\s*' + str(ad), both) is not None, "")
 
 # 4c CITY_TS 城市都有单年锚点（city_metrics 或省级兜底：直辖市市=省）
 miss_anchor = []
@@ -170,7 +172,7 @@ for ad in CITY_TS:
 check("覆盖[城市序列有单年锚点]", not miss_anchor, f"缺: {miss_anchor[:5]}")
 
 # 4d world.json 名 → WB 匹配（EN_ALIAS + BY_EN）
-m = re.search(r'const EN_ALIAS = \{(.*?)\};', html, re.S)
+m = re.search(r'window\.EN_ALIAS = \{(.*?)\};', core_src, re.S) or re.search(r'const EN_ALIAS = \{(.*?)\};', core_src, re.S)
 EN_ALIAS = dict(re.findall(r'"([^"]+)":"([^"]+)"', m.group(1))) if m else {}
 BY_EN = {o['en']: iso for iso, o in WB.items()}
 matched = 0

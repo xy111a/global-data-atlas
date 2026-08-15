@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>区域对比 · Compare</title>
+<style>
+  :root{
+    --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
+    --cyan:#00F0FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
+    --hover:rgba(0,240,255,.06); --line-soft:rgba(19,49,74,.45);
+    --num:tabular-nums;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  body{background:radial-gradient(1100px 700px at 12% -8%, rgba(0,240,255,.05), transparent 60%),
+    radial-gradient(900px 600px at 108% 112%, rgba(255,46,147,.04), transparent 60%), var(--bg);}
+  #app{display:flex;flex-direction:column;height:100vh;}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 20px;
+    border-bottom:1px solid var(--line);background:color-mix(in oklab,var(--bg) 72%,transparent);
+    backdrop-filter:blur(14px);}
+  header h1{font-size:16px;margin:0;font-weight:600;}
+  header h1 .en{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;}
+  .spacer{flex:1;}
+  .btn{background:transparent;border:1px solid var(--line);color:var(--text);padding:6px 12px;
+    border-radius:8px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-block;}
+  .btn:hover{border-color:var(--cyan);}
+  .seg{display:flex;gap:2px;padding:3px;background:rgba(10,16,26,.55);border:1px solid var(--line);border-radius:10px;}
+  .seg button{background:transparent;color:var(--muted);border:0;padding:6px 11px;font-size:12.5px;
+    cursor:pointer;white-space:nowrap;border-radius:6px;}
+  .seg button.active{background:rgba(0,240,255,.12);color:var(--cyan);}
+  #main{flex:1;display:flex;min-height:0;}
+  #list{width:300px;border-right:1px solid var(--line);padding:16px;overflow-y:auto;background:var(--panel);}
+  #list h3{font-size:13px;margin:0 0 10px;color:var(--muted);}
+  #addbar{display:flex;gap:8px;margin-bottom:14px;}
+  #addbar input{flex:1;background:rgba(5,6,10,.6);border:1px solid var(--line);color:var(--text);
+    padding:6px 10px;border-radius:8px;font-size:13px;outline:none;}
+  #addbar input:focus{border-color:var(--cyan);}
+  .cmp-item{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--line-soft);font-size:13px;}
+  .cmp-item .del{background:transparent;border:1px solid var(--line);color:var(--pink);border-radius:4px;
+    width:20px;height:20px;cursor:pointer;font-size:11px;}
+  .cmp-item .nm{flex:1;color:var(--text);}
+  .cmp-item .val{color:var(--cyan);font-variant-numeric:var(--num);font-size:12px;}
+  .empty{color:var(--muted);font-size:12px;padding:20px 0;text-align:center;line-height:1.8;}
+  #chart-area{flex:1;display:flex;flex-direction:column;min-width:0;padding:12px 18px;}
+  #chartBox{flex:1;min-height:0;}
+  #trendChart{width:100%;height:100%;}
+  .hint{color:var(--muted);font-size:12px;padding:8px 4px;}
+  @media(max-width:768px){
+    #main{flex-direction:column;}
+    #list{width:100%;border-right:none;border-bottom:1px solid var(--line);max-height:40vh;}
+    #chartBox{min-height:40vh;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>区域对比<span class="en">COMPARE</span></h1>
+    <span class="hint" style="margin:0">多年轨迹并排 · 多指标切换</span>
+    <div class="spacer"></div>
+    <input id="addInput" placeholder="搜索添加区域（国家/省/州/县/城市）…" aria-label="搜索添加对比区域" />
+    <div class="seg" id="metricSeg"></div>
+    <select id="yearSel" aria-label="选择年份"></select>
+    <a class="btn" href="global-data-atlas.html">← 返回地图</a>
+  </header>
+  <div id="main">
+    <div id="list">
+      <h3>对比列表（N 项）</h3>
+      <div id="addResults" style="display:none;margin-bottom:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;"></div>
+      <div id="cmpItems"></div>
+      <div class="empty" id="emptyTip">暂无对比项<br/>从地图页点「📊 加入对比」带过来，<br/>或在上方搜索添加。</div>
+    </div>
+    <div id="chart-area">
+      <div id="chartBox"><div id="trendChart"></div></div>
+      <div class="hint" id="hint">选择 ≥2 个区域显示轨迹对比；切换指标/年份实时刷新。</div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/echarts.min.js"></script>
+<script src="vendor/countries_wb.js"></script>
+<script src="vendor/fxrate.js"></script>
+<script src="vendor/ext_indicators.js"></script>
+<script src="vendor/cn_prov_ts.js"></script>
+<script src="vendor/cn/city_metrics.js"></script>
+<script src="vendor/cn/city_ts.js"></script>
+<script src="vendor/us_states_bea.js"></script>
+<script src="vendor/jp_metrics.js"></script>
+<script src="vendor/eu/eu_metrics.js"></script>
+<script src="vendor/app-core.js"></script>
+<script>
+/* ============== 独立对比页（compare.html） ==============
+   复用 app-core.js（METRICS/reg/cmpGetData/格式化）；本页仅对比 UI 与图表。 */
+let cmpList = [];        // [{t,name,k,pa}]
+let metric = "gdp";
+let dataYear = "2023";
+
+/* ---------- 区域解析（从 key 取显示名） ---------- */
+function resolveName(it){
+  if(it.t==="country"){ const o=window.WB&&window.WB[it.k]; return o?o.cn:it.k; }
+  if(it.t==="prov") return it.k;
+  if(it.t==="usstate") return it.k;
+  if(it.t==="jppref"){ const d=window.JP_METRICS&&window.JP_METRICS[it.k]; return d?it.k:it.k; }
+  if(it.t==="nutspref"){ const d=window.EU_METRICS&&window.EU_METRICS[it.k]; return d?d.name:it.k; }
+  if(it.t==="city"){ const cm=getCityMetric(it.k, it.pa); return cm&&cm.name?cm.name:it.k; }
+  return it.k;
+}
+function regFor(it){
+  if(it.t==="country") return regCountry(it.k);
+  if(it.t==="prov") return regProv(it.k);
+  if(it.t==="usstate") return regUSState(it.k);
+  if(it.t==="jppref") return regJapanPref(it.k);
+  if(it.t==="nutspref") return regNUTS(it.k);
+  if(it.t==="city"){ const cm=getCityMetric(it.k, it.pa); return cm?regCity(cm, it.k):null; }
+  return null;
+}
+function seriesFor(it){
+  /* 多年序列（折线）：reg.series(m) 返回 {years, values} 或 null */
+  const r = regFor(it);
+  if(!r||!r.series) return null;
+  try{ return r.series(metric); }catch(e){ return null; }
+}
+
+/* ---------- 渲染 ---------- */
+function renderList(){
+  const box=document.getElementById("cmpItems");
+  const tip=document.getElementById("emptyTip");
+  document.querySelector("#list h3").textContent="对比列表（"+cmpList.length+" 项）";
+  tip.style.display = cmpList.length ? "none" : "block";
+  box.innerHTML = cmpList.map((it,i)=>{
+    const d=cmpGetData(it);
+    const v=d&&d.v!=null?metricFmt(metric,d.v):"—";
+    return `<div class="cmp-item"><button class="del" data-i="${i}" aria-label="移除">×</button>
+      <span class="nm">${esc(it.name)}</span><span class="val">${esc(v)}</span></div>`;
+  }).join("");
+  box.querySelectorAll(".del").forEach(b=>{
+    b.onclick=()=>{ cmpList.splice(+b.dataset.i,1); renderList(); renderChart(); };
+  });
+}
+function renderChart(){
+  const el=document.getElementById("trendChart");
+  const chart=echarts.getInstanceByDom(el)||echarts.init(el);
+  const series=[];
+  cmpList.forEach(it=>{
+    const s=seriesFor(it);
+    if(s&&s.years&&s.values){ series.push({name:it.name, years:s.years, values:s.values}); }
+  });
+  if(series.length>=2){
+    // 多年折线叠加（轨迹对比）
+    const allYears=[...new Set(series.flatMap(s=>s.years))].sort((a,b)=>a-b);
+    chart.setOption({
+      backgroundColor:"transparent",
+      tooltip:{trigger:"axis", formatter:ps=>{
+        const y=ps[0].axisValue; let rows=[`<b>${y}</b>`];
+        ps.forEach(p=>{ rows.push(`${p.seriesName}: <b style="color:${p.color}">${metricFmt(metric,p.value)}</b>`); });
+        return rows.join("<br/>"); }},
+      legend:{textStyle:{color:"#9fb3c8"},top:0},
+      grid:{left:70,right:24,top:32,bottom:36,containLabel:true},
+      xAxis:{type:"category",data:allYears,axisLabel:{color:"#7f93a8",fontSize:10}},
+      yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>metricFmt(metric,v).replace("¥","")},
+        splitLine:{lineStyle:{color:"#0e2233"}}},
+      series:series.map((s,i)=>({name:s.name,type:"line",smooth:true,showSymbol:false,
+        data:allYears.map(y=>{ const idx=s.years.indexOf(y); return idx>=0?s.values[idx]:null; }),
+        lineStyle:{width:2},itemStyle:{}}))
+    });
+    document.getElementById("hint").textContent="多年轨迹对比（"+metricLabel(metric)+"，可切换指标/年份）。";
+  } else {
+    chart.clear();
+    document.getElementById("hint").textContent = "选择 ≥2 个区域显示轨迹对比；当前 "+(cmpList.length||0)+" 项。";
+  }
+  window.__cmpChart=chart;
+}
+
+/* ---------- 添加区域 ---------- */
+function addItem(t,k,pa){
+  if(cmpList.some(x=>x.t===t&&x.k===k)) return;
+  const name=resolveName({t,k,pa});
+  cmpList.push({t,name,k,pa});
+  renderList(); renderChart();
+}
+function parseAddParam(){
+  const p=new URLSearchParams(location.search);
+  const adds=p.getAll("add"); if(!adds.length) return;
+  adds.forEach(add=>{
+    const parts=add.split(":");
+    const t=parts[0], k=parts.slice(1).join(":");
+    if(t&&k) addItem(t,k,parts[2]?+parts[2]:undefined);
+  });
+}
+/* 搜索添加：国家/省/州/县/城市 */
+function doAddSearch(q){
+  q=(q||"").trim().toLowerCase(); if(!q) return;
+  const box=document.getElementById("addResults");
+  const hits=[];
+  const c=COUNTRIES.find(x=>x[0].toLowerCase().includes(q)||x[1].toLowerCase().includes(q));
+  if(c) hits.push(`<div class="cmp-item" data-add="country:${c[2]}"><span class="nm">${esc(c[0])}（国家）</span></div>`);
+  const pk=Object.keys(CN).find(x=>x.toLowerCase().includes(q));
+  if(pk) hits.push(`<div class="cmp-item" data-add="prov:${pk}"><span class="nm">${esc(pk)}（省）</span></div>`);
+  if(window.US_STATES_GDP){
+    const sk=Object.keys(US_STATES_GDP).find(x=>x.toLowerCase().includes(q));
+    if(sk) hits.push(`<div class="cmp-item" data-add="usstate:${sk}"><span class="nm">${esc(sk)}（州）</span></div>`);
+  }
+  if(window.JP_METRICS){
+    const jk=Object.keys(JP_METRICS).find(x=>x.toLowerCase().includes(q));
+    if(jk) hits.push(`<div class="cmp-item" data-add="jppref:${jk}"><span class="nm">${esc(jk)}（县）</span></div>`);
+  }
+  if(window.EU_METRICS){
+    const nk=Object.keys(EU_METRICS).find(k=>EU_METRICS[k].name.toLowerCase().includes(q));
+    if(nk) hits.push(`<div class="cmp-item" data-add="nutspref:${nk}"><span class="nm">${esc(EU_METRICS[nk].name)}（NUTS2）</span></div>`);
+  }
+  if(window.CITY_INDEX){
+    const hit=window.CITY_INDEX.find(x=>x[0].toLowerCase().includes(q));
+    if(hit) hits.push(`<div class="cmp-item" data-add="city:${hit[1]}:${hit[2]}"><span class="nm">${esc(hit[0])}（市）</span></div>`);
+  }
+  if(!hits.length){ box.style.display="block"; box.innerHTML=`<div class="empty">未找到「${esc(q)}」</div>`; return; }
+  box.style.display="block";
+  box.innerHTML=hits.join("");
+  box.querySelectorAll("[data-add]").forEach(el=>{
+    el.onclick=()=>{
+      const parts=el.dataset.add.split(":");
+      addItem(parts[0], parts.slice(1,3).join(":"), parts[2]?+parts[2]:undefined);
+      box.style.display="none";
+      document.getElementById("addInput").value="";
+    };
+  });
+}
+
+/* ---------- 指标/年份 ---------- */
+function initMetrics(){
+  const seg=document.getElementById("metricSeg");
+  Object.keys(METRICS).forEach((m,i)=>{
+    const b=document.createElement("button");
+    b.dataset.m=m; b.textContent=METRICS[m].label;
+    if(m==="gdp") b.classList.add("active");
+    seg.appendChild(b);
+  });
+  seg.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    metric=b.dataset.m;
+    [...seg.children].forEach(x=>x.classList.toggle("active",x===b));
+    renderList(); renderChart();
+  });
+}
+function initYear(){
+  const sel=document.getElementById("yearSel");
+  const yrs=[2024,2023,2022,2021,2020,2019,2018,2017,2016,2015,2014,2013,2012,2011,2010];
+  sel.innerHTML=yrs.map(y=>`<option value="${y}"${y===2023?" selected":""}>${y}</option>`).join("");
+  sel.addEventListener("change",e=>{ dataYear=e.target.value; renderList(); renderChart(); });
+}
+
+window.addEventListener("load",()=>{
+  initMetrics(); initYear();
+  parseAddParam();
+  renderList(); renderChart();
+  document.getElementById("addInput").addEventListener("keydown",e=>{ if(e.key==="Enter") doAddSearch(e.target.value); });
+  document.getElementById("addInput").addEventListener("blur",()=>setTimeout(()=>{ document.getElementById("addResults").style.display="none"; },200));
+  window.addEventListener("resize",()=>{ const c=echarts.getInstanceByDom(document.getElementById("trendChart")); if(c) c.resize(); });
+});
+</script>
+</body>
+</html>

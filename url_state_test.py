@@ -31,7 +31,6 @@ def runtime_out(dom):
 TRIGGER1 = """DRILLABLE['CN'].load();
 setTimeout(function(){
 showProvincePanel('广东');
-cmpHandleClick('prov','广东','广东');
 setTimeout(function(){
 document.body.insertAdjacentHTML('beforeend','<pre id="st">VERIFY>' + location.hash + '</pre>');
 },600);
@@ -40,7 +39,7 @@ dom1 = dump(make_variant("url_save.html", TRIGGER1), 14)
 out1 = runtime_out(dom1)
 hash_arg = out1.lstrip("#") if out1 else ""
 print("save hash:", ("#"+hash_arg)[:120])
-ok_save = out1 and all(k in hash_arg for k in ["level=china", "metric=gdp", "sel=", "cmp="])
+ok_save = out1 and all(k in hash_arg for k in ["level=china", "metric=gdp", "sel="])
 print("  save 编码:", "OK ✅" if ok_save else "FAIL ❌")
 
 # ---------- 2. restore ----------
@@ -49,7 +48,7 @@ inject2 = """<script>window.addEventListener('load',function(){
 var t=0;var iv=setInterval(function(){t++;
 if(currentLevel!=='world'||t>15){clearInterval(iv);
 var o=[];o.push('LEVEL='+currentLevel+'|面板='+document.getElementById('pName').textContent);
-o.push('指标='+metric+'|年份='+dataYear+'|对比='+cmpList.length);
+o.push('指标='+metric+'|年份='+dataYear);
 document.body.insertAdjacentHTML('beforeend','<pre id="st">VERIFY>' + o.join(' || ') + '</pre>');
 }},1000)});</script>"""
 html = html.replace("</body>", inject2 + "\n</body>")
@@ -59,5 +58,5 @@ url2 = "file://" + os.path.abspath(p2) + ("#" + hash_arg if hash_arg else "")
 dom2 = dump(url2, 20)
 out2 = runtime_out(dom2)
 print("restore:", out2 if out2 else "未获取")
-ok_restore = out2 and "LEVEL=china" in out2 and "广东" in out2 and "对比=1" in out2
+ok_restore = out2 and "LEVEL=china" in out2 and "广东" in out2
 print("  restore:", "OK ✅" if ok_restore else "FAIL ❌")
