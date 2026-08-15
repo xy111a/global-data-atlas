@@ -32,6 +32,13 @@ for f in vendor/app-core.js vendor/eu/eu_metrics.js vendor/world.js; do
 done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
+# 缓存失效：给 app-core.js 引用注入内容指纹（?v=md5前8位）——JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存
+CORE_HASH=$(md5 -q vendor/app-core.js | cut -c1-8)
+for f in dist/global-data-atlas.html dist/index.html dist/compare.html; do
+  sed -i '' "s|src=\"vendor/app-core.js\"|src=\"vendor/app-core.js?v=${CORE_HASH}\"|" "$f"
+done
+echo "  ↻ app-core.js?v=${CORE_HASH}（缓存指纹已注入）"
+
 if [ "$1" = "--deploy" ]; then
   echo "── 部署 Cloudflare Pages ──"
   # 绕过系统代理（本机代理会导致 fetch failed）
