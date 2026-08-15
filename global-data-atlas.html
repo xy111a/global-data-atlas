@@ -534,13 +534,11 @@ function renderTrendChart(series, fmt){
 function renderTrendCompare(entries, title, fmt){
   const box=document.getElementById("trend"); if(!box) return;
   if(!entries || !entries.length){ box.innerHTML=""; return; }
-  box.innerHTML=`<details class="fold" open><summary>${title||"增长对比"}</summary><div class="trend-scroll"><div id="trendChart" style="height:${Math.max(120,Math.min(entries.length,10)*20)}px;width:100%;"></div></div></details>`;
+  box.innerHTML=`<details class="fold" open><summary>${title||"增长对比"}</summary><div class="trend-scroll"><div id="trendChart" style="height:${Math.max(120,entries.length*20)}px;width:100%;"></div></div></details>`;
   const d=box.querySelector("details");
   if(d) d.addEventListener("toggle",()=>{ const c=window.__trendChart; if(c) setTimeout(()=>c.resize(),0); });
   const isGrowth = !fmt;                 // 默认按增长率渲染；传 fmt 则按绝对值（如 GDP 对比）
   const sorted=entries.slice().sort((a,b)=>b.val-a.val);   // 全量降序：第一名在前
-  const H=Math.max(120,sorted.length*20);    // 图表全量高度，容器 CSS 滚动（与排行一致）
-  box.innerHTML=`<div class="rank-title">${title||"增长对比"}</div><div class="trend-scroll"><div id="trendChart" style="height:${H}px;width:100%;"></div></div>`;
   const tc=echarts.init(document.getElementById("trendChart"));
   const fmtV = isGrowth ? (v=>fmtGrowth(v/100)) : (v=>fmt(v));
   tc.setOption({
