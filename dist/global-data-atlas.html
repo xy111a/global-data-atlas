@@ -500,6 +500,7 @@ function showGeneric(name,sub,hint){
   document.getElementById("pMetrics").innerHTML="";
   document.getElementById("pHint").innerHTML=hint||"";
   document.getElementById("pActions").innerHTML="";   // 清操作按钮（防上一区域"加入对比"残留）
+  const oldStats=document.getElementById("introStats"); if(oldStats) oldStats.remove();   // 清简介块三卡残留
   document.getElementById("trend").innerHTML="";   // 清理趋势区残留（L1 修复）
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
   /* 简介折叠块：summary 直接显示单元名（世界/中国/…），pName 隐藏由 summary 承担 */
@@ -583,18 +584,21 @@ function foldTrend(html){
   });
 }
 function renderDashboard(cfg){
-  /* 简介折叠块：summary 直接显示单元名，pName 隐藏 */
+  /* 简介+指标合并块：summary=单元名，内容=英文·年份 + 三张大卡 + 来源标签 */
   const isum=document.getElementById("introSum");
   if(isum) isum.textContent=cfg.name||"区域";
   document.getElementById("introFold").open=true;
   document.getElementById("pSub").textContent=cfg.en||"";
-  document.getElementById("pSub").textContent=cfg.en||"";
   const tags=(cfg.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   document.getElementById("pHint").innerHTML=`<span class="dash-level">${esc(cfg.level||"区域")}</span> ${tags}`;
-  document.getElementById("pMetrics").innerHTML=
-    `<details class="fold" open><summary>指标</summary><div class="dash-stats">${(cfg.stats||[]).map(s=>
+  /* 三张大卡插入简介块（pSub 后）；先删旧避免累积 */
+  const oldStats=document.getElementById("introStats"); if(oldStats) oldStats.remove();
+  const statsHTML=`<div id="introStats" class="dash-stats">${(cfg.stats||[]).map(s=>
       `<div class="dash-stat"><div class="k">${esc(s.label)}</div><div class="v ${s.cls||''}">${esc(s.value)}</div>`+
-      (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div></details>`+
+      (s.delta?`<div class="d ${s.delta.dir==='up'?'up':(s.delta.dir==='down'?'down':'')}">${esc(s.delta.txt)}</div>`:``)+`</div>`).join("")}</div>`;
+  document.getElementById("pSub").insertAdjacentHTML("afterend", statsHTML);
+  /* pMetrics 只放洞察（指标已并入简介块） */
+  document.getElementById("pMetrics").innerHTML=
     ((cfg.insight&&cfg.insight.length)?`<details class="fold" open><summary>洞察 · 增长</summary><div class="dash-insight">${cfg.insight.map(i=>
       `<div class="dash-insight-row"><span>${esc(i.label)}</span><b class="${i.cls||''}">${esc(i.value)}</b></div>`).join("")}</div></details>`:"");
   document.getElementById("pActions").innerHTML = cfg.actionsHTML ? `<div class="dash-actions">${cfg.actionsHTML}</div>` : "";   // 操作按钮移到标题下方（紧跟区域名）
@@ -1139,12 +1143,14 @@ function renderOverviewMetrics(){
   if(!list.length){ return; }
   const sum=m=>list.reduce((a,r)=>{ const v=regGet(r,m,dataYear); return a+(v||0); },0);
   const g=sum("gdp"), p=sum("pop"), a=sum("area");
-  document.getElementById("pMetrics").innerHTML=
-    `<details class="fold" open><summary>指标</summary><div class="dash-stats">
+  /* 层级总量并入简介块（与详情一致：简介+指标合并） */
+  const oldStats=document.getElementById("introStats"); if(oldStats) oldStats.remove();
+  const statsHTML=`<div id="introStats" class="dash-stats">
       <div class="dash-stat"><div class="k">GDP</div><div class="v">${fmtGDP(g)}</div></div>
       <div class="dash-stat"><div class="k">人口</div><div class="v">${fmtPop(p)}</div></div>
       <div class="dash-stat"><div class="k">面积</div><div class="v">${fmtArea(a)}</div></div>
-    </div></details>`;
+    </div>`;
+  document.getElementById("pSub").insertAdjacentHTML("afterend", statsHTML);
 }
 function renderRank(){
   const box=document.getElementById("rank");
