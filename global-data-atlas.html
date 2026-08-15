@@ -901,6 +901,7 @@ function showGeneric(name,sub,hint){
   document.getElementById("pSub").textContent=sub||"";
   document.getElementById("pMetrics").innerHTML="";
   document.getElementById("pHint").innerHTML=hint||"";
+  document.getElementById("pActions").innerHTML="";   // 清操作按钮（防上一区域"加入对比"残留）
   document.getElementById("trend").innerHTML="";   // 清理趋势区残留（L1 修复）
   document.getElementById("rank").innerHTML="";    // 清理排行榜残留
 }
