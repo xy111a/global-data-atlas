@@ -2,7 +2,14 @@
 """双币切换验证（GDP 人民币/美元）：默认 CNY / 切 USD / URL ?cur=usd 恢复"""
 import subprocess, os, re
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME = os.environ.get("CHROME_BIN")
+if not CHROME:
+    for p in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+              "/usr/bin/chromium", "/usr/bin/chromium-browser"):
+        if os.path.exists(p):
+            CHROME = p; break
+assert CHROME and os.path.exists(CHROME), "未找到 Chrome/Chromium，请设 CHROME_BIN"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.makedirs(os.path.join(ROOT, "atlas_test"), exist_ok=True)
 

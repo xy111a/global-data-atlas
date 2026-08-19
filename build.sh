@@ -6,6 +6,15 @@
 set -e
 cd "$(dirname "$0")"
 
+# 可移植 md5（macOS /sbin/md5、Linux md5sum、通用 shasum）
+if command -v md5 >/dev/null 2>&1; then
+  HASH() { md5 -q "$1"; }
+elif command -v md5sum >/dev/null 2>&1; then
+  HASH() { md5sum "$1" | awk '{print $1}'; }
+else
+  HASH() { shasum -a 1 "$1" | awk '{print $1}'; }
+fi
+
 echo "── 同步 source → dist ──"
 for f in global-data-atlas.html compare.html about.html; do
   cp "$f" "dist/$f"
@@ -19,21 +28,21 @@ cp -R vendor/. dist/vendor/
 echo "── md5 校验 ──"
 ok=1
 for f in global-data-atlas.html compare.html about.html; do
-  s=$(md5 -q "$f"); d=$(md5 -q "dist/$f")
+  s=$(HASH "$f"); d=$(HASH "dist/$f")
   if [ "$s" = "$d" ]; then echo "  ✓ $f 一致"; else echo "  ✗ $f 漂移"; ok=0; fi
 done
-s=$(md5 -q global-data-atlas.html); d=$(md5 -q dist/index.html)
+s=$(HASH global-data-atlas.html); d=$(HASH dist/index.html)
 if [ "$s" = "$d" ]; then echo "  ✓ index.html 一致"; else echo "  ✗ index.html 漂移"; ok=0; fi
 # vendor 关键文件抽查（HTML 按需加载的脚本/数据）
 for f in vendor/app-core.js vendor/eu/eu_metrics.js vendor/world.js; do
   rel="${f#vendor/}"
-  s=$(md5 -q "$f"); d=$(md5 -q "dist/vendor/$rel")
+  s=$(HASH "$f"); d=$(HASH "dist/vendor/$rel")
   if [ "$s" = "$d" ]; then echo "  ✓ $rel 一致"; else echo "  ✗ $rel 漂移"; ok=0; fi
 done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
 # 缓存失效：给 app-core.js 引用注入内容指纹（?v=md5前8位）——JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存
-CORE_HASH=$(md5 -q vendor/app-core.js | cut -c1-8)
+CORE_HASH=$(HASH vendor/app-core.js | cut -c1-8)
 for f in dist/global-data-atlas.html dist/index.html dist/compare.html; do
   sed -i '' "s|src=\"vendor/app-core.js\"|src=\"vendor/app-core.js?v=${CORE_HASH}\"|" "$f"
 done

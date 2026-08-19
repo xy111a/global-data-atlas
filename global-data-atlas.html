@@ -259,8 +259,9 @@
         <h2 id="pName" style="display:none"></h2>
         <div class="sub" id="pSub">加载中…</div>
         <div class="hint" id="pHint"></div>
-      </details>
-      <div id="pMetrics"></div>
+  </details>
+  <button id="drillBtn" class="btn" style="display:none;margin:8px 0;" title="下钻进入下级区域（省/州/县/市）">⬇ 下钻</button>
+  <div id="pMetrics"></div>
       <div id="trend"></div>
       <div id="rank"></div>
     </div>
@@ -454,6 +455,7 @@ function showBanner(t){ document.getElementById("banner").textContent=t; }
 
 function showCountry(c){
   lastShown={type:"country", data:c};   // 记录当前面板区域：切维度时恢复并跟随刷新
+  updateDrillButton();
   const iso2=c[2];
   const y=cYear(iso2);
   const g=cMetric(iso2,"gdp"), p=cMetric(iso2,"pop"), a=cMetric(iso2,"area");
@@ -791,6 +793,7 @@ async function loadProvince(short, adcode){
 }
 function showCityPanel(cityName, adcode, parentAdcode){
   lastShown={type:"city", name:cityName, adcode, pa:parentAdcode};
+  updateDrillButton();
   const cm=getCityMetric(adcode, parentAdcode); if(!cm) return;
   const r=regCity(cm, adcode);
   const yrs=r.years();
@@ -897,6 +900,7 @@ async function loadJapan(){
 }
 function showJapanPrefPanel(nm){
   lastShown={type:"jppref", nm};
+  updateDrillButton();
   const r=regJapanPref(nm); if(!r) return;
   const baseStats=[
       {label:"GDP (2021)", value:fmtGDP(regGet(r,"gdp",dataYear))},
@@ -914,6 +918,7 @@ function showJapanPrefPanel(nm){
 }
 function showUSStatePanel(nm){
   lastShown={type:"usstate", nm};
+  updateDrillButton();
   const s=US_STATES_GDP[nm]; if(!s) return;
   const gy=usGdpYear(nm,dataYear), yg=usGdpDisplay(nm,dataYear), ng=usNominalGrowth(nm,2000);
   const popY=(s.popYear||2023);
@@ -939,6 +944,7 @@ function showUSStatePanel(nm){
 }
 function showProvincePanel(short){
   lastShown={type:"prov", short};
+  updateDrillButton();
   const m=CN[short]; if(!m){ showGeneric(short, "省级数据未收录", "该地区未纳入维基省级序列（GDP/人口/面积暂无）。双击可进入下一级视图。"); return; }   // L2: 港澳单击给出提示
   const o = window.CN_TS && window.CN_TS[short];
   const gd = cnGdpRMB(short, dataYear);
@@ -1156,6 +1162,7 @@ async function loadNUTS(cc){
 }
 function showNUTSPanel(nid){
   lastShown={type:"nutspref", nm:nid};
+  updateDrillButton();
   const r=regNUTS(nid); if(!r) return;
   const cards=metricCards([
       {label:"GDP (2023)", value:fmtGDP(r.get("gdp"))},
@@ -1270,6 +1277,30 @@ function drillDownFor(p){
   ensurePanelOpen();   /* 下钻：自动展开面板 */
   const L=layerGet(); if(L&&L.drill) L.drill(p);
 }
+/* 移动端/键盘：面板「下钻」按钮（替代触摸双击下钻，P1 修复） */
+function drillCurrent(){
+  const L=layerGet(); if(!L) return;
+  const ls=lastShown; if(!ls) return;
+  if(currentLevel==="world" && ls.type==="country"){
+    const c=ls.data, iso2=c&&c[2], d=iso2&&DRILLABLE[iso2];
+    if(d) d.load();
+    else showGeneric((c&&c[0]||"国家")+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟27国）。单击查看国家详情，或返回世界选择其他区域。");
+  } else if(currentLevel==="china" && ls.type==="prov"){
+    const adcode=PROV_ADCODE[ls.short];
+    if(adcode) loadProvince(ls.short, adcode);
+  }
+}
+function updateDrillButton(){
+  const btn=document.getElementById("drillBtn"); if(!btn) return;
+  const ls=lastShown;
+  let can=false;
+  if(currentLevel==="world" && ls && ls.type==="country"){
+    const iso2=ls.data&&ls.data[2]; if(iso2 && DRILLABLE[iso2]) can=true;
+  } else if(currentLevel==="china" && ls && ls.type==="prov"){
+    if(PROV_ADCODE[ls.short]) can=true;
+  }
+  btn.style.display = can ? "inline-block" : "none";
+}
 
 /* ============== 启动 ============== */
 window.addEventListener("load", ()=>{
@@ -1285,6 +1316,7 @@ window.addEventListener("load", ()=>{
   /* 面板折叠：世界层自动折叠成悬浮按钮；点击区域自动展开 */
   document.getElementById("panelFold").addEventListener("click", ()=>togglePanel());
   document.getElementById("panelFloat").addEventListener("click", ()=>togglePanel(false));
+  document.getElementById("drillBtn").addEventListener("click", ()=>drillCurrent());   // 移动端下钻按钮
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){

@@ -274,8 +274,8 @@ function usGdpDisplay(name, year){         // 返回 当前显示币种 的州 G
   const s = US_STATES_GDP[name]; if(!s) return null;
   const y = usGdpYear(name, year), usd = usGdpUsdM(name, y);
   if(usd!=null) return gdpApply(usd*1e6, "USD", y);            // 基准 USD（BEA 序列）
-  const fb = s.gdpUsdM!=null ? s.gdpUsdM*1e6 : s.gdp;           // 兜底：优先 USD 百万，退 CNY
-  return gdpApply(fb, s.gdpUsdM!=null ? "USD" : "CNY", 2023);
+  const fb = s.gdpUsdM!=null ? s.gdpUsdM*1e6 : s.gdp*1e12;     // 兜底：缺失州(如 Puerto Rico) 的 .gdp 仍是美元万亿，×1e12 转美元元
+  return gdpApply(fb, "USD", 2023);
 }
 function usGdpYear(name, year){            // 实际采用的年份（usGdpUsdM 回退后）
   const ts = window.US_TS && window.US_TS[name];
@@ -415,8 +415,8 @@ function regUSState(nm){
       const s=US_STATES_GDP[nm]; if(!s) return null;
       if(m==="gdp"){ const y=usGdpYear(nm,year); const usd=usGdpUsdM(nm,y);
         if(usd!=null) return gdpApply(usd*1e6,"USD",y);                    // 州基准 USD（序列）
-        const fb=s.gdpUsdM!=null?s.gdpUsdM*1e6:s.gdp;                      // 兜底：优先 USD 百万，退 CNY
-        return gdpApply(fb, s.gdpUsdM!=null?"USD":"CNY", 2023); }
+        const fb=s.gdpUsdM!=null?s.gdpUsdM*1e6:s.gdp*1e12;                // 兜底：缺失州(如 Puerto Rico) 的 .gdp 仍是美元万亿，×1e12 转美元元
+        return gdpApply(fb, "USD", 2023); }
       if(m==="pop") return s.pop;
       if(m==="area") return s.area;
       return null;

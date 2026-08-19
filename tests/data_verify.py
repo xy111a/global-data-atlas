@@ -10,41 +10,60 @@ def check(name, cond, detail=""):
     (ok if cond else err).append(f"{name} {detail}")
 
 # ---------- 读取数据 ----------
-def load_js(path, varname, is_dict=True):
-    src = open(path, encoding='utf-8').read()
-    m = re.search(r'window\.%s = (\{.*?\}|\[.*?\]);' % varname, src, re.S)
-    if not m: raise SystemExit(f"无法解析 {path} 的 {varname}")
-    return json.loads(m.group(1).replace('null', 'null'))
+def _strip_comments(src):
+    """移除 // 行注释与 /* */ 块注释（保留字符串内 'http://' 之类）。"""
+    out, i, n, in_str = [], 0, len(src), False
+    while i < n:
+        c = src[i]
+        if in_str:
+            out.append(c)
+            if c == '\\': out.append(src[i+1]); i += 2; continue
+            if c in '"\'' : in_str = False
+            i += 1; continue
+        if c in '"\'':
+            in_str = True; out.append(c); i += 1; continue
+        if src.startswith('//', i):
+            j = src.find('\n', i); i = j if j >= 0 else n; continue
+        if src.startswith('/*', i):
+            j = src.find('*/', i+2); i = (j+2) if j >= 0 else n; continue
+        out.append(c); i += 1
+    return ''.join(out)
 
-# WB 国家（含 null → None）
-src = open('vendor/countries_wb.js', encoding='utf-8').read()
-m = re.search(r'window\.WB\s*=\s*(\{[\s\S]*\})', src)
-WB = eval(m.group(1).replace('null', 'None'))
-# EXT
-src = open('vendor/ext_indicators.js', encoding='utf-8').read()
-m = re.search(r'window\.EXT\s*=\s*(\{[\s\S]*\})', src)
-EXT = eval(m.group(1).replace('null', 'None'))
-# CN_TS 省
-src = open('vendor/cn_prov_ts.js', encoding='utf-8').read()
-CN_TS = eval(re.search(r'window\.CN_TS\s*=\s*(\{[\s\S]*\})', src).group(1))
-# 城市
-src = open('vendor/cn/city_metrics.js', encoding='utf-8').read()
-src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)   # 去注释（eval 前）
-CITY = eval(re.sub(r'(?<![\w"])(gdp|pop|area)\s*:', r'"\1":', re.search(r'window\.CITY_METRICS\s*=\s*(\{.*?\});', src, re.S).group(1)))
-# 日本（同样裸键）
-src = open('vendor/jp_metrics.js', encoding='utf-8').read()
-src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
-JP = eval(re.sub(r'(?<![\w"])(gdp|pop|area)\s*:', r'"\1":', re.search(r'window\.JP_METRICS\s*=\s*(\{.*?\});', src, re.S).group(1)))
-# 城市序列（值键为数字年份，Python 数字键合法）
-src = open('vendor/cn/city_ts.js', encoding='utf-8').read()
-src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
-CITY_TS = eval(re.search(r'window\.CITY_TS\s*=\s*(\{.*?\});', src, re.S).group(1))
-# 州
-src = open('vendor/us_states_bea.js', encoding='utf-8').read()
-US_TS = eval(re.search(r'window\.US_TS\s*=\s*(\{[\s\S]*\})', src).group(1))
-# 日本
-src = open('vendor/jp_metrics.js', encoding='utf-8').read()
-JP = eval(re.search(r'window\.JP_METRICS\s*=\s*(\{[\s\S]*\})', src).group(1))
+def _extract_literal(src, varname):
+    """按 window.<var> = <literal>; 提取对象字面量（平衡括号扫描，避免贪婪/脆弱正则）。"""
+    m = re.search(r'window\.%s\s*=\s*' % re.escape(varname), src)
+    if not m: raise SystemExit(f"无法定位 window.{varname} 定义")
+    i = m.end()
+    while i < len(src) and src[i] in ' \t\r\n': i += 1
+    if i >= len(src) or src[i] != '{': raise SystemExit(f"{varname} 不是对象字面量")
+    depth, j = 0, i
+    for j in range(i, len(src)):
+        if src[j] == '{': depth += 1
+        elif src[j] == '}':
+            depth -= 1
+            if depth == 0: break
+    return src[i:j+1]
+
+def _quote_bare_keys(lit):
+    """把 JS 裸键引号化 → JSON 合法（仅处理键位置，不改值）。
+       覆盖两种：字母裸键 {gdp: ...}、数字 adcode 裸键 {110000:{gdp:...}}。"""
+    lit = re.sub(r'(?<![\w"])([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'"\1":', lit)
+    lit = re.sub(r'(?<![\w"])(\d{4,6})\s*:', r'"\1":', lit)
+    return lit
+
+def load_js(path, varname):
+    """安全加载 JS 数据字面量：去注释 → 定位字面量 → 引号化裸键 → json.loads（无 eval）。"""
+    src = _strip_comments(open(path, encoding='utf-8').read())
+    lit = _extract_literal(src, varname)
+    return json.loads(_quote_bare_keys(lit))
+
+WB   = load_js('vendor/countries_wb.js',   'WB')
+EXT  = load_js('vendor/ext_indicators.js', 'EXT')
+CN_TS= load_js('vendor/cn_prov_ts.js',     'CN_TS')
+CITY = load_js('vendor/cn/city_metrics.js','CITY_METRICS')
+CITY_TS= load_js('vendor/cn/city_ts.js',   'CITY_TS')
+US_TS= load_js('vendor/us_states_bea.js',  'US_TS')
+JP   = load_js('vendor/jp_metrics.js',     'JP_METRICS')
 # 世界边界
 WORLD = json.load(open('vendor/world.json', encoding='utf-8'))
 # 主 HTML + app-core.js（CN 常量、US_STATES_GDP、EN_ALIAS 已抽取到 app-core.js，window 定义）
@@ -111,9 +130,9 @@ for ad in list(CITY)[:200]:
 prov_gdp = {s: CN_TS[s]['gdpRMB'].get('2023') for s in CN_TS}
 viol = []
 for ad, o in CITY.items():
-    p2 = ad//10000*10000 if ad >= 10000 else None
+    adi = int(ad)  # json 键为字符串，转 int 供算术/比较
     # 城市 adcode 前 4 位去掉后两位 → 省 adcode 需省级表；此处简化为量级上限
-    if o['gdp'] > 2e12: viol.append((ad, o['gdp']/1e12))
+    if o['gdp'] > 2e12: viol.append((adi, o['gdp']/1e12))
 check("量级[城市GDP≤2万亿]", not viol, f"超界: {viol[:5]}")
 
 # ---------- 3. 逐年校验 ----------
@@ -167,7 +186,7 @@ miss_anchor = []
 for ad in CITY_TS:
     a = int(ad)
     prov = a//10000*10000
-    if a not in CITY and prov not in CITY:
+    if str(a) not in CITY and str(prov) not in CITY:   # CITY 键为字符串
         miss_anchor.append(ad)
 check("覆盖[城市序列有单年锚点]", not miss_anchor, f"缺: {miss_anchor[:5]}")
 

@@ -3,7 +3,14 @@
 Verifies the main HTML renders via window globals (zero fetch)."""
 import subprocess, os, time, re
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME = os.environ.get("CHROME_BIN")
+if not CHROME:
+    for p in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+              "/usr/bin/chromium", "/usr/bin/chromium-browser"):
+        if os.path.exists(p):
+            CHROME = p; break
+assert CHROME and os.path.exists(CHROME), "未找到 Chrome/Chromium，请设 CHROME_BIN"
 SRC = "global-data-atlas.html"
 WS = os.path.abspath(".")
 OUT = "atlas_test"
