@@ -1,7 +1,8 @@
 #!/bin/bash
 # 全量测试门禁（L5）：语法 → 数据自洽 → 回归截图 → 对比 → EXT → 深度断言 → 性能 → 视觉回归
 # 用法: ./run_all_tests.sh   （任一步失败即退出非 0）
-# 依赖: L3j 视觉回归需要 Pillow（pip install Pillow）；本机受管 venv 已装，CI 需自行安装
+# 依赖: L3j 视觉回归需要 Pillow + websocket-client（pip install -r tests/requirements.txt）；
+#       本机受管 venv 已装；无 websocket-client 时移动端溢出断言降级跳过（不误报）
 set -e
 cd "$(dirname "$0")"
 # 选取一个能 import PIL 的 python（L3j 需要）；优先 PYTHON 环境变量，其次受管 venv，兜底 python3

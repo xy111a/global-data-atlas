@@ -1,0 +1,5 @@
+# L3j 视觉/响应式回归测试依赖
+#   Pillow         —— 截图非空白校验 + 基线 MSE 像素 diff
+#   websocket-client —— CDP 真·设备模拟（移动端视口必须，否则 --window-size 误报横向溢出）
+Pillow>=10.0
+websocket-client>=1.6
