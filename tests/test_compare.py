@@ -3,7 +3,14 @@
    ?add 参数 / 搜索添加 / 删除 / 轨迹图容器 / 层级点选"""
 import subprocess, os, re
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME = os.environ.get("CHROME_BIN")
+if not CHROME:
+    for p in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+              "/usr/bin/chromium", "/usr/bin/chromium-browser"):
+        if os.path.exists(p):
+            CHROME = p; break
+assert CHROME and os.path.exists(CHROME), "未找到 Chrome/Chromium，请设 CHROME_BIN"
 os.makedirs("atlas_test", exist_ok=True)
 
 def dump(url, wait):

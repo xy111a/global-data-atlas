@@ -2,7 +2,14 @@
 """四维经济洞察验证：国家面板洞察区应显示 GDP/人均GDP/人口 增长率行"""
 import subprocess, os, re
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME = os.environ.get("CHROME_BIN")
+if not CHROME:
+    for p in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+              "/usr/bin/chromium", "/usr/bin/chromium-browser"):
+        if os.path.exists(p):
+            CHROME = p; break
+assert CHROME and os.path.exists(CHROME), "未找到 Chrome/Chromium，请设 CHROME_BIN"
 
 def make_variant(name, trigger_js):
     html = open("global-data-atlas.html", encoding="utf-8").read()

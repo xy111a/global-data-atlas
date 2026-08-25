@@ -1,0 +1,39 @@
+name: Test Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  run-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install headless Chrome
+        run: |
+          # ubuntu-latest 自带 google-chrome-stable，若缺失则安装 chromium
+          if command -v google-chrome-stable >/dev/null 2>&1; then
+            echo "google-chrome-stable present at $(command -v google-chrome-stable)"
+          else
+            sudo apt-get update
+            sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+          fi
+          google-chrome-stable --version 2>/dev/null || chromium --version 2>/dev/null
+
+      - name: Run full test gate
+        run: ./run_all_tests.sh
+        env:
+          # 测试脚本通过 CHROME_BIN 解析浏览器；GitHub runner 的 chromium 也在此探测列表
+          CHROME_BIN: /usr/bin/google-chrome-stable

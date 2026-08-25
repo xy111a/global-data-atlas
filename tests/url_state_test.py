@@ -4,7 +4,14 @@
    匹配 VERIFY&gt; 前缀 + html.unescape 还原 &amp;，排除注入源码段（VERIFY&gt;'+ 形式）"""
 import subprocess, os, re, html as htmllib, json
 
-CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+CHROME = os.environ.get("CHROME_BIN")
+if not CHROME:
+    for p in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+              "/usr/bin/chromium", "/usr/bin/chromium-browser"):
+        if os.path.exists(p):
+            CHROME = p; break
+assert CHROME and os.path.exists(CHROME), "未找到 Chrome/Chromium，请设 CHROME_BIN"
 os.makedirs("atlas_test", exist_ok=True)
 
 def make_variant(name, trigger_js):
