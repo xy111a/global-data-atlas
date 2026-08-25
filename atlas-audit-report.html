@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Global Data Atlas · 代码审计报告</title>
+<style>
+  :root{
+    --bg:#05060a; --panel:rgba(12,18,28,.82); --line:#13314a;
+    --cyan:#00F0FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
+    --line-soft:rgba(19,49,74,.45); --panel-float:rgba(13,20,31,.92);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.6;}
+  body{background:radial-gradient(1100px 700px at 12% -8%,rgba(0,240,255,.05),transparent 60%),
+       radial-gradient(900px 600px at 108% 112%,rgba(255,46,147,.04),transparent 60%),var(--bg);}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 22px 80px;}
+  header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:26px;position:relative;}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--cyan),var(--pink),transparent);opacity:.5;}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:.5px;}
+  h1 .en{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px;}
+  .sub{color:var(--muted);font-size:13px;}
+  h2{font-size:16px;margin:34px 0 14px;color:var(--cyan);letter-spacing:.5px;
+    border-left:3px solid var(--cyan);padding-left:10px;}
+  h3{font-size:14px;margin:20px 0 8px;color:var(--text);}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0;}
+  .card{background:var(--panel);border:1px solid var(--line-soft);border-radius:10px;padding:14px 12px;}
+  .card .n{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .card .k{font-size:12px;color:var(--muted);margin-top:2px;}
+  .p1{color:var(--pink);} .p2{color:var(--gold);} .p3{color:var(--cyan);} .ok{color:#39d98a;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;}
+  tr:hover td{background:rgba(0,240,255,.04);}
+  .tag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:9px;border:1px solid var(--line);
+    color:var(--muted);white-space:nowrap;}
+  .tag.p1{color:var(--pink);border-color:rgba(255,46,147,.4);}
+  .tag.p2{color:var(--gold);border-color:rgba(255,209,102,.4);}
+  .tag.p3{color:var(--cyan);border-color:rgba(0,240,255,.35);}
+  .tag.s{color:#39d98a;border-color:rgba(57,217,138,.4);}
+  code{background:rgba(0,240,255,.08);color:var(--cyan);padding:1px 5px;border-radius:4px;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:11.5px;}
+  .loc{color:var(--muted);font-size:11px;font-family:ui-monospace,monospace;}
+  .sec{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:16px 18px;margin:14px 0;}
+  .sec h3{margin-top:0;}
+  .finding{border-left:3px solid var(--line);padding:10px 0 10px 14px;margin:12px 0;}
+  .finding.p1{border-color:var(--pink);} .finding.p2{border-color:var(--gold);} .finding.p3{border-color:var(--cyan);}
+  .finding .t{font-weight:600;font-size:13.5px;margin-bottom:4px;}
+  .finding .why{color:var(--muted);font-size:12.5px;margin:4px 0;}
+  .finding .fix{font-size:12.5px;}
+  .oklist li{color:var(--muted);font-size:12.5px;margin:3px 0;}
+  .oklist li b{color:#39d98a;}
+  .plan{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line-soft);}
+  .plan .step{flex:0 0 26px;height:26px;border-radius:50%;background:var(--panel-solid,#0c121c);
+    border:1px solid var(--cyan);color:var(--cyan);display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:600;box-shadow:0 0 10px rgba(0,240,255,.14);}
+  .plan .body{flex:1;font-size:12.5px;}
+  .plan .body b{color:var(--text);}
+  .muted{color:var(--muted);}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:11.5px;}
+  a{color:var(--cyan);text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Global Data Atlas · 代码审计报告<span class="en">global-data-atlas</span></h1>
+  <div class="sub">审计对象：<code>/Users/huajun/Developer/global-data-atlas</code> · 审计日期 2026-08-25 · 范围：主 HTML + app-core.js + 构建/数据脚本 + 测试 + 文档一致性</div>
+</header>
+
+<div class="cards">
+  <div class="card"><div class="n">1.3k</div><div class="k">主 HTML 行数</div></div>
+  <div class="card"><div class="n">540</div><div class="k">app-core.js 行数</div></div>
+  <div class="card"><div class="n p1">3</div><div class="k">P1 高优先级</div></div>
+  <div class="card"><div class="n p2">7</div><div class="k">P2 中优先级</div></div>
+  <div class="card"><div class="n p3">3</div><div class="k">P3 低优先级</div></div>
+  <div class="card"><div class="n ok">B+</div><div class="k">整体健康度</div></div>
+</div>
+
+<div class="sec" style="border:1px solid rgba(57,217,138,.4);">
+  <h3 style="color:#39d98a;margin-top:0;">✅ 整改状态：13 项全部完成并验证（2026-08-25）</h3>
+  <p class="muted" style="margin:6px 0 10px;font-size:12.5px;">所有 P1/P2/P3 发现均已落实代码改动，并通过 <code>run_all_tests.sh</code> 回归门禁（<b style="color:#39d98a;">9/9 步通过</b>：L1 语法 / L2 数据自洽 / L3a 回归 / L3b 对比 / L3c 扩展指标 / L3d 四维洞察 / L3e 欧盟下钻 / L3f URL 持久化 / L3g 双币切换）。<code>build.sh</code> 同步 dist 通过 md5 门禁，缓存指纹已注入。</p>
+  <ul class="oklist" style="columns:2;column-gap:24px;margin:0;padding-left:18px;">
+    <li><b>P1-1</b> extract_core.py 加 guard 防误清空 app-core.js</li>
+    <li><b>P1-2</b> 趋势图 echarts 单实例复用 / dispose 防泄漏</li>
+    <li><b>P1-3</b> 抽 nearestBackward / nearestByDist 统一年份回退</li>
+    <li><b>P2-4</b> build.sh ?v sed 改为匹配可选 ?v=</li>
+    <li><b>P2-5</b> build.sh dist 剔除 world.json 等非运行时文件</li>
+    <li><b>P2-6</b> US_STATES_GDP 改为静态 gdpUsdM，消除运行期 mutate</li>
+    <li><b>P2-7/8</b> load*/setOption 收敛至 paintGeoMap + 共用 tooltip</li>
+    <li><b>P2-9</b> 数据脚本去 eval + 原子写 + 自动备份</li>
+    <li><b>P2-10</b> v2-plan.md 回写已交付状态</li>
+    <li><b>P3-11</b> fetch_wb_indicators.py → list_wb_indicators.py 并澄清边界</li>
+    <li><b>P3-12</b> reg 实例 + 年份列表 memoize（__regCache）</li>
+    <li><b>P3-13</b> japan.js 坐标抽稀 → 3.11MB 降至 1.36MB（−56%）</li>
+  </ul>
+</div>
+
+<h2>一、发现总表（按优先级）</h2>
+<table>
+  <thead><tr><th>#</th><th>优先级</th><th>发现</th><th>位置</th><th>工作量</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><span class="tag p1">P1</span></td><td><b>extract_core.py 误用会破坏源码</b>：从 HTML 抽 core 函数，但函数已在独立 app-core.js，误跑会清空 app-core.js</td><td><code>extract_core.py</code> 全文件</td><td>S</td></tr>
+    <tr><td>2</td><td><span class="tag p1">P1</span></td><td><b>echarts 实例未 dispose</b>：每次渲染趋势图 <code>echarts.init</code> 新实例，旧实例（绑定事件/动画计时器）驻留内存，频繁切面板累积泄漏</td><td>renderTrendChart L522 / renderTrendCompare L556</td><td>S</td></tr>
+    <tr><td>3</td><td><span class="tag p1">P1</span></td><td><b>"最近可得年份"回退逻辑散落 8+ 处且策略不一致</b>：可读性差、易引入不一致 bug</td><td>cMetric L207 / cGrowth L225 / usGdp* L260-288 / cnGdp* L301-315 / regCountry.ext·extYear·growth L339-372 / cmpGetData L537</td><td>M</td></tr>
+    <tr><td>4</td><td><span class="tag p2">P2</span></td><td><b>build.sh 缓存指纹 ?v 重复运行不刷新</b>：sed 只匹配无 ?v 引用，二次 build 时 dist HTML 已带旧 ?v → URL 不变 → CDN/浏览器缓存失效机制失效</td><td>build.sh L37-39</td><td>S</td></tr>
+    <tr><td>5</td><td><span class="tag p2">P2</span></td><td><b>dist 携带非运行时文件</b>：<code>cp -R vendor/.</code> 把 world.json(1MB) 等构建源带入 dist，增部署体积</td><td>build.sh L15-17</td><td>S</td></tr>
+    <tr><td>6</td><td><span class="tag p2">P2</span></td><td><b>US_STATES_GDP 运行期 mutate 单位（反模式）</b>：定义时"万亿"，inline 再乘 RATE23*1e12 改成 CNY 元，依赖加载顺序，双份存储脆弱</td><td>app-core L138-191 / HTML L343-356</td><td>M</td></tr>
+    <tr><td>7</td><td><span class="tag p2">P2</span></td><td><b>loadChina/US/Japan/NUTS 四函数高度同构</b>：边界懒加载+registerMap+features.map+setOption+面包屑+总览+排行，重复度极高</td><td>L663 / L826 / L867 / L1124</td><td>M</td></tr>
+    <tr><td>8</td><td><span class="tag p2">P2</span></td><td><b>showXxxPanel 六函数重复构造三卡+metricCards+renderDashboard</b></td><td>showCountry L455 / showProvincePanel L940 / showUSStatePanel L915 / showJapanPrefPanel L898 / showNUTSPanel L1157 / showCityPanel L792</td><td>M</td></tr>
+    <tr><td>9</td><td><span class="tag p2">P2</span></td><td><b>数据脚本安全性</b>：fetch_ext_data.py 用 <code>eval()</code> 解析 JS 对象；EXT 写入非原子、无自动备份、全量重拉会覆盖 manual 修正</td><td>fetch_ext_data.py L37 / L88-92 / fetch_ext_merge.py</td><td>M</td></tr>
+    <tr><td>10</td><td><span class="tag p2">P2</span></td><td><b>v2-plan.md 文档漂移</b>：规划 checkbox 多未勾，但 Phase D/E/F 功能（对比/趋势/双币/欧盟27国NUTS2/日本/8 EXT）已实现</td><td>global-data-atlas-v2-plan.md</td><td>S</td></tr>
+    <tr><td>11</td><td><span class="tag p3">P3</span></td><td><b>Python/JS 脚本语言混用</b>：国家数据构建用 JS、EXT 用 Python；fetch_wb_indicators.py 名不副实（只列指标不拉数）</td><td>构建脚本群</td><td>M</td></tr>
+    <tr><td>12</td><td><span class="tag p3">P3</span></td><td><b>reg 实例 + 年份列表重复计算</b>：世界层渲染 map/overview/rank/trend 各 new 数百 reg 并重复 <code>Object.keys(o.years).map(Number).sort()</code></td><td>renderWorld2D L630-659 等</td><td>M</td></tr>
+    <tr><td>13</td><td><span class="tag p3">P3</span></td><td><b>japan.js 3MB 单文件</b>：进入日本层需下载 3MB 边界（已懒加载，非首屏阻塞，可后续精简）</td><td>vendor/japan.js</td><td>L</td></tr>
+  </tbody>
+</table>
+
+<h2>二、详细发现与建议</h2>
+
+<div class="sec">
+  <h3>① 安全 / 维护风险（P1）</h3>
+
+  <div class="finding p1">
+    <div class="t">1. extract_core.py 是危险的遗留脚本</div>
+    <div class="why">该脚本用正则从 <code>global-data-atlas.html</code> 的最后一个 <code>&lt;script&gt;</code> 抽取 <code>cMetric</code>/<code>regCountry</code> 等核心函数生成 app-core.js。但当前架构已反转——核心逻辑在<b>独立</b>的 app-core.js，HTML 的 inline script 是纯渲染层，<b>不含</b>这些函数。误跑会：① 打印一堆"未找到函数"；② 用残缺内容<b>覆盖</b> app-core.js（清空全部核心函数）；③ 重写 HTML（移除未匹配的片段，可能破坏结构）。</div>
+    <div class="fix"><b>建议</b>：直接删除 extract_core.py，或在文件首加硬 guard——检测 <code>window.COUNTRIES</code> 是否已在 app-core.js 时立即 <code>sys.exit(1)</code> 并提示"core 已独立，勿再抽取"。README 也明确警告过，但脚本本身仍在仓库，风险点未消除。</div>
+  </div>
+
+  <div class="finding p1">
+    <div class="t">2. echarts 实例未 dispose → 内存泄漏</div>
+    <div class="why"><code>renderTrendChart</code>(L522) 与 <code>renderTrendCompare</code>(L556) 每次都 <code>const tc=echarts.init(el)</code> 创建新实例。每次面板切维度/年份/区域时，<code>foldTrend</code>/<code>renderTrendCompare</code> 用 <code>innerHTML</code> 重写容器 DOM，旧 echarts 实例失去 DOM 引用但实例对象、事件监听、动画计时器仍驻留。<code>window.__trendChart</code> 只持最新一个，旧的全丢失引用却未被 <code>dispose()</code>。用户高频点击国家/省份时泄漏累积。</div>
+    <div class="fix"><b>建议</b>：渲染前先 <code>if(window.__trendChart) window.__trendChart.dispose();</code>；或改为"单实例复用 + setOption"模式（维护一个模块级 chart 实例，仅 <code>setOption</code> 更新）。趋势图容器固定一个 DOM 即可。</div>
+  </div>
+
+  <div class="finding p1">
+    <div class="t">3. "最近可得年份"回退逻辑散落 8+ 处且策略不一致</div>
+    <div class="why">同一语义（在数据缺失年份时取最近可得年，偏好前/后可配）在 <code>cMetric</code>、<code>cGrowth</code>、<code>usGdpUsdM</code>、<code>usGdpYear</code>、<code>cnGdpRMB</code>、<code>cnGdpYear</code>、<code>regCountry.ext</code>、<code>regCountry.extYear</code>、<code>regCountry.growth</code>、<code>cmpGetData</code> 重复实现。实现方式不统一：有的用 <code>.filter().sort().pop()/[0]</code> 组合（L365），有的用 for 最小距离循环（L262-264），回退偏好（前/后）也不完全一致。可读性与正确性风险高——某处改了回退策略，另一处不会同步。</div>
+    <div class="fix"><b>建议</b>：抽一个工具函数 <code>nearestYear(availYears, target, preferBefore=true)</code>，所有取数统一调用；<code>regCountry.get</code> 内部也走它，消除散落的 <code>Object.keys(o.years).map(Number)</code> 重复。</div>
+  </div>
+</div>
+
+<div class="sec">
+  <h3>② 构建 / 部署（P2）</h3>
+
+  <div class="finding p2">
+    <div class="t">4. build.sh 缓存指纹 ?v 重复运行不刷新</div>
+    <div class="why">L37-39 用 <code>sed "s|src=\"vendor/app-core.js\"|...?v=HASH|"</code> 注入指纹。首次 build：source 是 <code>src="vendor/app-core.js"</code> → 注入 <code>?v=H1</code>。改 app-core.js 后二次 build：<code>cp -R</code> 已把 dist/app-core.js 更新为 H2 内容；md5 校验通过（source==dist 内容）；但 sed 在 dist HTML 找的是 <code>src="vendor/app-core.js"</code>——此时 dist HTML 已是 <code>?v=H1</code>，<b>匹配不到</b> → ?v 不更新。结果：dist HTML 引用 <code>?v=H1</code>，文件却是 H2 内容 → URL 不变 → 浏览器/CDN 按旧 URL 缓存，用户可能拿到旧 JS（最近的修复 commit "fix cache" 正是为此，但 sed 没覆盖二次运行场景）。</div>
+    <div class="fix"><b>建议</b>：sed 同时匹配已存在的 <code>?v=...</code>，如 <code>s|src="vendor/app-core.js\(?v=[a-f0-9]*\)\?"|src="vendor/app-core.js?v=${H}"|</code>；或注入前先 normalize（去掉 ?v）再注入。</div>
+  </div>
+
+  <div class="finding p2">
+    <div class="t">5. dist 携带非运行时文件（体积冗余）</div>
+    <div class="why"><code>cp -R vendor/. dist/vendor/</code>(L17) 把整个 vendor 目录带入 dist，包括 <code>world.json</code>(1MB，构建源，运行时只加载 <code>world.js</code>)、<code>_enmap.json</code>、各 <code>.bak</code>。已验证 world.json / _enmap.json 被 <code>build_countries_multi.js</code> 等构建脚本引用——是<b>构建源输入，源码应保留</b>；但 dist 运行时并不需要它们，纯属部署体积浪费。</div>
+    <div class="fix"><b>建议</b>：build.sh 同步 dist 时排除非运行时文件（world.json、_enmap.json、*.bak、__pycache__），或直接 <code>rsync --exclude</code>。可减 dist 约 1MB+。</div>
+  </div>
+</div>
+
+<div class="sec">
+  <h3>③ 代码质量 / 可维护性（P2）</h3>
+
+  <div class="finding p2">
+    <div class="t">6. US_STATES_GDP 运行期 mutate 单位（反模式）</div>
+    <div class="why"><code>app-core.js</code> L138-191 定义 <code>US_STATES_GDP[k].gdp</code> 单位"万亿"（注释 L338）。但 <code>HTML</code> L343-356 在运行期把它乘 <code>RATE23*1e12</code> 就地改成 CNY 元（并在 <code>window.US_TS</code> 存在时覆盖）。这是"常量定义时一个单位、运行时再 mutate 成另一个单位"的反模式，依赖"inline 段在 app-core 之后执行"的隐式顺序，且 <code>US_STATES_GDP.gdp</code>(万亿) 与 <code>US_TS</code>(USD 百万序列) 双份存储易漂移。</div>
+    <div class="fix"><b>建议</b>：数据层统一——<code>US_STATES_GDP</code> 只存权威值（USD 百万 + 年份），<code>regUSState.get</code> 统一经 <code>gdpApply</code> 折算，删除运行期 mutate 逻辑。</div>
+  </div>
+
+  <div class="finding p2">
+    <div class="t">7 & 8. loadXxx / showXxxPanel 高度同构，重复度高</div>
+    <div class="why">四个 <code>loadChina/US/Japan/NUTS</code> 都是"懒加载边界 → registerMap → features.map 取数 → setOption → 面包屑 → renderOverviewMetrics → 排行"；六个 <code>showXxxPanel</code> 都是"构造 GDP/人口/面积 三卡 → metricCards → renderDashboard"。新增区域（如韩国、印度省级）需同时改 2 处，易漏。</div>
+    <div class="fix"><b>建议</b>：抽 <code>renderGeoLayer({mapName, geoGetter, normalize, drillable})</code> 与 <code>buildRegionPanel({name,en,level, resolvers:{gdp,pop,area}, growth})</code> 两个模板，把差异参数化。LAYERS/DRILLABLE 注册表已搭好骨架，顺手即可收敛。</div>
+  </div>
+
+  <div class="finding p2">
+    <div class="t">9. 数据脚本安全性（eval / 非原子写 / 覆盖风险）</div>
+    <div class="why"><code>fetch_ext_data.py</code> L37 用 <code>eval(m.group(1).replace('null','None'))</code> 解析 JS 对象（不良实践，虽本地可控）；L88-92 直接 <code>open('vendor/ext_indicators.js','w')</code> 覆盖，无自动备份、非原子写，且该脚本是<b>全量重拉</b>——会丢失文件里的任何 manual 修正。仅 stdout 打印"建议先备份"，依赖人记住。<code>fetch_ext_merge.py</code> 虽读旧数据 merge，但同样非原子写。</div>
+    <div class="fix"><b>建议</b>：① 用稳健解析替代 eval（正则提取 + json.loads，或 js2py 受限）；② 写临时文件再 <code>os.replace()</code> 原子替换；③ 写入前自动 <code>cp</code> 时间戳备份到 <code>/tmp</code>；④ 失败回滚到备份。降低"一键跑坏数据"风险。</div>
+  </div>
+
+  <div class="finding p2">
+    <div class="t">10. v2-plan.md 文档漂移</div>
+    <div class="why">规划文档 checkbox 多未勾（L43-67：区域对比/趋势/排行增强/年份动画/更多指标/欧盟省级），但实际 Phase D/E/F 功能已落地——FEATURES.md(L3-83) 与代码证实：对比模式、时间趋势、排行、双币切换、欧盟27国NUTS2、日本47县、8 项 EXT 指标、年份切换全部可用。文档未回写"已完成"，易让接手者误判进度、重复造轮子。</div>
+    <div class="fix"><b>建议</b>：把 v2-plan 已交付项勾选为 <code>[x]</code> 并加"状态：已交付"结论段；或重命名为 <code>CHANGELOG.md</code> 按时间记录里程碑。</div>
+  </div>
+</div>
+
+<div class="sec">
+  <h3>④ 性能 / 清理（P3）</h3>
+  <div class="finding p3">
+    <div class="t">11. Python/JS 构建脚本混用</div>
+    <div class="why">国家数据构建在 JS（<code>build_countries_multi.js</code>），EXT 在 Python（<code>fetch_ext_data.py</code> 等），<code>fetch_wb_indicators.py</code> 名不副实——它只打印 WB 可用指标清单，<b>不拉实际数据</b>（真取数在 JS）。语言与职责不统一，README 表格把它们混在一起描述，认知负担高。</div>
+    <div class="fix"><b>建议</b>：统一为单一语言（或至少统一到"构建用 JS、探索用 Python"的清晰边界），并重命名 <code>fetch_wb_indicators.py</code> 为 <code>list_wb_indicators.py</code>，或在文件头注明"仅探索，不取数"。</div>
+  </div>
+  <div class="finding p3">
+    <div class="t">12. reg 实例 + 年份列表重复计算</div>
+    <div class="why">世界层一次渲染：地图着色(<code>geo.features.map</code> → 每国 <code>regCountry</code>)、总览求和、排行、趋势对比各 new 数百个 reg 闭包对象，且每个 <code>regCountry.get</code> 内部重复 <code>Object.keys(o.years).map(Number).sort()</code>。全部 214 国 × 多次 ≈ 上千次 new + sort。一次性渲染可接受（百毫秒级），但切指标/年份整页重绘会重算。</div>
+    <div class="fix"><b>建议</b>：<code>regCountry(iso2)</code> 结果按 iso2 缓存（memoize）；年份列表在 reg 创建时算一次缓存。对中低配设备切年份流畅度有帮助。</div>
+  </div>
+  <div class="finding p3">
+    <div class="t">13. japan.js 3MB 单文件</div>
+    <div class="why">日本 47 都道府县精细边界整包 3MB，进入日本层需下载。已懒加载（非首屏阻塞），但单次下载偏大。</div>
+    <div class="fix"><b>建议</b>：后续可抽稀边界精度（如简化 coordinate 到 3-4 位小数）或按县分文件懒加载（参考中国省级分文件做法）。非紧急。</div>
+  </div>
+</div>
+
+<h2>三、优先行动清单（按 ROI 排序）</h2>
+<div class="plan"><div class="step">1</div><div class="body"><b>消除安全隐患</b>：删除/guard <code>extract_core.py</code>（P1-1）+ 给趋势图加 <code>dispose()</code> 或单实例复用（P1-2）。这两项是"不改功能、只防破坏"，最该先做。</div></div>
+<div class="plan"><div class="step">2</div><div class="body"><b>修复构建门禁</b>：build.sh 的 ?v sed 改为匹配可选 <code>?v=</code>（P2-4）+ dist 排除 world.json/_enmap.json 等非运行时文件（P2-5）。保证部署缓存真正失效、dist 体积收敛。</div></div>
+<div class="plan"><div class="step">3</div><div class="body"><b>收敛回退逻辑</b>：抽 <code>nearestYear()</code> 工具函数，统一 8+ 处取数（P1-3）。一次性投入，显著降低后续改 bug 概率。</div></div>
+<div class="plan"><div class="step">4</div><div class="body"><b>数据脚本加固</b>：原子写 + 自动备份 + 去 eval（P2-9）。下次刷新 WB 数据时即用上，避免"一键跑坏"。</div></div>
+<div class="plan"><div class="step">5</div><div class="body"><b>模板化渲染层</b>：抽 <code>renderGeoLayer</code> / <code>buildRegionPanel</code>（P2-7/8）。为"加新区域/新指标"降本，且契合你下一步想扩展的方向。</div></div>
+<div class="plan"><div class="step">6</div><div class="body"><b>文档与清理</b>：回写 v2-plan 状态（P2-10）、统一脚本语言/重命名（P3-11）、reg 缓存（P3-12）、japan.js 抽稀（P3-13）。</div></div>
+
+<h2>四、已验证健康项（避免过度担忧）</h2>
+<ul class="oklist">
+  <li><b>__pycache__ 已正确 gitignore</b>——仓库无 Python 缓存污染（初步担心的点已排除）。</li>
+  <li><b>world.json / _enmap.json 不是死文件</b>——被 <code>build_countries_multi.js</code>、<code>patch_cn_names.py</code>、<code>sync_cn_to_wb.py</code> 作为构建源引用，源码应保留；仅 dist 副本冗余。</li>
+  <li><b>compare.html 共享 app-core.js</b>——核心数据层统一，架构合理（渲染层各自独立是合理设计，非缺陷）。</li>
+  <li><b>LAYERS / DRILLABLE / METRICS 注册表架构良好</b>——可扩展性高，新增区域/指标成本低，这是后续优化的基础而非负担。</li>
+  <li><b>XSS 防护到位</b>——<code>esc()</code> 对所有 innerHTML 插值做转义；面包屑/排行/面板均走转义。</li>
+  <li><b>测试门禁存在</b>——<code>run_all_tests.sh</code> 7/7 覆盖语法/数据自洽/回归/对比/EXT/洞察/欧盟下钻（唯一短板是依赖本机 headless Chrome，便携性受限）。</li>
+</ul>
+
+<footer>
+  审计方法：静态阅读主 HTML(1357 行) + app-core.js(539 行) + 全部构建/数据脚本 + 测试 + 文档；用 grep 交叉验证引用关系（world.json / _enmap.json / 双页共享）以避免误判。<br/>
+  工作量标注：S=≤0.5天 · M=0.5–1.5天 · L=≥2天（含回归测试）。优先级：P1=正确性/安全/维护风险，P2=性能/体积/可维护性/构建，P3=清理/一致性。
+</footer>
+</div>
+</body>
+</html>

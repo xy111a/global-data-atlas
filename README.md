@@ -35,7 +35,7 @@ python3 -m http.server 8000   # 访问 http://localhost:8000
 
 | 数据 | 脚本 | 说明 |
 |---|---|---|
-| 国家 GDP/人口/面积 + 扩展指标 | `fetch_wb_indicators.py` / `fetch_ext_data.py` / `fetch_ext_merge.py` | World Bank API，需出网 |
+| 国家 GDP/人口/面积 + 扩展指标 | `list_wb_indicators.py`（仅探索指标清单，不取数） / `fetch_ext_data.py` / `fetch_ext_merge.py` | World Bank API，需出网 |
 | 中国省级序列 | `build_cn_prov.js` | 维基解析 |
 | 中国城市序列/索引 | `build_city_ts.py`（依赖维基快照 `CITYGDP_WT`，默认 `/tmp/citygdp_wt.txt`，缺失时脚本会提示获取方式）/ `build_city_index.py`（本地，可复现） | |
 

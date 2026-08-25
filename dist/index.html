@@ -287,7 +287,7 @@
 <script src="vendor/cn/city_ts.js"></script>
 <script src="vendor/countries_wb.js"></script>
 <script src="vendor/fxrate.js"></script>
-<script src="vendor/app-core.js?v=9da34988"></script>
+<script src="vendor/app-core.js?v=fab3f8ca"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script>
 /* ============== 数据（公开整理近似值） ============== */
@@ -335,25 +335,9 @@
 PROV_ADCODE["香港"]=810000; PROV_ADCODE["澳门"]=820000;
 
 
-/* 美国各州：gdp=名义GDP(美元现价 万亿, 约2023 BEA)，pop=常住人口(人, Census 2023-07-01 估计)，
-   area=总面积(km², 含水域, Census)。gdp 在下方统一折算为人民币元；pop/area 单位与全球一致。 */
-
-/* 州 GDP 快照（美元万亿）——作为 US_TS 缺失时的兜底；仅缺失时才折算（消除正常路径死计算） */
-  // 美国州为2023单年数据，用当年汇率折算
-if(!window.US_TS){
-  Object.keys(US_STATES_GDP).forEach(k=> US_STATES_GDP[k].gdp = US_STATES_GDP[k].gdp*RATE23*1e12);
-}
-/* M5 单数据源：用 BEA 序列 2023 现值覆盖快照 gdp（消除双份存储差异，fallback 时也用现价口径） */
-if(window.US_TS){
-  Object.keys(US_STATES_GDP).forEach(k=>{
-    const ts=window.US_TS[k];
-    if(ts && ts.years && ts.years["2023"]!=null){
-      const r=(window.FXRATE&&window.FXRATE["2023"])||USD_CNY;
-      US_STATES_GDP[k].gdpUsdM = ts.years["2023"];          // 保留 USD 百万（供 USD 显示兜底）
-      US_STATES_GDP[k].gdp = ts.years["2023"] * r * 1e6;    // 人民币元（CNY 兜底）
-    }
-  });
-}
+/* 美国各州：gdpUsdM=名义GDP(美元现价 百万, 约2023 BEA)，pop=常住人口(人)，area=总面积(km²)。
+   单位已由 app-core 的 US_STATES_GDP 静态定义，regUSState.get 统一经 gdpApply 折算到当前币种；
+   此处不再运行期 mutate 单位（P2-6 修复反模式）。 */
 
 /* 美国州 GDP 多年序列（BEA SAGDP2 现价, 百万美元）：按所选年份取数, 缺失取最近可得年
    注：build_bea_states.js 实测 SAGDP2 + LineCode=1 返回现价（全国 2023=27.81T 吻合官方），勿改表号 */
@@ -519,6 +503,7 @@ function showGeneric(name,sub,hint){
 /* 仪表盘趋势图：容器（#trendChart）已由 renderDashboard 写入，只做 echarts 渲染 */
 function renderTrendChart(series, fmt){
   const el=document.getElementById("trendChart"); if(!el) return;
+  if(window.__trendChart){ echarts.dispose(window.__trendChart); window.__trendChart=null; }   // 防旧实例泄漏（P1-2）
   const tc=echarts.init(el);
   tc.setOption({
     backgroundColor:"transparent",
@@ -553,6 +538,7 @@ function renderTrendCompare(entries, title, fmt){
   if(d) d.addEventListener("toggle",()=>{ const c=window.__trendChart; if(c) setTimeout(()=>c.resize(),0); });
   const isGrowth = !fmt;                 // 默认按增长率渲染；传 fmt 则按绝对值（如 GDP 对比）
   const sorted=entries.slice().sort((a,b)=>b.val-a.val);   // 全量降序：第一名在前
+  if(window.__trendChart){ echarts.dispose(window.__trendChart); window.__trendChart=null; }   // 防旧实例泄漏（P1-2）
   const tc=echarts.init(document.getElementById("trendChart"));
   const fmtV = isGrowth ? (v=>fmtGrowth(v/100)) : (v=>fmt(v));
   tc.setOption({
@@ -660,6 +646,41 @@ function renderWorld2D(){
 }
 
 /* ============== 中国（2D 省→市 下钻） ============== */
+/* ===== P2-7/8 收敛：地图渲染骨架 / tooltip 公共体 / 区域趋势块（消除 load×4 / show×3 同构重复） ===== */
+function geoTooltipBody(p, yearText){
+  const r = p.data && p.data.reg;
+  if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
+  return `<b>${p.name}</b> · ${yearText}<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;
+}
+/* 城市级 tooltip：城市用 cm（非 reg 接口），GDP 走 regGet / 单年 cm.gdp 兜底 */
+function cityTooltipBody(p){
+  const d=p.data; if(!d) return p.name;
+  const cm=d.cm;
+  if(!cm) return `<b>${d.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
+  const r=cm?regCity(cm, d.adcode):null;
+  const gv=r?r.get("gdp", dataYear):gdpApply(cm.gdp,"CNY",2023);
+  return `<b>${d.name}</b><br/>GDP${r&&r.years().length?" ("+dataYear+")":""} ${fmtGDP(gv)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;
+}
+/* 统一地图渲染骨架：backgroundColor + tooltip + visualMap + series（差异仅在 mapName / data / title / tooltip） */
+function paintGeoMap(mapName, data, opts){
+  const vals = data.map(d=>d.value).filter(v=>v>0);
+  const min = vals.length?Math.min(...vals):0, max = vals.length?Math.max(...vals):0;
+  const itemStyle = opts.itemStyle || {areaColor:"#0c2a3a",borderColor:"#1d5a72"};
+  chart.clear();
+  chart.setOption({
+    backgroundColor:"#05060a",
+    tooltip:{trigger:"item", formatter:opts.tooltipFormatter},
+    visualMap: vals.length ? {
+      min,max,left:20,bottom:30,calculable:true,
+      title: metricLabel(metric)+" · "+opts.titleText,
+      inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+      textStyle:{color:"#9fb3c8"}, text:["高","低"], formatter:v=>metricFmt(metric,v)
+    } : {show:false},
+    series:[{type:"map", map:mapName, roam:false, data, label:{show:false},
+      itemStyle, emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+  });
+}
+
 async function loadChina(){
   showLoading(true);
   /* 状态残留清理：进入中国省级列表层时清空省级下钻状态与欧盟状态 */
@@ -674,18 +695,10 @@ async function loadChina(){
       const v = reg ? (regGet(reg,metric,dataYear)||0) : 0;
       return {name:f.properties.name, value:v, short:nm, reg};
     });
-    const vals=provData.map(d=>d.value).filter(v=>v>0);
-    const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
-    currentLevel="china"; chart.clear();
-    chart.setOption({
-      backgroundColor:"#05060a",
-      tooltip:{trigger:"item", formatter:p=>{ const d=p.data; if(!d||!d.reg)return p.name;
-        const r=d.reg;
-        return `<b>${d.name}</b> · ${dataYear}<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
-      visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},   // L2: 省 GDP 稀疏回退/人口单年，不写死 dataYear
-        textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-      series:[{type:"map",map:"china",roam:false,data:provData,
-        label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+    currentLevel="china";
+    paintGeoMap("china", provData, {
+      titleText:"最近可得年",
+      tooltipFormatter:p=>geoTooltipBody(p, String(dataYear))
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"}]);
     showGeneric("中国");   // 总览简介：层级名
@@ -762,23 +775,11 @@ async function loadProvince(short, adcode){
       currentProvData.push({name:f.properties.name, adcode:ac, parentAdcode:pa, cm});
       return {name:f.properties.name, value:v, adcode:ac, parentAdcode:pa, cm};
     });
-    const vals=data.map(d=>d.value).filter(v=>v>0);
-    const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
-    currentLevel="province"; chart.clear();
-    chart.setOption({
-      backgroundColor:"#05060a",
-      tooltip:{trigger:"item", formatter:p=>{
-        const d=p.data; if(!d) return p.name;
-        const cm=d.cm;
-        if(!cm) return `<b>${d.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
-        const r=cm?regCity(cm, d.adcode):null;
-        const gv=r?r.get("gdp", dataYear):gdpApply(cm.gdp,"CNY",2023);
-        return `<b>${d.name}</b><br/>GDP${r&&r.years().length?" ("+dataYear+")":""} ${fmtGDP(gv)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;}},
-      visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},   // L2: 省 GDP 稀疏回退/人口单年，不写死 dataYear
-        textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>fmtBy(v)}:{show:false},
-      series:[{type:"map",map:mapName,roam:false,data,
-        label:{show:false},itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
-        emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+    currentLevel="province";
+    paintGeoMap(mapName, data, {
+      titleText:"最近可得年",   // L2: 省 GDP 稀疏回退/人口单年，不写死 dataYear
+      itemStyle:{areaColor:"#0c2a3a",borderColor:"#1d5a72"},
+      tooltipFormatter:p=>cityTooltipBody(p)
     });
     setCrumbPath([{label:"世界", level:"world"},{label:"中国", level:"china"},{label:short, level:"province"}]);
     const m=CN[short];
@@ -835,23 +836,16 @@ async function loadUS(){
     const nm=f.properties.name;
     return {name:nm, value:usVal(nm), reg:regUSState(nm)};
   });
-  const vals=data.map(d=>d.value).filter(v=>v>0);
-  const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
-  chart.clear();
-  chart.setOption({
-    backgroundColor:"#05060a",
-    tooltip:{trigger:"item", formatter:p=>{ const r=p.data&&p.data.reg;
+  paintGeoMap("us", data, {
+    titleText:"最近可得年",
+    tooltipFormatter:p=>{ const r=p.data&&p.data.reg;
       if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
       const yg=regGet(r,"gdp",dataYear);
       const refTxt = window.CURRENCY==="USD"
         ? `人民币现价约 ${fmtMoney(usGdpY(p.name,dataYear), "¥")}`
-        : `美元现价约 ${usGdpUsdT(p.name,dataYear)!=null?usGdpUsdT(p.name,dataYear).toFixed(2):(US_STATES_GDP[p.name].gdp/RATE23/1e12).toFixed(2)} 万亿`;
-      return `<b>${p.name}</b> · ${usGdpYear(p.name,dataYear)}<br/>GDP ${fmtGDP(yg)}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`
-        +`<br/><span style="color:#7f93a8">${refTxt}</span>`;}},
-    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
-      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"us",roam:false,data,label:{show:false},
-      emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+        : `美元现价约 ${(US_STATES_GDP[p.name].gdpUsdM/1e6).toFixed(2)} 万亿`;
+      return geoTooltipBody(p, usGdpYear(p.name,dataYear))
+        +`<br/><span style="color:#7f93a8">${refTxt}</span>`; }
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
   showGeneric("美国 · 州");   // 总览简介：层级名
@@ -876,18 +870,9 @@ async function loadJapan(){
     const nm=f.properties.name;
     return {name:nm, value:regGet(regJapanPref(nm),metric,dataYear)||0, reg:regJapanPref(nm)};
   });
-  const vals=data.map(d=>d.value).filter(v=>v>0);
-  const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
-  chart.clear();
-  chart.setOption({
-    backgroundColor:"#05060a",
-    tooltip:{trigger:"item", formatter:p=>{ const r=p.data&&p.data.reg;
-      if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
-      return `<b>${p.name}</b> · 2021<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;}},
-    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 2021",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
-      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"japan",roam:false,data,label:{show:false},
-      emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+  paintGeoMap("japan", data, {
+    titleText:"2021",
+    tooltipFormatter:p=>geoTooltipBody(p, "2021")
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"日本", level:"japan"}]);
   showGeneric("日本 · 都道府县");   // 总览简介：层级名
@@ -1135,18 +1120,12 @@ async function loadNUTS(cc){
     const r=regNUTS(nid);
     return {name:f.properties.NUTS_NAME, value:r?regGet(r,metric,dataYear)||0:0, reg:r, nid};
   });
-  const vals=data.map(d=>d.value).filter(v=>v>0);
-  const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
   chart.clear();
-  chart.setOption({
-    backgroundColor:"#05060a",
-    tooltip:{trigger:"item", formatter:p=>{ const r=p.data&&p.data.reg;
+  paintGeoMap("nuts-"+cc, data, {
+    titleText:"2023",
+    tooltipFormatter:p=>{ const r=p.data&&p.data.reg;
       if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无指标数据</span>`;
-      return `<b>${p.name}</b> · ${r.years()[0]}<br/>GDP ${fmtGDP(r.get("gdp"))}<br/>人口 ${fmtPop(r.get("pop"))}<br/>面积 ${fmtArea(r.get("area"))}`;}},
-    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 2023",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
-      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>metricFmt(metric,v)}:{show:false},
-    series:[{type:"map",map:"nuts-"+cc,roam:false,data,label:{show:false},
-      emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
+      return `<b>${p.name}</b> · ${r.years()[0]}<br/>GDP ${fmtGDP(r.get("gdp"))}<br/>人口 ${fmtPop(r.get("pop"))}<br/>面积 ${fmtArea(r.get("area"))}`; }
   });
   setCrumbPath([{label:"世界", level:"world"},{label:euCCName(cc), level:"nuts"}]);
   showGeneric(euCCName(cc)+" · NUTS2");   // 总览简介：层级名

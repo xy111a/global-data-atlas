@@ -15,6 +15,8 @@ cp global-data-atlas.html dist/index.html
 echo "── 同步 vendor → dist/vendor ──"
 mkdir -p dist/vendor
 cp -R vendor/. dist/vendor/
+# world.json 是构建源（build_*.js 读取），运行时地图由 world.js 提供，部署无需携带 → 剔除省 ~1MB
+rm -f dist/vendor/world.json
 
 echo "── md5 校验 ──"
 ok=1
@@ -35,7 +37,7 @@ done
 # 缓存失效：给 app-core.js 引用注入内容指纹（?v=md5前8位）——JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存
 CORE_HASH=$(md5 -q vendor/app-core.js | cut -c1-8)
 for f in dist/global-data-atlas.html dist/index.html dist/compare.html; do
-  sed -i '' "s|src=\"vendor/app-core.js\"|src=\"vendor/app-core.js?v=${CORE_HASH}\"|" "$f"
+  sed -i '' -E "s|src=\"vendor/app-core.js(\\?v=[a-f0-9]+)?\"|src=\"vendor/app-core.js?v=${CORE_HASH}\"|g" "$f"
 done
 echo "  ↻ app-core.js?v=${CORE_HASH}（缓存指纹已注入）"
 

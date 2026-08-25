@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """拉取 3 个新指标（unemp/internet/military）追加进 vendor/ext_indicators.js
-   读现有 EXT（iso2 键）→ 新数据按 iso2 追加 → 写回，不破坏旧 5 指标。"""
-import json, urllib.request, time, re
+   读现有 EXT（iso2 键）→ 新数据按 iso2 追加 → 写回，不破坏旧 8 指标。
+
+   安全加固（P2-9）：写入前自动备份到 /tmp，临时文件 + os.replace 原子替换，失败回滚。"""
+import json, urllib.request, time, re, os, tempfile, shutil
 
 def fetch(url, tries=3):
     for i in range(tries):
@@ -13,6 +15,34 @@ def fetch(url, tries=3):
             if i == tries - 1:
                 raise
             time.sleep(3)
+
+def atomic_write(path, content):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    backup = None
+    if os.path.exists(path):
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        backup = f"/tmp/ext_indicators.js.bak.{ts}"
+        shutil.copy2(path, backup)
+    tmp = None
+    try:
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)),
+                                   prefix=".ext_", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush(); os.fsync(f.fileno())
+        os.replace(tmp, path)
+        tmp = None
+    except Exception:
+        if tmp and os.path.exists(tmp):
+            os.remove(tmp)
+        if backup and os.path.exists(path):
+            shutil.copy2(backup, path)
+        raise
+    finally:
+        if tmp and os.path.exists(tmp):
+            try: os.remove(tmp)
+            except OSError: pass
+    return backup
 
 NEW = {"unemp": "SL.UEM.TOTL.ZS", "internet": "IT.NET.USER.ZS", "military": "MS.MIL.XPND.GD.ZS"}
 
@@ -67,9 +97,10 @@ def main():
 
     js = "/* 扩展指标（World Bank）：trade贸易占GDP% / health医疗支出占GDP% / edu教育支出占GDP% / life预期寿命 / gdpcap人均GDP(2015不变价USD) / unemp失业率% / internet互联网普及率% / military军费占GDP% */\n"
     js += "window.EXT = " + json.dumps(final, ensure_ascii=False, separators=(',', ':')) + ";\n"
-    print("⚠️ 将覆盖 vendor/ext_indicators.js（建议先备份：cp vendor/ext_indicators.js /tmp/）")
-    open('vendor/ext_indicators.js', 'w', encoding='utf-8').write(js)
+    backup = atomic_write('vendor/ext_indicators.js', js)
     print(f"已写 vendor/ext_indicators.js ({len(js)} bytes, {len(final)} 国)")
+    if backup:
+        print(f"自动备份: {backup}")
 
     # 验证 CN
     cn = final.get('CN', {})

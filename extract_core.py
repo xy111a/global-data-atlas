@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
 """抽取 app-core.js：从 global-data-atlas.html 主 script 提取核心层（纯数据/逻辑，无 DOM）。
-   const 常量改为 window.X 暴露（跨 script 共享）；函数声明保持（全局共享）。
-   用法：python3 extract_core.py  → 生成 vendor/app-core.js + 备份主 HTML"""
-import re, shutil
+   ⚠️ 已废弃（DEPRECATED）：当前架构已反转——核心逻辑现位于 vendor/app-core.js（独立维护，
+   由 HTML 的渲染层 <script src="vendor/app-core.js"> 加载）。global-data-atlas.html 的
+   inline script 已不含这些函数。误跑本脚本会用空实现覆盖 app-core.js，破坏线上。
+   如需重建 app-core.js，请手工维护；本脚本默认拒绝运行，传 --force 可强行运行（运行前自动备份现有 app-core.js）。"""
+import re, shutil, sys, os, time
 
 SRC = "global-data-atlas.html"
 BACKUP = "global-data-atlas.html.bak"
 CORE_OUT = "vendor/app-core.js"
+
+# ── 安全护栏：本脚本已废弃，默认拒绝运行，避免误清空独立维护的 app-core.js ──
+if "--force" not in sys.argv:
+    print("⛔ extract_core.py 已废弃，默认拒绝运行（防误清空 app-core.js）。")
+    print("   原因：项目架构已反转——核心逻辑现位于 vendor/app-core.js（独立文件），HTML 仅含渲染层。")
+    print("   误跑会用空实现覆盖 app-core.js，导致线上崩溃。")
+    print("   如确需强制运行（自担风险），传入 --force；运行前会自动备份现有 app-core.js。")
+    sys.exit(0)
+
+# 防御：覆盖前先备份现有 app-core.js，即使 --force 误跑也可恢复
+if os.path.exists(CORE_OUT):
+    bak = CORE_OUT + ".pre-extract-" + time.strftime("%Y%m%d%H%M%S") + ".bak"
+    shutil.copy(CORE_OUT, bak)
+    print(f"🛡 已备份现有 app-core.js → {bak}")
 
 html = open(SRC, encoding="utf-8").read()
 shutil.copy(SRC, BACKUP)

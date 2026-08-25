@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""查询 World Bank 可用指标（贸易/医疗/教育/预期寿命），确认新维度数据可接入"""
+"""【探索用 · 不取数】查询 World Bank 可用指标（贸易/医疗/教育/预期寿命等），确认新维度数据可接入。
+
+注意：本脚本仅打印 WB 指标清单供人工核对，不拉取任何实际数据。
+真正的数据拉取在 fetch_ext_data.py / fetch_ext_merge.py（生成 vendor/ext_indicators.js）。
+（原文件名 fetch_wb_indicators.py 名不副实，已重命名为 list_wb_indicators.py 以明确职责边界。）"""
 import json, urllib.request
 
 def fetch(url):

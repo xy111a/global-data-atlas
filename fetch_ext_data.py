@@ -3,8 +3,12 @@
    指标：trade(贸易占GDP%) / health(医疗支出占GDP%) / edu(教育支出占GDP%) /
          life(预期寿命岁) / gdpcap(人均GDP 2015不变价 USD)
    输出结构 window.EXT = { [iso2]: { [metric]: { [year]: value } } }
-"""
-import json, urllib.request, time, os
+
+   安全加固（P2-9）：
+   - 解析 countries_wb.js 改用 json.loads（不再 eval）
+   - 写入 vendor/ext_indicators.js 前自动备份到 /tmp，并用临时文件 + os.replace 原子替换
+   - 任一步骤失败回滚到备份，避免“一键跑坏数据”"""
+import json, urllib.request, time, os, re, tempfile, shutil
 
 def fetch(url, tries=3):
     for i in range(tries):
@@ -29,12 +33,45 @@ IND = {
     "military":"MS.MIL.XPND.GD.ZS",# 军费占GDP%（Phase F2）
 }
 
+def parse_wb(src):
+    """稳健解析 countries_wb.js 的 window.WB（双引号 JSON，json.loads 直读，不 eval）"""
+    m = re.search(r'window\.WB\s*=\s*(\{[\s\S]*\})', src)
+    if not m:
+        raise RuntimeError("countries_wb.js 未找到 window.WB 定义")
+    return json.loads(m.group(1))
+
+def atomic_write(path, content):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    backup = None
+    if os.path.exists(path):
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        backup = f"/tmp/ext_indicators.js.bak.{ts}"
+        shutil.copy2(path, backup)
+    tmp = None
+    try:
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)),
+                                   prefix=".ext_", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush(); os.fsync(f.fileno())
+        os.replace(tmp, path)   # 原子替换（POSIX 保证）
+        tmp = None
+    except Exception:
+        if tmp and os.path.exists(tmp):
+            os.remove(tmp)
+        if backup and os.path.exists(path):
+            shutil.copy2(backup, path)   # 回滚
+        raise
+    finally:
+        if tmp and os.path.exists(tmp):
+            try: os.remove(tmp)
+            except OSError: pass
+    return backup
+
 def main():
     # 从 countries_wb.js 读国家 iso2 列表
     src = open('vendor/countries_wb.js', encoding='utf-8').read()
-    import re
-    m = re.search(r'window\.WB\s*=\s*(\{[\s\S]*\})', src)
-    WB = eval(m.group(1).replace('null', 'None'))
+    WB = parse_wb(src)
     iso2s = sorted(WB.keys())
     print(f"国家数: {len(iso2s)}")
 
@@ -87,10 +124,10 @@ def main():
 
     js = "/* 扩展指标（World Bank）：trade贸易占GDP% / health医疗支出占GDP% / edu教育支出占GDP% / life预期寿命 / gdpcap人均GDP(2015不变价USD) */\n"
     js += "window.EXT = " + json.dumps(final, ensure_ascii=False, separators=(',', ':')) + ";\n"
-    print("⚠️ 将覆盖 vendor/ext_indicators.js（建议先备份：cp vendor/ext_indicators.js /tmp/）")
-    with open('vendor/ext_indicators.js', 'w', encoding='utf-8') as f:
-        f.write(js)
-    print("已写入 vendor/ext_indicators.js", os.path.getsize('vendor/ext_indicators.js'), "bytes")
+    backup = atomic_write('vendor/ext_indicators.js', js)
+    print(f"已写入 vendor/ext_indicators.js ({os.path.getsize('vendor/ext_indicators.js')} bytes)")
+    if backup:
+        print(f"自动备份: {backup}")
 
 if __name__ == "__main__":
     main()
