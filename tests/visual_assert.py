@@ -74,6 +74,16 @@ function check(step, cond, detail){ out.push({step:step, pass:!!cond, detail:det
   var expJP=fmtGDP(regGet(regJapanPref('北海道'),'gdp',dataYear));
   check('F_JP_panel_gdp', ptext().indexOf(expJP)>=0, 'expected='+expJP+'|got='+ptext().replace(/\\s+/g,' ').slice(0,80));
 
+  // H 城市级（深圳市：adcode 440300 / 父 440000）。CITY_METRICS 随页面急加载（非懒加载），
+  //    与"省→点击城市"同一渲染函数 showCityPanel，直接 open 即校验城市面板数据绑定
+  showCityPanel('深圳市', '440300', '440000');
+  await new Promise(function(r){ setTimeout(r, 900); });
+  var cmSz=getCityMetric('440300','440000');
+  var rCity=regCity(cmSz,'440300');
+  var expCity=fmtGDP(rCity.get('gdp', dataYear));
+  check('H_city_panel_gdp', ptext().indexOf(expCity)>=0 && /深圳市/.test(ptext()), 'expected='+expCity+'|got='+ptext().replace(/\\s+/g,' ').slice(0,80));
+  check('H_city_panel_render', /地级市/.test(ptext()) || (document.getElementById('trend')&&document.getElementById('trend').textContent.replace(/\\s/g,'').length>0), '城市面板已渲染（层级标识/趋势）');
+
   // G 欧盟 NUTS DE11（必须先进入 EU/DE 下钻：EU_METRICS 与 geo 均为懒加载，
   //    应用从不裸调 showNUTSPanel，故此处先 loadNUTS('DE') 再下钻）
   await loadNUTS('DE');

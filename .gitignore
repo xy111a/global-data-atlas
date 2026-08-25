@@ -22,3 +22,6 @@ __pycache__/
 # 审计截图/报告与归档脚本：出库但保留本地（历史已入库，可随时找回）
 .audit/
 scripts_archive/
+
+# 视觉回归基线（机器相关，本地生成，不入库）
+tests/baseline/
