@@ -3,10 +3,30 @@
 
 用法：python3 sync_cn_to_wb.py
 """
-import json, re
+import json, re, os, tempfile, shutil, time
 
 EMAP = "_enmap.json"
 WB_JS = "vendor/countries_wb.js"
+
+def atomic_write(path, content, backup=True):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".js")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 def main():
     emap = json.load(open(EMAP, encoding="utf-8"))
@@ -28,7 +48,7 @@ def main():
         else:
             missing.append(iso)
     new_src = m.group(1) + body
-    open(WB_JS, "w", encoding="utf-8").write(new_src)
+    atomic_write(WB_JS, new_src)
     print(f"✅ 同步 {len(replaced)} 个 cn 到 countries_wb.js")
     if missing:
         print(f"⚠️ 未找到匹配: {missing}")

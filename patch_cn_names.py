@@ -4,11 +4,30 @@
 数据源：ISO 3166 标准中文译名（外交部/新华社常用译法）。
 用法：python3 patch_cn_names.py
 """
-import json, re, shutil, os
+import json, re, shutil, os, tempfile, time
 
 SRC = "_enmap.json"
 OUT = "_enmap.json"
-BAK = "_enmap.json.bak"
+
+def atomic_write(path, content, backup=True):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".json")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 # ISO2 -> 标准中文名（仅列出当前 cn 仍为英文/需修正的）
 CN_FIX = {
@@ -65,7 +84,7 @@ def main():
             fixed.append((iso, old, CN_FIX[iso]))
         elif not has_cn(v.get("cn", "")):
             skipped.append((iso, v.get("en"), v.get("cn")))
-    json.dump(emap, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    atomic_write(OUT, json.dumps(emap, ensure_ascii=False, indent=2))
     print(f"✅ 修正 {len(fixed)} 个中文名")
     for iso, old, new in fixed:
         print(f"  {iso}: {old!r} -> {new!r}")

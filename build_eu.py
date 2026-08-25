@@ -8,7 +8,52 @@
      curl -L -o /tmp/eu_build/nuts2.geojson \
        "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2021_4326_LEVL_2.geojson"
 """
-import json, os, sys, math, urllib.request, urllib.parse, argparse, time
+import json, os, sys, math, urllib.request, urllib.parse, argparse, time, tempfile, shutil
+
+# ---------- 安全/工具：与 P2-9 一致的原子写 + 坐标抽稀 ----------
+TARGET_KEYS = ("coordinates", "center", "centroid")
+
+def _round_all(x):
+    if isinstance(x, bool):
+        return x
+    if isinstance(x, float):
+        return round(x, 4)
+    if isinstance(x, int):
+        return x
+    if isinstance(x, list):
+        return [_round_all(e) for e in x]
+    return x
+
+def round_coords(value):
+    """递归：仅对 coordinates/center/centroid 内浮点降精度（4 位小数≈11m），其余原样。"""
+    if isinstance(value, list):
+        return [round_coords(e) for e in value]
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            out[k] = _round_all(v) if k in TARGET_KEYS else round_coords(v)
+        return out
+    return value
+
+def atomic_write(path, content, backup=True):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".js")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EU_DIR = os.path.join(ROOT, "vendor", "eu")
@@ -130,12 +175,13 @@ def main():
                 metrics[nid]["area"] = round(a)
 
     # ---------- 5. 输出 ----------
-    # 5a. 边界：每国一个 js（window.EU_{CC}_GEO）
+    # 5a. 边界：每国一个 js（window.EU_{CC}_GEO），坐标抽稀（可复现）
     for cc, fs in by_country.items():
         out = {"type": "FeatureCollection", "features": fs}
+        out = round_coords(out)
         js = f"window.EU_{cc}_GEO=" + json.dumps(out, ensure_ascii=False, separators=(",", ":")) + ";\n"
         p = os.path.join(EU_DIR, f"{cc.lower()}.js")
-        open(p, "w", encoding="utf-8").write(js)
+        atomic_write(p, js)
         print(f" 边界 → {os.path.relpath(p, ROOT)} ({os.path.getsize(p)//1024}KB)")
 
     # 5b. 指标：window.EU_METRICS（gdp 折算人民币元；单年快照）
@@ -151,7 +197,7 @@ def main():
             "window.EU_RATE=" + f"{rate:.4f}" + ";\n"
             "window.EU_METRICS=" + json.dumps(out_m, ensure_ascii=False, separators=(",", ":")) + ";\n")
     p = os.path.join(EU_DIR, "eu_metrics.js")
-    open(p, "w", encoding="utf-8").write(js_m)
+    atomic_write(p, js_m)
     print(f" 指标 → {os.path.relpath(p, ROOT)} ({len(out_m)} 区域, {os.path.getsize(p)//1024}KB)")
     print(f"\n完成：{len(out_m)} 个 NUTS2 区域（{len(COUNTRIES)} 国），汇率 {rate:.4f}")
 

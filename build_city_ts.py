@@ -4,7 +4,27 @@
    输入：中文维基「中华人民共和国城市地区生产总值列表」的 wikitext 快照，
    默认读 /tmp/citygdp_wt.txt，可用环境变量 CITYGDP_WT 指定路径。
 """
-import re, json, os, sys
+import re, json, os, sys, tempfile, shutil, time
+
+def atomic_write(path, content, backup=False):
+    """写前可选备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚。默认不备份（目标为 /tmp 中间产物）。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".json")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 WT = os.environ.get('CITYGDP_WT', '/tmp/citygdp_wt.txt')
 if not os.path.exists(WT):
@@ -90,4 +110,4 @@ for name in ['上海','北京','深圳','杭州','苏州','广州','成都','武
     yrs = all_city_years.get(name, {})
     print(f"  {name}: { {k: round(v,1) for k,v in sorted(yrs.items())} }")
 
-json.dump(all_city_years, open('/tmp/city_years.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+atomic_write('/tmp/city_years.json', json.dumps(all_city_years, ensure_ascii=False, indent=1))

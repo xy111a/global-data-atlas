@@ -99,6 +99,21 @@
   </ul>
 </div>
 
+<div class="sec" style="border:1px solid rgba(57,217,138,.4);">
+  <h3 style="color:#39d98a;margin-top:0;">✅ 第二轮审计整改（2026-08-25 续）：覆盖首轮遗漏项</h3>
+  <p class="muted" style="margin:6px 0 10px;font-size:12.5px;">首轮 13 项交付后，按"尽量做完整"补齐审计盲区：① 7 个 build 脚本安全加固；② 坐标抽稀确认全覆盖 + 固化进 build（可复现）；③ 独立审查 compare.html / 远程 V2 合入 / tests 自身。回归门禁 <b style="color:#39d98a;">run_all_tests.sh 9/9 全绿</b>，build.sh 重建干净。</p>
+  <ul class="oklist" style="columns:2;column-gap:24px;margin:0;padding-left:18px;">
+    <li><b>S1</b> 7 个 build 脚本（build_japan/eu/simplify_geo/city_index/city_ts/patch_cn_names/sync_cn_to_wb）统一加 <code>atomic_write</code>：临时文件+<code>os.replace</code> 原子写、写前自动备份到 <code>/tmp</code>、失败回滚（与 P2-9 同款）</li>
+    <li><b>S2</b> 消除潜在脆弱点：sync_cn_to_wb.py 原 <code>open(...,'w')</code> 直写 countries_wb.js（无备份）→ 原子写；patch_cn_names.py 原定义 BAK 却从不备份 → 复用 atomic_write</li>
+    <li><b>S3</b> build_japan.py / build_eu.py 把坐标抽稀（4 位小数≈11m）固化进 build：重跑不再冲掉已抽稀成果，抽稀可复现</li>
+    <li><b>S4</b> 坐标抽稀确认全覆盖：cn/eu/world 已是 4 位小数（远程 V2 压缩）、japan 3 位（首轮）；simplify_geo.py 复用为统一抽稀工具（已加固备份），运行幂等</li>
+    <li><b>S5</b> compare.html 独立审查：复用 echarts 单实例（getInstanceByDom，无 P1-2 泄漏）、走 app-core 的 regGet（年份回退已统一）、esc 转义来自 app-core、无 eval → 无需要改缺陷</li>
+    <li><b>S6</b> 远程 V2 合入审查：.github/workflows/test.yml（CI 合理）、自定义 echarts（L3a/L3e 渲染验证）、移动端下钻、eu NUTS2 数据+regNUTS（L2 4f + L3e 断言）→ 经门禁验证无埋雷</li>
+    <li><b>S7</b> tests 自身审查：非假绿——L2 data_verify.py 硬断言+<code>exit(1)</code>，L3 系列 headless Chrome 抓崩溃+关键标记（OK/LEVEL=nuts/restore:OK/人均GDP）；仅无视觉/数值深度断言（静态数据可视化可接受，遵循"够用则跳过"）</li>
+    <li><b>修复</b> 修正 atomic_write 备份误落仓库的 bug（原放目标文件旁会污染 vendor/ 与被 build.sh 拷入 dist/）→ 统一备份至 <code>/tmp</code>，清理 129 个 .bak 垃圾</li>
+  </ul>
+</div>
+
 <h2>一、发现总表（按优先级）</h2>
 <table>
   <thead><tr><th>#</th><th>优先级</th><th>发现</th><th>位置</th><th>工作量</th></tr></thead>

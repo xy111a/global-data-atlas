@@ -3,7 +3,27 @@
    从省级 GeoJSON（vendor/cn/{adcode}.js, window.CN_PROV[adcode]）提取 {name, adcode, parent}
    与 CITY_METRICS 键求交，输出 window.CITY_INDEX = [[城市名, 市adcode, 省adcode, 省名], ...]
 """
-import re, json, os, glob
+import re, json, os, glob, tempfile, shutil, time
+
+def atomic_write(path, content, backup=True):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".js")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 def main():
     # 1. 加载 CITY_METRICS 键（无名称）
@@ -64,9 +84,8 @@ def main():
     js = "/* 城市搜索索引（build_city_index.py 生成）：[城市名, 市adcode, 省adcode, 省名]\n"
     js += " * 来源：省级 GeoJSON（DataV）+ CITY_METRICS 求交；用于 doSearch 城市搜索 */\n"
     js += "window.CITY_INDEX = " + json.dumps(index, ensure_ascii=False, separators=(',', ':')) + ";\n"
-    with open('vendor/cn/city_index.js', 'w', encoding='utf-8') as f:
-        f.write(js)
-    print(f"已写 vendor/cn/city_index.js ({len(js)} bytes)")
+    bak = atomic_write('vendor/cn/city_index.js', js)
+    print(f"已写 vendor/cn/city_index.js ({len(js)} bytes)" + (f" · 备份 {bak}" if bak else ""))
 
     # 抽样验证
     for probe in ['广州', '杭州', '深圳', '成都']:

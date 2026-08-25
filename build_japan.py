@@ -3,7 +3,52 @@
    输出 window.JP_GEO = FeatureCollection（features 的 properties.name 改为中文名）
    中文名映射：日文常用汉字与中文一致，仅少数不同（県→县、東京→东京、大阪→大阪、神奈川→神奈川等）
 """
-import json, re
+import json, re, os, tempfile, shutil, time
+
+# ---------- 安全/工具：与 P2-9 一致的原子写 + 坐标抽稀 ----------
+TARGET_KEYS = ("coordinates", "center", "centroid")
+
+def _round_all(x):
+    if isinstance(x, bool):
+        return x
+    if isinstance(x, float):
+        return round(x, 4)
+    if isinstance(x, int):
+        return x
+    if isinstance(x, list):
+        return [_round_all(e) for e in x]
+    return x
+
+def round_coords(value):
+    """递归：仅对 coordinates/center/centroid 内浮点降精度（4 位小数≈11m），其余原样。"""
+    if isinstance(value, list):
+        return [round_coords(e) for e in value]
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            out[k] = _round_all(v) if k in TARGET_KEYS else round_coords(v)
+        return out
+    return value
+
+def atomic_write(path, content, backup=True):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".js")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 # 日文→中文映射（47 都道府县）
 NAME_MAP = {
@@ -37,12 +82,14 @@ def main():
             mapped += 1
     print(f"中文名映射: {mapped}/47")
 
+    # 坐标抽稀（4 位小数≈11m，可复现；固化进 build，重跑不再冲掉）
+    gj = round_coords(gj)
+
     # 输出 vendor/japan.js
     js = "/* 日本都道府县边界（dataofjapan/land, 47 县，properties.name 为中文名） */\n"
     js += "window.JP_GEO = " + json.dumps(gj, ensure_ascii=False, separators=(',', ':')) + ";\n"
-    with open('vendor/japan.js', 'w', encoding='utf-8') as f:
-        f.write(js)
-    print(f"已写 vendor/japan.js ({len(js)/1024:.0f} KB)")
+    bak = atomic_write('vendor/japan.js', js)
+    print(f"已写 vendor/japan.js ({len(js)/1024:.0f} KB)" + (f" · 备份 {bak}" if bak else ""))
 
     # 抽查
     for f in gj['features'][:5]:

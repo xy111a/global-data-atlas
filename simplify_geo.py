@@ -7,9 +7,29 @@
      python3 simplify_geo.py vendor/world.js   # 仅处理指定文件
    安全性：先用 git 管理，可 git checkout 还原。
 """
-import json, glob, os, sys
+import json, glob, os, sys, tempfile, shutil, time
 
 TARGET_KEYS = ("coordinates", "center", "centroid")
+
+def atomic_write(path, content, backup=True):
+    """写前自动备份到 /tmp；临时文件 + os.replace 原子替换；失败回滚到备份。"""
+    bak = None
+    if backup and os.path.exists(path):
+        bak = f"/tmp/{os.path.basename(path)}.bak.{int(time.time())}"
+        shutil.copy2(path, bak)
+    d = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".tmp_", suffix=".js")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        if bak and os.path.exists(path):
+            shutil.copy2(bak, path)
+        raise
+    return bak
 
 def round_num(x):
     if isinstance(x, bool):
@@ -91,8 +111,7 @@ def process(path):
     out = prefix + new_json + ";" + ("\n" if "\n" in trailing else "")
     before = len(raw.encode("utf-8"))
     after = len(out.encode("utf-8"))
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(out)
+    atomic_write(path, out)
     return (before, after), None
 
 def main():
