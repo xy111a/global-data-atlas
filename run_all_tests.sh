@@ -56,5 +56,13 @@ step "L3g 双币切换（cur_test）"
 python3 tests/cur_test.py > /tmp/cur.log 2>&1 && tail -1 /tmp/cur.log || { echo "  ✗ 双币失败:"; tail -5 /tmp/cur.log; exit 1; }
 echo "  ✓ L3g 通过"; PASS=$((PASS+1))
 
+step "L3h 视觉/数值深度断言（visual_assert）"
+python3 tests/visual_assert.py > /tmp/visual.log 2>&1 && tail -3 /tmp/visual.log || { echo "  ✗ 深度断言失败:"; tail -12 /tmp/visual.log; exit 1; }
+echo "  ✓ L3h 通过"; PASS=$((PASS+1))
+
+step "L3i 运行时性能实测（perf_trace）"
+python3 tests/perf_trace.py > /tmp/perf.log 2>&1 && tail -8 /tmp/perf.log || { echo "  ✗ 性能实测失败:"; tail -12 /tmp/perf.log; exit 1; }
+echo "  ✓ L3i 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

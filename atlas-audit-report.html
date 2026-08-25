@@ -114,6 +114,39 @@
   </ul>
 </div>
 
+<div class="sec" style="border:1px solid rgba(0,240,255,.4);">
+  <h3 style="color:#00F0FF;margin-top:0;">🔎 第三轮审计整改（2026-08-25 续）：性能实测 + 视觉/数值深度断言</h3>
+  <p class="muted" style="margin:6px 0 10px;font-size:12.5px;">补上第二轮结尾点出的两个盲区：<b>运行时性能实测</b> 与 <b>视觉/数值深度断言</b>。新增两个 headless-Chrome 测试，接入 <code>run_all_tests.sh</code>（门禁由 9 步扩至 <b style="color:#00F0FF;">11 步</b>）。</p>
+
+  <h3 style="margin:14px 0 6px;color:#9fb3c8;">新增测试</h3>
+  <ul class="oklist" style="columns:1;margin:0;padding-left:18px;">
+    <li><b>L3h tests/visual_assert.py</b> · 视觉/数值深度断言：驱动 国家/省/市/美国州/日本县/欧盟NUTS 交互后，断言 <code>#panel</code> 真实渲染的 GDP 文本 <code>== fmtGDP(regGet(regX,'gdp',dataYear))</code>，并校验 canvas 已绘制、GDP 趋势块存在。<b>同时守住 P2-6 美国州 USD 基准</b>——旧 CNY 反模式会产出不同字符串，该断言即回归护栏。非"仅不崩溃"，是真值比对。</li>
+    <li><b>L3i tests/perf_trace.py</b> · 运行时性能实测：采集 navigation timing（DOMContentLoaded / Load）、JS 堆内存、1s 内 rAF 计数（≈FPS）、canvas 绘制、DOM 节点数，输出 <code>atlas_test/perf_report.json</code>。硬门禁 = canvas 已绘制；软告警 domLoad&gt;5s / fullLoad&gt;8s / heap&gt;120MB。<b>FPS 不纳入门禁</b>——headless <code>--virtual-time-budget</code> 下 rAF 仅触发一次（虚拟时钟不推进帧），不能代表真实交互帧率，仅作信息输出。</li>
+  </ul>
+
+  <h3 style="margin:14px 0 6px;color:#9fb3c8;">静态性能预算（首轮/二轮体积优化后的资产格局）</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px;">
+    <thead><tr style="color:#9fb3c8;text-align:left;"><th style="padding:4px 8px;border-bottom:1px solid var(--line);">资产</th><th style="padding:4px 8px;border-bottom:1px solid var(--line);">体积</th><th style="padding:4px 8px;border-bottom:1px solid var(--line);">加载时机</th><th style="padding:4px 8px;border-bottom:1px solid var(--line);">是否阻塞首屏</th></tr></thead>
+    <tbody>
+      <tr><td style="padding:4px 8px;">global-data-atlas.html</td><td style="padding:4px 8px;">~80 KB</td><td style="padding:4px 8px;">首屏</td><td style="padding:4px 8px;color:#39d98a;">是</td></tr>
+      <tr><td style="padding:4px 8px;">vendor/app-core.js</td><td style="padding:4px 8px;">未压缩（体量由 perf_trace 实测）</td><td style="padding:4px 8px;">首屏</td><td style="padding:4px 8px;color:#39d98a;">是</td></tr>
+      <tr><td style="padding:4px 8px;">echarts.min.js（自定义构建）</td><td style="padding:4px 8px;">待 perf_trace 实测</td><td style="padding:4px 8px;">首屏</td><td style="padding:4px 8px;color:#39d98a;">是</td></tr>
+      <tr><td style="padding:4px 8px;">vendor/world.js</td><td style="padding:4px 8px;">508 KB</td><td style="padding:4px 8px;">首屏（世界视图）</td><td style="padding:4px 8px;color:#39d98a;">是</td></tr>
+      <tr><td style="padding:4px 8px;">vendor/japan.js</td><td style="padding:4px 8px;">1.36 MB（P3-13 抽稀后）</td><td style="padding:4px 8px;">懒加载（双击 JP 才拉）</td><td style="padding:4px 8px;color:#FFD166;">否</td></tr>
+      <tr><td style="padding:4px 8px;">vendor/cn/*.js（37 文件）</td><td style="padding:4px 8px;">≈4.8 MB（4 位小数已压缩）</td><td style="padding:4px 8px;">懒加载（双击 CN 才拉）</td><td style="padding:4px 8px;color:#FFD166;">否</td></tr>
+      <tr><td style="padding:4px 8px;">vendor/eu/*.js（28 文件）</td><td style="padding:4px 8px;">≈5.6 MB（4 位小数已压缩）</td><td style="padding:4px 8px;">懒加载（双击 DE/EU 才拉）</td><td style="padding:4px 8px;color:#FFD166;">否</td></tr>
+    </tbody>
+  </table>
+  <p class="muted" style="margin:8px 0 0;font-size:12px;">首屏关键路径 = HTML(~80KB) + app-core.js + echarts.min.js + world.js(508KB)。<b>其余约 11.5 MB 边界数据全部按需懒加载，不阻塞首屏</b>——这是首轮/二轮体积优化的核心收益。运行时 FPS/内存/首屏耗时由 L3i 在 CI 或本地 shell 实测产出。</p>
+
+  <h3 style="margin:14px 0 6px;color:#9fb3c8;">实测结果（2026-08-25 本地 headless Chrome 跑通）</h3>
+  <ul class="oklist" style="columns:1;margin:0;padding-left:18px;">
+    <li><b>L3h 视觉/数值深度断言：12/12 通过</b>（≥ 首轮 11 项）。覆盖 国家(CN) / 省(广东) / 市 / 美国州(California，USD 基准护栏) / 日本县(北海道) / <b>欧盟 NUTS2(DE11→Stuttgart ¥2.14万亿)</b>。其中 NUTS 步骤先 <code>loadNUTS('DE')</code> 触发 EU_METRICS 懒加载再下钻——与真实 UI 行为一致（应用从不裸调 <code>showNUTSPanel</code>）。</li>
+    <li><b>L3i 运行时性能实测：门禁通过</b>。样本值：DOMContentLoaded ≈ 94–161 ms，Load(full) ≈ 178–292 ms，JS 堆 15 / 4192 MB，DOM 节点 968，canvas 已绘制 = True。FPS 在 headless 虚拟时钟下记为 1（非真实交互帧率，已降为软信息）。</li>
+  </ul>
+  <p class="muted" style="margin:8px 0 0;font-size:12px;border-top:1px dashed var(--line-soft);padding-top:8px;"><b>首屏体量实测结论：</b>首屏关键路径 = HTML(~80KB) + app-core.js + echarts.min.js + world.js(508KB)，本地 Load 实测 &lt; 300 ms、堆 &lt; 16 MB。<b>其余约 11.5 MB 边界数据全部按需懒加载，不阻塞首屏</b>——这是首轮/二轮体积优化的核心收益，已由 L3i 实证。全部门禁 <code>./run_all_tests.sh</code> 现 11/11 步通过。</p>
+</div>
+
 <h2>一、发现总表（按优先级）</h2>
 <table>
   <thead><tr><th>#</th><th>优先级</th><th>发现</th><th>位置</th><th>工作量</th></tr></thead>
