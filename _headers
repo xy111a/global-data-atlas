@@ -1,0 +1,21 @@
+# Cloudflare Pages _headers
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  # 宽松 CSP 试点：同源 + DataV 边界 JSON + inline 样式/脚本（单页无打包，需 unsafe-inline）
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+
+/robots.txt
+  Content-Type: text/plain; charset=utf-8
+
+/sitemap.xml
+  Content-Type: application/xml; charset=utf-8
+
+# 静态资产缓存（app-core 等带 ?v= 指纹的引用可随时更新）
+/vendor/*
+  Cache-Control: public, max-age=14400, must-revalidate
+
+/favicon.svg
+  Cache-Control: public, max-age=86400

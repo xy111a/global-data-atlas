@@ -20,7 +20,7 @@ window.EN_ALIAS = {
 };
 window.METRICS = {
   gdp: {
-    label:"GDP", fmt:fmtGDP, unit:"人民币元",
+    label:"GDP", fmt:fmtGDP, unit:"美元",
     near(o,year){ return (o&&o.get)?o.get("gdp",year):null; },
     series(o){ return (o&&o.gdpSeries)?o.gdpSeries():null; },
     growth(o,base){ return (o&&o.growth)?o.growth("gdp",base):null; }
@@ -89,11 +89,10 @@ window.METRICS = {
   }
 };
 window.USD_CNY = 7.2;
-/* ===== 双币显示（GDP 人民币/美元切换） =====
-   CURRENCY: "CNY" | "USD"；gdpRate(y)=USD→CNY 系数（逐年 FXRATE，缺失兜底 7.2）；
-   gdpApply(v, from, y)：把基准币种值折算到当前显示币种（from="USD"|"CNY"）。
-   各层 reg.get("gdp") 统一经 gdpApply 返回显示币种值，趋势序列同样处理。 */
-window.CURRENCY = "CNY";
+/* ===== 货币：固定显示美元（USD） =====
+   gdpRate(y)=USD→CNY 系数（逐年 FXRATE，缺失兜底 7.2）——仅用于把 CNY 基准源数据折算为 USD；
+   gdpApply(v, from, y)：把基准币种值折算到当前显示币种（恒为 "USD"）。 */
+window.CURRENCY = "USD";
 window.gdpRate = y => (window.FXRATE && window.FXRATE[y]) || window.USD_CNY;
 window.gdpApply = (v, from, y) => {
   if (v == null || isNaN(v)) return null;
@@ -268,7 +267,7 @@ function usGdpUsdM(name, year){            // 返回 USD 百万 (number) 或 nul
   if(!avail.length) return null;
   return ys[nearestByDist(avail, year)];
 }
-function usGdpY(name, year){               // 返回 人民币元 (按逐年汇率折算)
+function usGdpY(name, year){               // 调试/兼容：返回人民币元（按逐年汇率）；主 UI 走 usGdpDisplay→USD
   const m = usGdpUsdM(name, year);
   if(m==null) return null;
   const y = usGdpYear(name, year);         // 实际采用的年份（回退后），汇率随实际年份
@@ -318,7 +317,7 @@ function cnNominalGrowth(short, baseYear){ // 较基准年 名义(现价)增长,
   return e/b - 1;
 }
 function fmtMoney(v, s){ if(v==null||isNaN(v)) return "—"; if(v>=1e12)return s+(v/1e12).toFixed(2)+" 万亿"; if(v>=1e8)return s+(v/1e8).toFixed(2)+" 亿"; if(v>=1e4)return s+(v/1e4).toFixed(1)+" 万"; return s+v.toFixed(0); }
-function fmtGDP(v){ return fmtMoney(v, (window.CURRENCY==="USD")?"$":"¥"); }
+function fmtGDP(v){ return fmtMoney(v, "$"); }
 function fmtPop(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e8)return (v/1e8).toFixed(2)+" 亿人"; if(v>=1e4)return (v/1e4).toFixed(2)+" 万人"; return v.toLocaleString()+" 人"; }
 function fmtArea(v){ if(v==null||isNaN(v)) return "—"; if(v>=1e4)return (v/1e4).toFixed(2)+" 万平方千米"; return v.toLocaleString()+" 平方千米"; }
 function normProv(n){ return n.replace(/(省|市|自治区|特别行政区|壮族|回族|维吾尔)/g,"").trim(); }
@@ -370,7 +369,7 @@ function regCountry(iso2){
       return vs/vb - 1;   // 相对增长率（trade/health/edu/gdpcap）
     },
     gdpSeries(){ const tr=countryTrend(iso2); return tr?{name:o.cn,years:tr.years,values:tr.values}:null; },
-    /* 趋势随维度：gdp→WB序列(人民币元)；pop/area→WB 多年；EXT 指标→按年（≥2 点才有趋势） */
+    /* 趋势随维度：gdp→WB序列(展示恒为 USD)；pop/area→WB 多年；EXT 指标→按年（≥2 点才有趋势） */
     series(m){
       if(m==="gdp"){ const tr=countryTrend(iso2); return tr?{name:o.cn,years:tr.years,values:tr.values}:null; }
       if(m==="pop"||m==="area"){
@@ -512,7 +511,7 @@ function usTrend(name){
   return {years:ys, values:ys.map(y=>gdpApply(ts.years[y]*1e6,"USD",y))};
 }
 function currencyTag(m){
-  if(m==="gdp") return "货币："+(window.CURRENCY==="USD"?"美元(USD)":"人民币(CNY)");
+  if(m==="gdp") return "货币：美元(USD)";
   if(m==="gdpcap") return "货币：USD(2015不变价)";
   return "";   // pop/area/%/岁 等无量纲指标不标货币
 }
@@ -530,15 +529,15 @@ function cmpGetData(it){
   const y=dataYear;
   let base={};
   if(it.t==="country"){ base={g:cMetric(it.k,"gdp",y), p:cMetric(it.k,"pop",y), a:cMetric(it.k,"area",y)}; }
-  else if(it.t==="prov"){ const g=cnGdpRMB(it.k,y), o=window.CN_TS&&window.CN_TS[it.k];
+  else if(it.t==="prov"){ const g=gdpApply(cnGdpRMB(it.k,y), "CNY", cnGdpYear(it.k,y)), o=window.CN_TS&&window.CN_TS[it.k];
     base={g, p:(o&&o.pop&&o.pop["2023"])?o.pop["2023"]:null, a:(o&&o.area)||null}; }
   else if(it.t==="usstate"){ base={g:usGdpDisplay(it.k,y), p:(US_STATES_GDP[it.k]||{}).pop, a:(US_STATES_GDP[it.k]||{}).area}; }
   else if(it.t==="jppref"){ const d=window.JP_METRICS&&window.JP_METRICS[it.k]; if(!d) return null;
-    base={g:d.gdp, p:d.pop, a:d.area}; }
+    base={g:gdpApply(d.gdp,"CNY",d.year||2021), p:d.pop, a:d.area}; }
   else if(it.t==="nutspref"){ const d=window.EU_METRICS&&window.EU_METRICS[it.k]; if(!d) return null;
-    base={g:d.gdp, p:d.pop, a:d.area}; }
+    base={g:gdpApply(d.gdp,"CNY",d.year||2023), p:d.pop, a:d.area}; }
   else if(it.t==="city"){ const cm=getCityMetric(it.k, it.pa); if(!cm) return null;
-    base={g:cm.gdp, p:cm.pop, a:cm.area}; }   // 数据已由 city_metrics.js 折算为元/人（L5: 传 parentAdcode 支持直辖市兜底）
+    base={g:gdpApply(cm.gdp,"CNY",2023), p:cm.pop, a:cm.area}; }   // 源数据人民币 → 显示美元（L5: parentAdcode 支持直辖市兜底）
   else return null;
   // 当前维度值：gdp/pop/area 用对应值；EXT 系指标（trade/health/edu/life/gdpcap）仅国家层有
   if(metric==="gdp") base.v=base.g;

@@ -61,8 +61,8 @@ echo "  ✓ L3e 通过"; PASS=$((PASS+1))
 step "L3f URL 状态持久化（url_state_test）"
 "$PY" tests/url_state_test.py > /tmp/url.log 2>&1 && grep -q "restore: OK" /tmp/url.log || { echo "  ✗ URL 持久化失败:"; tail -8 /tmp/url.log; exit 1; }
 echo "  ✓ L3f 通过"; PASS=$((PASS+1))
-step "L3g 双币切换（cur_test）"
-"$PY" tests/cur_test.py > /tmp/cur.log 2>&1 && tail -1 /tmp/cur.log || { echo "  ✗ 双币失败:"; tail -5 /tmp/cur.log; exit 1; }
+step "L3g 固定美元（cur_test）"
+"$PY" tests/cur_test.py > /tmp/cur.log 2>&1 && tail -1 /tmp/cur.log || { echo "  ✗ 固定美元失败:"; tail -5 /tmp/cur.log; exit 1; }
 echo "  ✓ L3g 通过"; PASS=$((PASS+1))
 
 step "L3h 视觉/数值深度断言（visual_assert）"
@@ -76,6 +76,10 @@ echo "  ✓ L3i 通过"; PASS=$((PASS+1))
 step "L3j 视觉/响应式回归（visual_regression）"
 "$PY" tests/visual_regression.py > /tmp/visreg.log 2>&1 && tail -14 /tmp/visreg.log || { echo "  ✗ 视觉/响应式回归失败:"; tail -20 /tmp/visreg.log; exit 1; }
 echo "  ✓ L3j 通过"; PASS=$((PASS+1))
+
+step "L3k 搜索/ESC 回归（search_esc_test）"
+"$PY" tests/search_esc_test.py > /tmp/searchesc.log 2>&1 && tail -3 /tmp/searchesc.log || { echo "  ✗ 搜索/ESC 失败:"; tail -8 /tmp/searchesc.log; exit 1; }
+echo "  ✓ L3k 通过"; PASS=$((PASS+1))
 
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

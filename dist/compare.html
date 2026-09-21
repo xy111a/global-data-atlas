@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>区域对比 · Compare</title>
+<meta name="description" content="多区域经济数据并排对比：国家/省/州/县/城市多年轨迹，GDP 统一以美元计价。" />
+<meta name="theme-color" content="#05060a" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <style>
   :root{
     --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
@@ -67,14 +70,10 @@
     <h1>区域对比<span class="en">COMPARE</span></h1>
     <span class="hint" style="margin:0">多年轨迹并排 · 多指标切换</span>
     <div class="spacer"></div>
-    <input id="addInput" placeholder="搜索添加区域（国家/省/州/县/城市）…" aria-label="搜索添加对比区域" />
+    <input id="addInputTop" placeholder="搜索添加区域（国家/省/州/县/城市）…" aria-label="搜索添加对比区域" />
     <div class="seg" id="metricSeg"></div>
     <select id="yearSel" aria-label="选择年份"></select>
-    <select id="curSel" aria-label="货币单位" title="GDP 显示币种（人民币/美元切换）">
-      <option value="CNY">¥ 人民币</option>
-      <option value="USD">$ 美元</option>
-    </select>
-    <a class="btn" href="global-data-atlas.html">← 返回地图</a>
+    <a class="btn" href="index.html">← 返回地图</a>
   </header>
   <div id="main">
     <div id="list">
@@ -113,7 +112,7 @@
 <script src="vendor/us_states_bea.js"></script>
 <script src="vendor/jp_metrics.js"></script>
 <script src="vendor/eu/eu_metrics.js"></script>
-<script src="vendor/app-core.js?v=fab3f8ca"></script>
+<script src="vendor/app-core.js?v=4af5ddd1"></script>
 <script>
 /* ============== 独立对比页（compare.html） ==============
    复用 app-core.js（METRICS/reg/cmpGetData/格式化）；本页仅对比 UI 与图表。 */
@@ -150,6 +149,14 @@ function seriesFor(it){
 /* ---------- 层级单元选择（按层级浏览添加对比单元） ---------- */
 function unitKey(t,k,pa){ return pa!=null ? t+":"+k+":"+pa : t+":"+k; }
 function isAdded(t,k){ return cmpList.some(x=>x.t===t&&x.k===k); }
+/* 统一 key 解析：city:adcode:pa → {t,k,pa}；其余 t:k（k 可含冒号时保留整段） */
+function parseAddKey(key){
+  const parts=String(key).split(":");
+  const t=parts[0];
+  if(!t||parts.length<2) return null;
+  if(parts.length>2) return {t, k:parts[1], pa:+parts[2]};
+  return {t, k:parts.slice(1).join(":"), pa:undefined};
+}
 function renderUnitList(){
   const lv=document.getElementById("levelSel").value;
   const box=document.getElementById("unitList");
@@ -172,8 +179,8 @@ function renderUnitList(){
   items.sort((a,b)=>(b[2]||-1)-(a[2]||-1));
   if(!items.length){ box.innerHTML=`<div class="empty">当前层级无「${esc(q)||"数据"}」</div>`; return; }
   box.innerHTML=items.map(it=>{
-    const parts=it[1].split(":"); const t=parts[0], k=parts.slice(1).join(":");
-    const added=isAdded(t,k);
+    const pk=parseAddKey(it[1]);
+    const added=pk?isAdded(pk.t,pk.k):false;
     return `<div class="unit${added?" added":""}" data-key="${it[1]}" title="点击${added?"移除":"加入"}对比">
       <span>${esc(it[0])}</span>
       <span class="uval">${it[2]!=null?esc(metricFmt(metric,it[2])):"—"}</span>
@@ -181,11 +188,9 @@ function renderUnitList(){
   }).join("");
   box.querySelectorAll(".unit").forEach(el=>{
     el.onclick=()=>{
-      const parts=el.dataset.key.split(":");
-      const t=parts[0], k=parts.slice(1,-(parts.length>2?1:0)).join(":")||parts[1];
-      const pa=parts.length>2?+parts[parts.length-1]:undefined;
-      const idx=cmpList.findIndex(x=>x.t===t&&x.k===k);
-      if(idx>=0) cmpList.splice(idx,1); else addItem(t,k,pa);
+      const pk=parseAddKey(el.dataset.key); if(!pk) return;
+      const idx=cmpList.findIndex(x=>x.t===pk.t&&x.k===pk.k);
+      if(idx>=0) cmpList.splice(idx,1); else addItem(pk.t,pk.k,pk.pa);
       renderList(); renderChart(); renderUnitList();
     };
   });
@@ -251,9 +256,8 @@ function parseAddParam(){
   const p=new URLSearchParams(location.search);
   const adds=p.getAll("add"); if(!adds.length) return;
   adds.forEach(add=>{
-    const parts=add.split(":");
-    const t=parts[0], k=parts.slice(1).join(":");
-    if(t&&k) addItem(t,k,parts[2]?+parts[2]:undefined);
+    const pk=parseAddKey(add);
+    if(pk&&pk.t&&pk.k) addItem(pk.t,pk.k,pk.pa);
   });
 }
 /* 搜索添加：国家/省/州/县/城市 */
@@ -286,10 +290,11 @@ function doAddSearch(q){
   box.innerHTML=hits.join("");
   box.querySelectorAll("[data-add]").forEach(el=>{
     el.onclick=()=>{
-      const parts=el.dataset.add.split(":");
-      addItem(parts[0], parts.slice(1,3).join(":"), parts[2]?+parts[2]:undefined);
+      const pk=parseAddKey(el.dataset.add);
+      if(pk) addItem(pk.t,pk.k,pk.pa);
       box.style.display="none";
       document.getElementById("addInput").value="";
+      const top=document.getElementById("addInputTop"); if(top) top.value="";
     };
   });
 }
@@ -324,19 +329,18 @@ function initYear(){
 
 window.addEventListener("load",()=>{
   initMetrics(); initYear();
-  // 货币切换：?cur=usd 恢复 + select 切换（GDP 格式化走 app-core.js 的 fmtGDP/gdpApply，随 CURRENCY 联动）
-  const curP=new URLSearchParams(location.search).get("cur");
-  if(curP==="usd"){ window.CURRENCY="USD"; document.getElementById("curSel").value="USD"; }
-  document.getElementById("curSel").addEventListener("change",e=>{
-    window.CURRENCY=e.target.value;
-    renderList(); renderChart(); renderUnitList();
-  });
   parseAddParam();
   renderList(); renderChart(); renderUnitList();
   document.getElementById("levelSel").addEventListener("change",()=>{ renderUnitList(); });
-  document.getElementById("addInput").addEventListener("keydown",e=>{ if(e.key==="Enter") renderUnitList(); });
+  document.getElementById("addInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ if(e.target.id==="addInputTop") doAddSearch(e.target.value); else renderUnitList(); } });
   document.getElementById("addInput").addEventListener("input",()=>{ renderUnitList(); });
   document.getElementById("addInput").addEventListener("blur",()=>setTimeout(()=>{ document.getElementById("addResults").style.display="none"; },200));
+  const top=document.getElementById("addInputTop");
+  if(top){
+    top.addEventListener("keydown",e=>{ if(e.key==="Enter") doAddSearch(e.target.value); });
+    top.addEventListener("input",()=>{ if(e.target.value) doAddSearch(e.target.value); });
+    top.addEventListener("blur",()=>setTimeout(()=>{ document.getElementById("addResults").style.display="none"; },200));
+  }
   window.addEventListener("resize",()=>{ const c=echarts.getInstanceByDom(document.getElementById("trendChart")); if(c) c.resize(); });
 });
 </script>

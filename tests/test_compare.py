@@ -110,5 +110,38 @@ dom5 = dump("file://" + os.path.abspath(p5), 12)
 out5 = runtime_out(dom5)
 check("层级点选", bool(out5) and "广东已选标记=有" in out5, f"({(out5 or '未获取')[:80]})")
 
+# 6. 城市 key：?add=city:adcode:pa → k 必须是 adcode 而非 "adcode:pa"（P1）
+import json as _json
+inject6 = """<script>window.addEventListener('load',function(){setTimeout(function(){
+try{
+var it=cmpList[0]||null;
+var d=it?cmpGetData(it):null;
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({
+  h:document.getElementById('cmpHead').textContent,
+  t:it&&it.t, k:it&&it.k, pa:it&&it.pa,
+  g:d&&d.g, hasCity:!!(it&&it.t==='city'&&String(it.k)==='440300')
+})+'</pre>');
+}catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
+},900);});</script>"""
+html6 = open("compare.html", encoding="utf-8").read().replace("</body>", inject6 + "\n</body>")
+p6 = os.path.join("atlas_test", "cmp_city_key.html")
+open(p6, "w", encoding="utf-8").write(html6)
+dom6 = dump("file://" + os.path.abspath(p6) + "?add=city:440300:440000", 12)
+out6 = runtime_out(dom6)
+ok_city = False
+if isinstance(out6, str):
+    try:
+        out6 = _json.loads(out6)
+    except Exception:
+        out6 = None
+if isinstance(out6, dict):
+    ok_city = (
+        out6.get("t") == "city"
+        and str(out6.get("k")) == "440300"
+        and out6.get("g") not in (None, 0)
+        and out6.get("hasCity") is True
+    )
+check("城市 key 解析", ok_city, f"({str(out6)[:120] if out6 else '未获取'})")
+
 print(f"\n对比页测试: {ok}/{total} 通过")
 exit(0 if ok == total else 1)

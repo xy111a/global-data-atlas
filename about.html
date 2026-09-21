@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>关于 · 数据来源 · Global Data Atlas</title>
+<meta name="description" content="Global Data Atlas 数据来源、口径与诚实性说明：World Bank、维基、BEA、Eurostat 等公开权威源。" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <style>
   :root{
     --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
@@ -41,7 +43,7 @@
   <header>
     <h1>关于 · 数据来源<span class="en">ABOUT &amp; DATA SOURCES</span></h1>
     <div class="nav">
-      <a class="btn" href="global-data-atlas.html">← 数据地图</a>
+      <a class="btn" href="index.html">← 数据地图</a>
       <a class="btn" href="compare.html">对比页</a>
     </div>
   </header>
@@ -63,7 +65,7 @@
 
   <h2>口径说明</h2>
   <h3>货币</h3>
-  <p>GDP 支持<strong>人民币 / 美元切换</strong>（header 币种选择器，URL <code>?cur=usd</code> 持久化）。国家 GDP 以美元为基准，按<strong>逐年平均市场汇率</strong>折算人民币（World Bank PA.NUS.FCRF，2000–2024）；欧盟按 EUR/CNY 年均汇率（ECB 数据）折算；省/城市/日本等以人民币为基准反向折算美元（日本 1日元≈0.05元为近似值已标注）。不使用固定汇率，避免早年低估。</p>
+  <p>GDP <strong>统一以美元（USD）计价</strong>。国家 GDP 与美国州 GDP 以美元为基准（World Bank / BEA 现价美元）；中国省/市、日本、欧盟等以本币或人民币为基准的数据，按<strong>逐年平均市场汇率</strong>折算为美元（World Bank PA.NUS.FCRF 2000–2024；欧盟按 EUR/USD 年均；日本 1 日元≈0.0067 美元为近似值已标注）。人均 GDP 为 World Bank 2015 不变价美元。<strong>2025 年</strong>尚无入表年均汇率时，按近似 1 USD≈7.2 CNY 兜底折算（已在标签中可感知为近似）。</p>
   <h3>现价 vs 不变价</h3>
   <p>地图上的 GDP 为<strong>现价</strong>（含通胀与汇率波动）；"较 2000 年实际增长"使用<strong>不变价</strong>序列（剔除通胀），两者分开标注。</p>
   <h3>年份</h3>

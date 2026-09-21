@@ -4,6 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>全球数据地图 · Global Data Atlas</title>
+<meta name="description" content="交互式全球行政区划数据地图：世界→国家→中国省/市、美国州、日本县、欧盟 NUTS2 下钻，GDP/人口/面积与扩展指标，统一以美元计价。" />
+<meta name="theme-color" content="#05060a" />
+<meta property="og:title" content="全球数据地图 · Global Data Atlas" />
+<meta property="og:description" content="交互式全球行政区划数据地图：多层级下钻与经济数据对比，GDP 统一以美元计价。" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://atlas.huajun.wang/" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="alternate icon" href="favicon.ico" />
 <style>
   :root{
     /* 品牌令牌（数据语义，沿用） */
@@ -231,7 +239,7 @@
   <header>
     <div class="tb-main">
       <div class="brand">
-        <div class="breadcrumb" id="crumb">世界</div>
+        <h1 class="breadcrumb" id="crumb" style="margin:0;font-size:inherit;font-weight:inherit;">世界</h1>
       </div>
       <div class="tb-actions">
         <input id="search" placeholder="搜索国家 / 省份 / 城市…" aria-label="搜索国家、省份或城市" />
@@ -240,17 +248,13 @@
           <option value="2024">2024</option>
           <option value="2023">2023</option>
         </select>
-        <select id="curSel" aria-label="货币单位" title="GDP 显示币种（人民币/美元切换）">
-          <option value="CNY">¥ 人民币</option>
-          <option value="USD">$ 美元</option>
-        </select>
         <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
     <div class="seg" id="metricSeg" role="group" aria-label="选择指标"></div>
   </header>
-  <div id="main">
+  <main id="main">
     <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
     <!-- I5: 缩放已锁死（roam:false），无需恢复视图按钮 -->
     <div id="panel">
@@ -269,13 +273,13 @@
     <div id="banner"></div>
     <div id="fatal"></div>
     <button id="panelFloat" title="展开数据面板" aria-label="展开数据面板">📊 数据面板</button>
-  </div>
+  </main>
   <footer>
     <div class="footer-sources">
       <b>数据来源</b>
       <span>World Bank · 维基 · BEA · 日本内阁府 · Eurostat · DataV</span>
     </div>
-    <div class="footer-note"><span style="opacity:1;color:var(--cyan);">数据更新于 2026-08</span> · GDP 支持人民币/美元切换（逐年平均汇率折算）· <a href="about.html" style="color:var(--cyan);text-decoration:none;">数据来源与口径详见「关于」</a></div>
+    <div class="footer-note"><span style="opacity:1;color:var(--cyan);">数据更新于 2026-08</span> · GDP 统一以美元（USD）计价 · <a href="about.html" style="color:var(--cyan);text-decoration:none;">数据来源与口径详见「关于」</a></div>
   </footer>
 </div>
 
@@ -291,8 +295,13 @@
 <script src="vendor/app-core.js"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script>
+/* 轻量错误收集：仅 console，便于审计/调试（P3） */
+window.addEventListener("error", e=>{ console.error("[atlas]", e.message); });
+window.addEventListener("unhandledrejection", e=>{ console.error("[atlas] reject", e.reason); });
+</script>
+<script>
 /* ============== 数据（公开整理近似值） ============== */
-/* 国家：多年度序列（GDP=World Bank 当期USD$, 人口/面积；另含不变价GDP gdpKd 与 PPP不变价 gdpPpKd 用于真实增长计算），运行时按所选年份取数、GDP 按逐年平均市场汇率(USD/CNY)折算人民币(CNY) */
+/* 国家：多年度序列（GDP=World Bank 当期USD$, 人口/面积；另含不变价GDP gdpKd 与 PPP不变价 gdpPpKd 用于真实增长计算），运行时按所选年份取数；显示币种恒为美元（CNY 源经 gdpApply 折算） */
 
  COUNTRIES.forEach(c=>BY_EN[c[1]]=c);
 /* world.json 边界名 → WB en 名 别名表（ECharts 官方 world.json 用旧名/缩写，此处归一以便地图着色与点击）
@@ -524,11 +533,11 @@ function renderTrendChart(series, fmt){
   tc.on("click",()=>{});
   window.__trendChart=tc;
 }
-/* 国家 GDP 多年序列（人民币元）：取 WB years 里 gdp 存在的年份 */
+/* 国家 GDP 多年序列（源为 World Bank 现价美元；展示经 gdpApply 恒为 USD）：取 WB years 里 gdp 存在的年份 */
 
-/* 中国省 GDP 多年序列（人民币元） */
+/* 中国省 GDP 多年序列（源为人民币元；展示折算 USD） */
 
-/* 美国州 GDP 多年序列（人民币元） */
+/* 美国州 GDP 多年序列（源为美元；展示经 gdpApply 恒为 USD） */
 
 /* 总览层：按当前指标 TOP N 增长对比（条形） */
 function renderTrendCompare(entries, title, fmt){
@@ -604,7 +613,7 @@ function renderDashboard(cfg){
   else { const t=document.getElementById("trend"); t.innerHTML=""; t.style.display="none"; }   // 空则隐藏
   if(typeof saveState==="function") saveState();   // 优化3：面板区域变化保存 URL 状态（lastShown 已由 showXxxPanel 设置）
 }
-/* T1: 货币标签按指标动态（避免「人民币(CNY)」与 USD 人均GDP 矛盾）；返回纯文本由 renderDashboard 统一包 tag */
+/* T1: 货币标签按指标动态（GDP→美元、人均GDP→USD、其余无）；返回纯文本由 renderDashboard 统一包 tag */
 
 
 /* ============== 2D 世界地图（默认，无需 WebGL） ============== */
@@ -799,8 +808,10 @@ function showCityPanel(cityName, adcode, parentAdcode){
   const r=regCity(cm, adcode);
   const yrs=r.years();
   const hasTS = yrs.length >= 2;
-  const gv = r.get("gdp", dataYear);   // 序列城市跟随年份；单年城市返回约2023值
-  const gd = hasTS ? (r.get("gdp", dataYear)/cm.gdp) : null;   // 相对2023的变化
+  const gv = r.get("gdp", dataYear);   // 序列城市跟随年份；单年城市返回约2023值（已折算显示币种）
+  /* vs 2023：同币种比值-1（序列用展示币种，单年用 gdpApply(基准)） */
+  const g23 = gdpApply(cm.gdp, "CNY", 2023);
+  const gd = hasTS && g23 ? (gv/g23 - 1) : null;
   const growth = hasTS ? r.growth("gdp", 2009) : null;
   const baseStats=[
       {label:"GDP"+(hasTS?" ("+dataYear+")":""), value:fmtGDP(gv), delta:hasTS&&gd!=null?{txt:(gd>=0?"+":"")+(gd*100).toFixed(1)+"% vs 2023",dir:gd>=0?"up":"down"}:null},
@@ -843,12 +854,7 @@ async function loadUS(){
     titleText:"最近可得年",
     tooltipFormatter:p=>{ const r=p.data&&p.data.reg;
       if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
-      const yg=regGet(r,"gdp",dataYear);
-      const refTxt = window.CURRENCY==="USD"
-        ? `人民币现价约 ${fmtMoney(usGdpY(p.name,dataYear), "¥")}`
-        : `美元现价约 ${(US_STATES_GDP[p.name].gdpUsdM/1e6).toFixed(2)} 万亿`;
-      return geoTooltipBody(p, usGdpYear(p.name,dataYear))
-        +`<br/><span style="color:#7f93a8">${refTxt}</span>`; }
+      return geoTooltipBody(p, usGdpYear(p.name,dataYear)); }
   });
   setCrumbPath([{label:"世界", level:"world"},{label:"美国", level:"us"}]);
   showGeneric("美国 · 州");   // 总览简介：层级名
@@ -932,11 +938,11 @@ function showProvincePanel(short){
   updateDrillButton();
   const m=CN[short]; if(!m){ showGeneric(short, "省级数据未收录", "该地区未纳入维基省级序列（GDP/人口/面积暂无）。双击可进入下一级视图。"); return; }   // L2: 港澳单击给出提示
   const o = window.CN_TS && window.CN_TS[short];
-  const gd = cnGdpRMB(short, dataYear);
   const gdY = cnGdpYear(short, dataYear);   // 实际采用的年份（稀疏年份诚实标注）
+  const gd = gdpApply(cnGdpRMB(short, dataYear), "CNY", gdY);   // 省人民币基准 → 显示美元
   const pop = (o && o.pop && o.pop["2023"]) ? o.pop["2023"] : m.pop*1e4;
   const area = (o && o.area!=null) ? o.area : m.area;
-  const g25 = (o && o.gdpRMB && o.gdpRMB["2025"]!=null) ? o.gdpRMB["2025"] : null;
+  const g25 = (o && o.gdpRMB && o.gdpRMB["2025"]!=null) ? gdpApply(o.gdpRMB["2025"], "CNY", 2025) : null;
   const rg25 = (o && o.rg25!=null) ? o.rg25 : null;
   const ng = cnNominalGrowth(short, 2000);
   const baseStats=[{label:"GDP ("+gdY+(gdY!==dataYear?" 回退":"")+")", value:fmtGDP(gd!=null?gd:0)}];
@@ -1067,16 +1073,9 @@ function layerGet(){ return LAYERS[currentLevel]||null; }
 /* ============== URL 状态持久化（优化3）：hash 保存/恢复 层级·指标·年份·面板·对比 ==============
    用 history.replaceState 避免历史堆积；saveState 在层级/指标/年份/对比/面板变化时调用，
    restoreState 在 load 时恢复（无 hash 或无效则返回 false 走默认世界视图）。 */
-/* ===== 货币切换（GDP 人民币/美元）：顶层函数，saveState/restoreState 与 load 回调共用 ===== */
-function setCurrency(cur){
-  if(cur!=="USD"&&cur!=="CNY") cur="CNY";
-  window.CURRENCY=cur;
-  const sel=document.getElementById("curSel"); if(sel) sel.value=cur;
-}
 function saveState(){
   try{
     const s={level:currentLevel, metric, year:dataYear};
-    if(window.CURRENCY==="USD") s.cur="usd";   // 货币切换持久化（默认 CNY 不占 URL）
     if(lastShown){
       const ls=lastShown;
       if(ls.type==="country"&&ls.data) s.sel="country:"+ls.data[2];
@@ -1084,6 +1083,7 @@ function saveState(){
       else if(ls.type==="usstate"&&ls.nm) s.sel="usstate:"+ls.nm;
       else if(ls.type==="jppref"&&ls.nm) s.sel="jppref:"+ls.nm;
       else if(ls.type==="nutspref"&&ls.nm) s.sel="nutspref:"+ls.nm;
+      else if(ls.type==="city"&&ls.adcode) s.sel="city:"+ls.adcode+":"+(ls.pa!=null?ls.pa:"");
     }
     const target="#"+new URLSearchParams(s).toString();
     if(location.hash!==target) history.replaceState(null,"",target);
@@ -1092,7 +1092,6 @@ function saveState(){
 async function restoreState(){
   const h=location.hash.slice(1); if(!h) return false;
   const p=new URLSearchParams(h);
-  if(p.get("cur")==="usd") setCurrency("USD");   // 恢复货币（在渲染前，GDP 折算/标签随币种）
   const lvl=p.get("level"), m=p.get("metric"), yr=p.get("year");
   if(m&&METRICS[m]){ metric=m; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===m)); }
   if(yr&&!isNaN(+yr)) dataYear=yr;
@@ -1107,6 +1106,11 @@ async function restoreState(){
     else if(t==="usstate"){ if(US_STATES_GDP[k]) showUSStatePanel(k); }
     else if(t==="jppref"){ if(window.JP_METRICS&&JP_METRICS[k]) showJapanPrefPanel(k); }
     else if(t==="nutspref"){ if(window.EU_METRICS&&EU_METRICS[k]) showNUTSPanel(k); }
+    else if(t==="city"){
+      const kp=k.split(":"); const ac=kp[0], pa=kp[1]?+kp[1]:undefined;
+      const cm=getCityMetric(ac, pa);
+      if(cm) showCityPanel(cm.name||String(ac), String(ac), pa);
+    }
   }
   return true;
 }
@@ -1151,7 +1155,7 @@ function showNUTSPanel(nid){
     metric==="pop"?{label:"人口 (2023)", value:fmtPop(r.get("pop"))}:metric==="area"?{label:"面积", value:fmtArea(r.get("area"))}:null);
   renderDashboard({
     name:r.name, en:euCCName(r.cc)+" · NUTS2", level:"欧盟省级",
-    tags:["来源：Eurostat","GDP 2023 · 欧元折算"+(window.CURRENCY==="USD"?"美元":"人民币")],
+    tags:["来源：Eurostat","GDP 2023 · 欧元折算美元"],
     stats:cards.stats, insight:cards.insight,
   });
   document.getElementById("trend").innerHTML="";
@@ -1209,17 +1213,23 @@ function doSearch(q){
   const c=COUNTRIES.find(x=>x[0].toLowerCase().includes(q)||x[1].toLowerCase().includes(q));
   if(c){
     const d=DRILLABLE[c[2]];
-    if(d) d.load();   // 泛化下钻
-    else { renderWorld2D(); showCountry(c); }   // M4: 第三国先回世界层再显示面板，避免层级错位
+    if(d) d.load();
+    else { renderWorld2D(); showCountry(c); }
     return;
   }
   const pk=Object.keys(CN).find(k=>k.toLowerCase().includes(q)||normProv(k).toLowerCase().includes(q));
-  if(pk){ (currentLevel==="china"?Promise.resolve():loadChina()).then(()=>showProvincePanel(pk)); return; }   // L7: 等 loadChina 完成再显示省面板，避免竞态
-  if(window.US_GEO){
+  if(pk){ (currentLevel==="china"?Promise.resolve():loadChina()).then(()=>showProvincePanel(pk)); return; }
+  /* 美国州：不依赖 US_GEO（P1） */
+  if(window.US_STATES_GDP){
     const sk=Object.keys(US_STATES_GDP).find(k=>k.toLowerCase().includes(q));
     if(sk){ if(currentLevel!=="us") loadUS(); setTimeout(()=>showUSStatePanel(sk), currentLevel==="us"?0:700); return; }
   }
-  /* 城市搜索（L5）：CITY_INDEX 离线索引 [城市名, 市adcode, 省adcode, 省名] */
+  /* 日本都道府县 */
+  if(window.JP_METRICS){
+    const jk=Object.keys(JP_METRICS).find(k=>k.toLowerCase().includes(q)||k.includes(q));
+    if(jk){ if(currentLevel!=="japan") loadJapan(); setTimeout(()=>showJapanPrefPanel(jk), currentLevel==="japan"?0:700); return; }
+  }
+  /* 城市（同步索引，先于 EU 异步） */
   if(window.CITY_INDEX){
     const qq = q.replace(/(市|地区|自治州|盟)$/, "");
     const hit = window.CITY_INDEX.find(x => x[0].includes(q) || x[0].replace(/(市|地区|自治州|盟)$/,"").includes(qq) || qq.includes(x[0].replace(/(市|地区|自治州|盟)$/,"")));
@@ -1229,7 +1239,17 @@ function doSearch(q){
       return;
     }
   }
-  showBanner("未找到匹配：「"+q+"」");
+  /* 欧盟：已载同步匹配；未载则加载后再试（最终未找到才提示） */
+  const tryEU=()=>{
+    if(!window.EU_METRICS){ showBanner("未找到匹配：「"+q+"」"); return; }
+    const nk=Object.keys(EU_METRICS).find(k=>(EU_METRICS[k].name||"").toLowerCase().includes(q)||k.toLowerCase().includes(q));
+    if(!nk){ showBanner("未找到匹配：「"+q+"」"); return; }
+    const cc=EU_METRICS[nk].cc;
+    if(currentLevel!=="nuts"||currentNUTS!==cc) loadNUTS(cc).then(()=>setTimeout(()=>showNUTSPanel(nk),80));
+    else showNUTSPanel(nk);
+  };
+  if(window.EU_METRICS){ tryEU(); return; }
+  loadScript("vendor/eu/eu_metrics.js").then(tryEU).catch(()=>showBanner("未找到匹配：「"+q+"」"));
 }
 
 /* ============== 对比模式（Phase D 补齐） ============== */
@@ -1346,21 +1366,22 @@ window.addEventListener("load", ()=>{
     redrawByYear();
     saveState();   // 优化3：年份变化保存 URL 状态
   });
-  /* 货币切换事件：只影响 GDP 显示（格式化/折算），人口面积等无量纲不受影响 */
-  document.getElementById("curSel").addEventListener("change", e=>{
-    setCurrency(e.target.value);
-    const L=layerGet(); if(L){ L.render(); L.restore(); }   // 重绘当前层 + 恢复面板（GDP 数值/标签随币种更新）
-    renderRank();
-    saveState();
-  });
   document.getElementById("backBtn").addEventListener("click", ()=>{
     // 统一返回逻辑（L6/I2）：逐级返回 + 面包屑一致（走 LAYERS.back）
     const L=layerGet();
     if(L) goLevel(L.back);
     else goLevel("world");
   });
-  /* ESC 键返回上一级 */
-  window.addEventListener("keydown", e=>{ if(e.key==="Escape" && !(e.target&&e.target.tagName==="INPUT")){ document.getElementById("backBtn").click(); } });   // L4: 搜索框聚焦时 ESC 不触发返回
+  /* ESC 键返回上一级；表单控件（INPUT/SELECT/TEXTAREA/contenteditable）上不触发（P2） */
+  window.addEventListener("keydown", e=>{
+    if(e.key!=="Escape") return;
+    const t=e.target;
+    if(t){
+      const tag=(t.tagName||"").toUpperCase();
+      if(tag==="INPUT"||tag==="SELECT"||tag==="TEXTAREA"||t.isContentEditable) return;
+    }
+    document.getElementById("backBtn").click();
+  });
   const searchEl=document.getElementById("search");
   searchEl.addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(e.target.value); });
   searchEl.addEventListener("blur", e=>{ /* 不搜索：避免点击地图/排行时误触发跳转（M10 修复） */ });
