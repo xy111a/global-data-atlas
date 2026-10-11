@@ -215,10 +215,22 @@ src_eu = open('vendor/eu/eu_metrics.js', encoding='utf-8').read()
 m_eu = re.search(r'window\.EU_METRICS=(\{.*\})', src_eu, re.S)
 EU_M = json.loads(m_eu.group(1)) if m_eu else {}
 check("覆盖[欧盟NUTS2区域]", 230 <= len(EU_M) <= 260, f"{len(EU_M)} 区域")
-eu_gdp_ok = all(v['gdp'] is None or 0 < v['gdp'] < 2e13 for v in EU_M.values())   # GDP 0~2万亿 元（部分区域 Eurostat 缺 GDP=null）
+def eu_latest(d, key):
+    v = d.get(key)
+    if v is None: return None
+    if isinstance(v, dict):   # 新格式：{年: 值} → 取最新年
+        y = d.get('year')
+        if y is not None and str(y) in v and v[str(y)] is not None: return v[str(y)]
+        for x in v.values():
+            if x is not None: return x
+        return None
+    return v
+eu_gdp_ok = all(eu_latest(v,'gdp') is None or 0 < eu_latest(v,'gdp') < 2e13 for v in EU_M.values())   # GDP 0~2万亿 元（部分区域 Eurostat 缺 GDP=null）
 check("量级[欧盟NUTS2 GDP]", eu_gdp_ok, "")
-eu_pop_ok = all(1e4 < v['pop'] < 2e7 for v in EU_M.values())  # 人口 1万~2000万
+eu_pop_ok = all(eu_latest(v,'pop') is None or 1e4 < eu_latest(v,'pop') < 2e7 for v in EU_M.values())  # 人口 1万~2000万
 check("量级[欧盟NUTS2 人口]", eu_pop_ok, "")
+eu_ts_count = sum(1 for v in EU_M.values() if isinstance(v.get('gdp'), dict) and len([x for x in v['gdp'].values() if x is not None]) >= 2)
+print(f"  ℹ 欧盟 NUTS2 多年 GDP 序列覆盖: {eu_ts_count}/{len(EU_M)} 区域")
 # 边界 NUTS_ID 与指标键一致性（抽查 DE 与新国家 EL）
 for cc in ("DE", "EL"):
     src_geo = open(f'vendor/eu/{cc.lower()}.js', encoding='utf-8').read()

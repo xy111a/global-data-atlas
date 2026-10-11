@@ -481,12 +481,48 @@ function regJapanPref(nm){
 function regNUTS(nid){
   if(__regCache.nuts[nid]) return __regCache.nuts[nid];
   const d=window.EU_METRICS&&window.EU_METRICS[nid]; if(!d) return null;
+  const gdpObj = (d.gdp && typeof d.gdp==="object") ? d.gdp : null;   // 新格式：{年:元}；旧格式：数字
+  const popObj = (d.pop && typeof d.pop==="object") ? d.pop : null;
+  const yl = gdpObj ? Object.keys(gdpObj).map(Number).sort((a,b)=>a-b)
+                     : (d.year!=null ? [d.year] : []);
   const r={
     name:d.name, cn:d.name, cc:d.cc,
-    years:()=>[d.year],   // 单年快照
+    years:()=>yl,
     ext(){ return null; },
-    get(m){ return m==="gdp"?gdpApply(d.gdp,"CNY",d.year):m==="pop"?d.pop:(m==="area"?d.area:null); },
-    growth(){ return null; }, gdpSeries(){ return null; }, series(){ return null; }
+    get(m, year){
+      year = (year==null)?dataYear:+year;
+      if(m==="gdp"){
+        if(gdpObj){
+          if(gdpObj[year]!=null) return gdpApply(gdpObj[year],"CNY",year);
+          const avail=Object.keys(gdpObj).map(Number).filter(y=>gdpObj[y]!=null).sort((a,b)=>a-b);
+          if(avail.length){ const ny=nearestByDist(avail,+year); return gdpApply(gdpObj[ny],"CNY",ny); }
+        }
+        if(typeof d.gdp==="number") return gdpApply(d.gdp,"CNY",d.year||year);   // 旧格式兜底
+        return null;
+      }
+      if(m==="pop"){
+        if(popObj){
+          if(popObj[year]!=null) return popObj[year];
+          const avail=Object.keys(popObj).map(Number).filter(y=>popObj[y]!=null).sort((a,b)=>a-b);
+          if(avail.length) return popObj[nearestByDist(avail,+year)];
+        }
+        if(typeof d.pop==="number") return d.pop;
+        return null;
+      }
+      if(m==="area") return d.area;
+      return null;
+    },
+    growth(m, base){
+      if(m!=="gdp"||!gdpObj||yl.length<2) return null;
+      const b = (base==null)?yl[0]:+base;
+      const lo=yl[0], hi=yl[yl.length-1];
+      const bv = gdpObj[b]!=null ? gdpObj[b] : (b<lo?gdpObj[lo]:gdpObj[hi]);
+      if(bv==null) return null;
+      return (gdpObj[hi]-bv)/bv;
+    },
+    gdpSeries(){ if(!gdpObj) return null;
+      return {name:d.name, years:yl, values:yl.map(y=>gdpApply(gdpObj[y],"CNY",y))}; },
+    series(m){ return m==="gdp"?this.gdpSeries():null; }
   };
   __regCache.nuts[nid]=r; return r;
 }

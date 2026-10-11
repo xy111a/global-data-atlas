@@ -73,6 +73,8 @@
     <input id="addInputTop" placeholder="搜索添加区域（国家/省/州/县/城市）…" aria-label="搜索添加对比区域" />
     <div class="seg" id="metricSeg"></div>
     <select id="yearSel" aria-label="选择年份"></select>
+    <button class="btn" id="btnCsv" type="button" title="导出当前对比（CSV）">⬇ CSV</button>
+    <button class="btn" id="btnJson" type="button" title="导出当前对比（JSON）">⬇ JSON</button>
     <a class="btn" href="index.html">← 返回地图</a>
   </header>
   <div id="main">
@@ -144,6 +146,45 @@ function seriesFor(it){
   const r = regFor(it);
   if(!r||!r.series) return null;
   try{ return r.series(metric); }catch(e){ return null; }
+}
+
+/* ---------- 导出（B5）：当前对比 → CSV / JSON ---------- */
+function csvCell(s){ return /[",\n\r]/.test(s) ? '"'+String(s).replace(/"/g,'""')+'"' : String(s); }
+function downloadBlob(blob, fn){
+  const u=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=u; a.download=fn; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u), 1500);
+}
+function exportCompare(fmt){
+  if(!cmpList.length){ alert("请先在左侧添加至少一个对比区域"); return; }
+  const unit = (typeof currencyTag==="function" && currencyTag(metric)) || "—";
+  const rows = cmpList.map(it=>{
+    const r = regFor(it);
+    const s = (r&&r.series) ? r.series(metric) : null;
+    const yrs = (s&&s.years) ? s.years.slice() : [];
+    const ser = {};
+    if(yrs.length){ s.years.forEach((y,i)=>{ ser[y]=s.values[i]; }); }
+    const cur = (r&&r.get) ? r.get(metric, +dataYear) : null;
+    return { name:it.name, type:it.t, metric, year:+dataYear, current:cur, series:ser, years:yrs };
+  });
+  if(fmt==="json"){
+    const payload = { metric, unit, year:+dataYear, exportedAt:new Date().toISOString(), count:rows.length, regions:rows };
+    downloadBlob(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),
+                 `atlas-compare-${metric}-${dataYear}.json`);
+  } else {
+    const allYears = [...new Set(rows.flatMap(r=>r.years))].sort((a,b)=>a-b);
+    let csv = "区域,层级,指标,单位,"+dataYear+"年值";
+    allYears.forEach(y=> csv += ","+y);
+    csv += "\n";
+    rows.forEach(r=>{
+      const cur = (r.current==null)?"":r.current;
+      let line = [csvCell(r.name), csvCell(r.type), csvCell(r.metric), csvCell(unit), csvCell(cur)].join(",");
+      allYears.forEach(y=>{ const v = r.series[y]; line += ","+(v==null?"":v); });
+      csv += line + "\n";
+    });
+    downloadBlob(new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}),
+                 `atlas-compare-${metric}-${dataYear}.csv`);
+  }
 }
 
 /* ---------- 层级单元选择（按层级浏览添加对比单元） ---------- */
@@ -329,6 +370,8 @@ function initYear(){
 
 window.addEventListener("load",()=>{
   initMetrics(); initYear();
+  document.getElementById("btnCsv").addEventListener("click",()=>exportCompare("csv"));
+  document.getElementById("btnJson").addEventListener("click",()=>exportCompare("json"));
   parseAddParam();
   renderList(); renderChart(); renderUnitList();
   document.getElementById("levelSel").addEventListener("change",()=>{ renderUnitList(); });
