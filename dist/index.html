@@ -85,6 +85,24 @@
   .btn:hover{color:var(--text);border-color:var(--line-bright);background:var(--hover);}
   .btn:active{background:var(--pressed);transform:translateY(.5px);}
   .btn.active{color:var(--cyan);border-color:var(--line-bright);background:var(--hover-strong);box-shadow:var(--glow-sm);}  /* S2: 对比模式开启反馈 */
+  /* ══ sn-drop 兄弟站下拉（统一导航，零 JS，变量映射到本站深色令牌） ══ */
+  .sn-drop{position:relative;flex-shrink:0;}
+  .sn-drop>summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--muted);
+    padding:8px 12px;border:1px solid var(--line);border-radius:8px;white-space:nowrap;}
+  .sn-drop>summary::-webkit-details-marker{display:none;}
+  .sn-drop>summary::after{content:"";display:inline-block;width:7px;height:7px;margin-left:7px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:rotate(45deg) translateY(-2px);}
+  .sn-drop[open]>summary{color:var(--text);border-color:var(--line-bright);background:var(--hover);}
+  .sn-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:220px;z-index:40;
+    background:var(--panel-float);border:1px solid var(--line);border-radius:8px;padding:6px;}
+  .sn-menu a{display:flex;align-items:baseline;gap:10px;padding:8px 10px;
+    border-radius:6px;font-size:13px;text-decoration:none;color:inherit;}
+  .sn-menu a:hover{background:var(--hover-strong);}
+  .sn-menu .name{font-weight:500;color:var(--text);}
+  .sn-menu .desc{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);}
+  .sn-menu .badge{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted);
+    border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:auto;}
   #search{background:var(--panel);border:1px solid var(--line);color:var(--text);
     padding:8px 12px;border-radius:var(--r-md);font-size:13px;width:200px;outline:none;caret-color:var(--cyan);
     transition:border-color var(--t-fast),box-shadow var(--t-med),background var(--t-fast);}
@@ -242,6 +260,7 @@
         <h1 class="breadcrumb" id="crumb" style="margin:0;font-size:inherit;font-weight:inherit;">世界</h1>
       </div>
       <div class="tb-actions">
+        <details class="sn-drop"><summary>兄弟站</summary><div class="sn-menu" role="menu"><a href="https://intel.huajun.wang" role="menuitem"><span class="name">intel</span><span class="desc">每日情报</span></a><a href="https://research.huajun.wang" role="menuitem"><span class="name">research</span><span class="desc">品类看板</span></a><a href="https://gtm.huajun.wang" role="menuitem"><span class="name">gtm</span><span class="desc">GTM 知识库</span></a><a href="https://huajun.wang" role="menuitem"><span class="name">home</span><span class="desc">门户</span><span class="badge">独立</span></a></div></details>
         <input id="search" placeholder="搜索国家 / 省份 / 城市…" aria-label="搜索国家、省份或城市" />
         <select id="yearSel" aria-label="选择年份">
           <option value="2025" selected>2025</option>
