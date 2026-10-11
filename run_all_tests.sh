@@ -85,5 +85,13 @@ step "L3l 排行模式切换（rank_growth_test，T6）"
 "$PY" tests/rank_growth_test.py > /tmp/rankg.log 2>&1 && tail -3 /tmp/rankg.log || { echo "  ✗ 排行模式切换失败:"; tail -12 /tmp/rankg.log; exit 1; }
 echo "  ✓ L3l 通过"; PASS=$((PASS+1))
 
+step "L3m 配色刻度切换（color_scale_test，T7）"
+"$PY" tests/color_scale_test.py > /tmp/cscale.log 2>&1 && tail -3 /tmp/cscale.log || { echo "  ✗ 配色刻度失败:"; tail -12 /tmp/cscale.log; exit 1; }
+echo "  ✓ L3m 通过"; PASS=$((PASS+1))
+
+step "L3n 数据新鲜度标注（freshness_test，T8）"
+"$PY" tests/freshness_test.py > /tmp/fresh.log 2>&1 && tail -3 /tmp/fresh.log || { echo "  ✗ 新鲜度标注失败:"; tail -12 /tmp/fresh.log; exit 1; }
+echo "  ✓ L3n 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

@@ -278,6 +278,7 @@
         </select>
         <button class="btn" id="playBtn" aria-label="播放年份动画" title="逐年自动播放（再次点击暂停）">▶ 播放</button>
         <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
+        <button class="btn" id="scaleBtn" aria-label="切换配色刻度（线性/对数）" title="配色刻度：线性 ↔ 对数（GDP 等长尾分布建议用对数）">🎨 线性</button>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
@@ -308,7 +309,7 @@
       <b>数据来源</b>
       <span>World Bank · 维基 · BEA · 日本内阁府 · Eurostat · DataV</span>
     </div>
-    <div class="footer-note"><span id="dataBuilt" style="opacity:1;color:var(--cyan);">数据更新于 2026-08</span> · GDP 统一以美元（USD）计价 · 颜色按数值线性映射（部分区域为最近可得年）· <a href="about.html" style="color:var(--cyan);text-decoration:none;">数据来源与口径详见「关于」</a></div>
+    <div class="footer-note"><span id="dataBuilt" style="opacity:1;color:var(--cyan);">数据更新于 2026-08</span> · GDP 统一以美元（USD）计价 · 颜色刻度：<span id="scaleNote">线性映射</span>（部分区域为最近可得年）· <a href="about.html" style="color:var(--cyan);text-decoration:none;">数据来源与口径详见「关于」</a></div>
   </footer>
 </div>
 
@@ -413,7 +414,20 @@ PROV_ADCODE["香港"]=810000; PROV_ADCODE["澳门"]=820000;
 
 
 /* ============== 工具 ============== */
-let chart, currentLevel="world", metric="gdp", worldGeo=null, dataYear="2025", rankMode="value";
+let chart, currentLevel="world", metric="gdp", worldGeo=null, dataYear="2025", rankMode="value", colorScale="linear";
+/* T7 配色刻度：linear=按数值线性映射；log=按数量级对数映射（长尾分布如 GDP 更均衡）。
+   返回 {data,min,max,fmtv,note}：log 模式下 data.value 被替换为 log10，tooltip 走 reg 取真实值不受影响。 */
+function buildColorScale(data){
+  const vals = data.map(d=>d.value).filter(v=>v>0);
+  if(!vals.length) return {data, min:0, max:0, fmtv:v=>metricFmt(metric,v), note:"", on:false};
+  const lo0=Math.min(...vals), hi0=Math.max(...vals);
+  if(colorScale==="log" && lo0>0 && hi0>lo0){        // 退化区间（全等值/含 0）自动回落线性
+    const lo=Math.log10(lo0), hi=Math.log10(hi0);
+    return {data:data.map(d=>(d.value>0)?Object.assign({},d,{value:Math.log10(d.value)}):Object.assign({},d,{value:null})),
+            min:lo, max:hi, fmtv:v=>metricFmt(metric,Math.pow(10,v)), note:" · 对数刻度", on:true};
+  }
+  return {data, min:lo0, max:hi0, fmtv:v=>metricFmt(metric,v), note:"", on:false};
+}
 /* 增长排行基准年：取「当前年 − 5」且不低于 2000（统一窗口，跨区域可比） */
 function rankBaseYear(){ return Math.max(2000, (+dataYear||2025) - 5); }
 /* 取某区域在指定模式下的排行值：value→当前年数值；growth→较 rankBaseYear 的名义增长 */
@@ -675,8 +689,9 @@ function renderWorld2D(){
     const v = reg ? regGet(reg, metric, dataYear) : null;
     return {name:nm, value:v, cn:c, reg};
   });
+  const cs=buildColorScale(data);            // T7：线性 / 对数刻度
   const vals=data.map(d=>d.value).filter(v=>v>0);
-  const min=vals.length?Math.min(...vals):0, max=vals.length?Math.max(...vals):0;
+  const min=cs.min, max=cs.max;
   const F=(m,v)=>metricFmt(m,v);
   chart.clear();
   chart.setOption({
@@ -685,10 +700,11 @@ function renderWorld2D(){
       const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=reg.growth(metric,2000);
       const grFmt = metric==="gdp" ? ("较2000年实际增长 <b style=\"color:"+((gr||0)>=0?'#00F0FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
         : (`较2000年${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
-      return `<b>${c[0]}</b> ${c[1]} · ${cYear(c[2])}<br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>${grFmt}`;}},
-    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年",inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
-      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:v=>F(metric,v)}:{show:false},
-    series:[{type:"map",map:"world",roam:false,data,
+      const cy=cYear(c[2]); const cyTag=(String(cy)===String(dataYear))?String(cy):("≈"+cy);   // T8：回退年显式标记
+      return `<b>${c[0]}</b> ${c[1]} · <span style="color:#7f93a8" title="该数值的实际数据年份（≈ 表示最近可得年）">${cyTag}</span><br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>${grFmt}`;}},
+    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年"+cs.note,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+      textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:cs.fmtv}:{show:false},
+    series:[{type:"map",map:"world",roam:false,data:cs.data,
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
   setCrumbPath([{label:"世界", level:"world"}]);
@@ -706,7 +722,9 @@ function renderWorld2D(){
 function geoTooltipBody(p, yearText){
   const r = p.data && p.data.reg;
   if(!r) return `<b>${p.name}</b><br/><span style="color:#7f93a8">暂无细分指标</span>`;
-  return `<b>${p.name}</b> · ${yearText}<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;
+  const gy=freshnessTag(r,"gdp",dataYear) || yearText;   // T8：实际采用年份（回退年标记 ≈）
+  return `<b>${p.name}</b> · <span style="color:#7f93a8" title="该数值的实际数据年份（≈ 表示最近可得年）">${esc(gy)}</span>`
+    +`<br/>GDP ${fmtGDP(regGet(r,"gdp",dataYear))}<br/>人口 ${fmtPop(regGet(r,"pop",dataYear))}<br/>面积 ${fmtArea(regGet(r,"area",dataYear))}`;
 }
 /* 城市级 tooltip：城市用 cm（非 reg 接口），GDP 走 regGet / 单年 cm.gdp 兜底 */
 function cityTooltipBody(p){
@@ -718,9 +736,31 @@ function cityTooltipBody(p){
   return `<b>${d.name}</b><br/>GDP${r&&r.years().length?" ("+dataYear+")":""} ${fmtGDP(gv)}<br/>人口 ${fmtPop(cm.pop)}<br/>面积 ${cm.area?fmtArea(cm.area):"暂无"}`;
 }
 /* 统一地图渲染骨架：backgroundColor + tooltip + visualMap + series（差异仅在 mapName / data / title / tooltip） */
+/* T8 数据新鲜度标注：返回该区域某指标「实际采用年份」的角标。
+   与请求年一致 → "2024"；回退/近似（如请求2025但最新只有2024）→ "≈2024"，诚实暴露口径年份。 */
+function resolveYear(reg, m, year){
+  try{
+    if(!reg || typeof reg.years!=="function") return null;
+    const ys=reg.years(); if(!ys || !ys.length) return null;
+    const y=+year;
+    if(ys.indexOf(y)>=0) return String(y);                     // 命中请求年
+    const avail=ys.filter(x=>{ try{ return reg.get(m,x)!=null; }catch(e){ return false; } })
+                  .sort((a,b)=>a-b);
+    if(!avail.length) return null;
+    let best=avail[0], bd=Math.abs(avail[0]-y);
+    for(const x of avail){ const d=Math.abs(x-y); if(d<bd){ bd=d; best=x; } }
+    return String(best);
+  }catch(e){ return null; }
+}
+function freshnessTag(reg, m, year){
+  const y=resolveYear(reg, m, year);
+  if(y==null) return null;
+  return (String(y)===String(year)) ? String(y) : ("≈"+y);
+}
 function paintGeoMap(mapName, data, opts){
+  const cs = buildColorScale(data);            // T7：线性 / 对数刻度
   const vals = data.map(d=>d.value).filter(v=>v>0);
-  const min = vals.length?Math.min(...vals):0, max = vals.length?Math.max(...vals):0;
+  const min = cs.min, max = cs.max;
   const itemStyle = opts.itemStyle || {areaColor:"#0c2a3a",borderColor:"#1d5a72"};
   chart.clear();
   chart.setOption({
@@ -728,11 +768,11 @@ function paintGeoMap(mapName, data, opts){
     tooltip:{trigger:"item", formatter:opts.tooltipFormatter},
     visualMap: vals.length ? {
       min,max,left:20,bottom:30,calculable:true,
-      title: metricLabel(metric)+" · "+opts.titleText,
+      title: metricLabel(metric)+" · "+opts.titleText+cs.note,
       inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
-      textStyle:{color:"#9fb3c8"}, text:["高","低"], formatter:v=>metricFmt(metric,v)
+      textStyle:{color:"#9fb3c8"}, text:["高","低"], formatter:cs.fmtv
     } : {show:false},
-    series:[{type:"map", map:mapName, roam:false, data, label:{show:false},
+    series:[{type:"map", map:mapName, roam:false, data:cs.data, label:{show:false},
       itemStyle, emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
   });
 }
@@ -1379,6 +1419,19 @@ window.addEventListener("load", ()=>{
   document.getElementById("panelFold").addEventListener("click", ()=>togglePanel());
   document.getElementById("panelFloat").addEventListener("click", ()=>togglePanel(false));
   document.getElementById("drillBtn").addEventListener("click", ()=>drillCurrent());   // 移动端下钻按钮
+
+  /* T7 配色刻度切换：线性 ↔ 对数（世界层长尾 GDP 用对数更均衡）；切换后按当前层重绘 */
+  document.getElementById("scaleBtn").addEventListener("click", ()=>{
+    colorScale = (colorScale==="linear") ? "log" : "linear";
+    const b=document.getElementById("scaleBtn"), isLog=(colorScale==="log");
+    b.textContent = isLog ? "🎨 对数" : "🎨 线性";
+    b.title = isLog ? "当前：对数刻度（点击切回线性）" : "当前：线性刻度（点击切对数，长尾分布更均衡）";
+    b.setAttribute("aria-label", "切换配色刻度（当前" + (isLog?"对数":"线性") + "）");
+    const sn=document.getElementById("scaleNote"); if(sn) sn.textContent = isLog ? "对数刻度" : "线性映射";
+    const L=layerGet(); if(L){ L.render(); L.restore(); }
+    renderRank();
+    saveState && saveState();
+  });
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){
