@@ -228,6 +228,14 @@
   #rank{margin-top:4px;}   /* 排行已折叠为 details.fold（滚动交给 .rank-wrap） */
   .trend-scroll{max-height:360px;overflow-y:auto;}   /* 与 #rank 一致：容器 CSS 滚动，滚轮直接滚（默认显示头部） */
   .rank-title{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px;font-weight:600;}
+  /* 排行模式切换（T6）：数值 ↔ 增长 */
+  .rank-toggle{display:flex;gap:6px;margin:8px 0 2px;}
+  .rank-toggle button{flex:1;padding:5px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;
+    background:transparent;border:1px solid var(--line);color:var(--muted);font-family:inherit;
+    transition:border-color var(--t-fast),color var(--t-fast),background var(--t-fast);}
+  .rank-toggle button:hover{color:var(--text);border-color:var(--cyan);}
+  .rank-toggle button.on{color:var(--cyan);border-color:var(--cyan);background:var(--hover);font-weight:600;}
+  .rank-toggle button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px;}
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
     cursor:pointer;font-size:13px;transition:background var(--t-fast);}
   .rank-item:hover{background:var(--hover);}
@@ -405,7 +413,14 @@ PROV_ADCODE["香港"]=810000; PROV_ADCODE["澳门"]=820000;
 
 
 /* ============== 工具 ============== */
-let chart, currentLevel="world", metric="gdp", worldGeo=null, dataYear="2025";
+let chart, currentLevel="world", metric="gdp", worldGeo=null, dataYear="2025", rankMode="value";
+/* 增长排行基准年：取「当前年 − 5」且不低于 2000（统一窗口，跨区域可比） */
+function rankBaseYear(){ return Math.max(2000, (+dataYear||2025) - 5); }
+/* 取某区域在指定模式下的排行值：value→当前年数值；growth→较 rankBaseYear 的名义增长 */
+function rankVal(reg, mode){
+  if(mode==="growth"){ const g = reg && reg.growth ? reg.growth(metric, rankBaseYear()) : null; return (g!=null && isFinite(g)) ? g : null; }
+  return reg ? regGet(reg, metric, dataYear) : null;
+}
 let currentProvName="", currentProvAdcode="", currentProvData=[];
 
 
@@ -1047,7 +1062,7 @@ const LAYERS = {
       const d=DRILLABLE[c[2]];
       if(d) d.load();
       else showGeneric(c[0]+" · 国家","暂无下钻数据","该国家未提供省级行政区划下钻（当前支持 中国/美国/日本/欧盟27国）。单击查看国家详情，或返回世界选择其他区域。"); },
-    rank:()=>COUNTRIES.map(c=>{ const r=regCountry(c[2]); return [c[0],c[1],r?regGet(r,metric,dataYear):null,"country"]; }).filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
+    rank:(mode)=>COUNTRIES.map(c=>{ const r=regCountry(c[2]); return [c[0],c[1],rankVal(r,mode),"country"]; }).filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
     restore(){ if(lastShown&&lastShown.type==="country") showCountry(lastShown.data); }
   },
   china: {
@@ -1055,8 +1070,8 @@ const LAYERS = {
     render:()=>loadChina(),
     click(p){ const nm=normProv(p.name); if(PROV_ADCODE[nm]) showProvincePanel(nm); },
     drill(p){ const nm=normProv(p.name); const adcode=PROV_ADCODE[nm]; if(adcode) loadProvince(nm, adcode); },
-    rank:()=>{ const MUNI=["上海","北京","天津","重庆"];   // 直辖市不加"省"
-      return Object.keys(CN).map(k=>{ const r=regProv(k), v=regGet(r,metric,dataYear); return [MUNI.includes(k)?k:k+"省",k,v,"prov"]; })
+    rank:(mode)=>{ const MUNI=["上海","北京","天津","重庆"];   // 直辖市不加"省"
+      return Object.keys(CN).map(k=>{ const r=regProv(k); return [MUNI.includes(k)?k:k+"省",k,rankVal(r,mode),"prov"]; })
         .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]); },
     restore(){ if(lastShown&&lastShown.type==="prov") showProvincePanel(lastShown.short); }
   },
@@ -1065,8 +1080,8 @@ const LAYERS = {
     render:()=>{ if(currentProvName&&currentProvAdcode) loadProvince(currentProvName, currentProvAdcode); else loadChina(); },   // 无省级上下文时回退中国层（与旧分支一致）
     click(p){ const d=p.data; if(d&&d.cm) showCityPanel(d.name, d.adcode, d.parentAdcode); },
     drill:null,
-    rank:()=>currentProvData.filter(d=>d.cm)
-      .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); const v=regGet(r,metric,dataYear); return [d.name, d.name, v, "city", d.adcode, d.parentAdcode]; })
+    rank:(mode)=>currentProvData.filter(d=>d.cm)
+      .map(d=>{ const cm=d.cm; const r=regCity(cm, d.adcode); return [d.name, d.name, rankVal(r,mode), "city", d.adcode, d.parentAdcode]; })
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),   // L1: null 过滤（与其余分支一致）
     restore(){ if(lastShown&&lastShown.type==="city") showCityPanel(lastShown.name, lastShown.adcode, lastShown.pa); }
   },
@@ -1075,7 +1090,7 @@ const LAYERS = {
     render:()=>loadUS(),
     click(p){ showUSStatePanel(p.name); },
     drill:null,
-    rank:()=>Object.keys(US_STATES_GDP).map(k=>{ const r=regUSState(k); return [k,k,regGet(r,metric,dataYear),"usstate"]; })
+    rank:(mode)=>Object.keys(US_STATES_GDP).map(k=>{ const r=regUSState(k); return [k,k,rankVal(r,mode),"usstate"]; })
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
     restore(){ if(lastShown&&lastShown.type==="usstate") showUSStatePanel(lastShown.nm); }
   },
@@ -1084,7 +1099,7 @@ const LAYERS = {
     render:()=>loadJapan(),
     click(p){ showJapanPrefPanel(p.name); },
     drill:null,
-    rank:()=>Object.keys(window.JP_METRICS||{}).map(k=>{ const r=regJapanPref(k); return [k,k,regGet(r,metric,dataYear),"jppref"]; })
+    rank:(mode)=>Object.keys(window.JP_METRICS||{}).map(k=>{ const r=regJapanPref(k); return [k,k,rankVal(r,mode),"jppref"]; })
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),
     restore(){ if(lastShown&&lastShown.type==="jppref") showJapanPrefPanel(lastShown.nm); }
   },
@@ -1093,8 +1108,8 @@ const LAYERS = {
     render:()=>loadNUTS(currentNUTS||"DE"),
     click(p){ const d=p.data; if(d&&d.nid) showNUTSPanel(d.nid); },
     drill:null,
-    rank:()=>Object.keys(window.EU_METRICS||{}).filter(k=>(window.EU_METRICS[k]||{}).cc===currentNUTS)
-      .map(k=>{ const r=regNUTS(k); const v=r?regGet(r,metric,dataYear):null; return [r?r.name:k,k,v,"nutspref"]; })
+    rank:(mode)=>Object.keys(window.EU_METRICS||{}).filter(k=>(window.EU_METRICS[k]||{}).cc===currentNUTS)
+      .map(k=>{ const r=regNUTS(k); return [r?r.name:k,k,rankVal(r,mode),"nutspref"]; })
       .filter(it=>it[2]!=null).sort((a,b)=>b[2]-a[2]),   // NUTS2 排行（当前国家）
     restore(){ if(lastShown&&lastShown.type==="nutspref") showNUTSPanel(lastShown.nm); }
   }
@@ -1218,11 +1233,19 @@ function renderRank(){
   const box=document.getElementById("rank");
   let items=[], unit=metricLabel(metric);
   const L=layerGet();
-  if(L&&L.rank){ items=L.rank(); }
+  if(L&&L.rank){ items=L.rank(rankMode); }
   else { box.innerHTML=""; return; }
   if(!items.length){ box.innerHTML=""; return; }
-  const fmt=v=> metricFmt(metric,v);
-  box.innerHTML=`<details class="fold" open><summary>排行 · ${esc(unit)} · ${dataYear}</summary><div class="rank-wrap">`+items.map((it,i)=>
+  /* 增长模式：值为比率 → 按百分比格式化；数值模式 → 按指标自身口径 */
+  const fmt=v=> rankMode==="growth" ? fmtGrowth(v) : metricFmt(metric,v);
+  /* 诚实性：reg.growth 走的是名义(现价)序列，标题显式标注「名义增长」，避免被误读为实测实际增长 */
+  const head = rankMode==="growth" ? `排行 · ${esc(unit)} · 名义增长 ${rankBaseYear()}→${dataYear}` : `排行 · ${esc(unit)} · ${dataYear}`;
+  box.innerHTML=`<details class="fold" open><summary>${head}</summary>`
+    +`<div class="rank-toggle" role="group" aria-label="排行模式切换">`
+      +`<button type="button" data-mode="value" class="${rankMode==="value"?"on":""}" aria-pressed="${rankMode==="value"}">数值 ${dataYear}</button>`
+      +`<button type="button" data-mode="growth" class="${rankMode==="growth"?"on":""}" aria-pressed="${rankMode==="growth"}">增长 ${rankBaseYear()}→${dataYear}</button>`
+    +`</div>`
+    +`<div class="rank-wrap">`+items.map((it,i)=>
     `<div class="rank-item" data-type="${it[3]}" data-key="${esc(it[1])}" tabindex="0" role="button" aria-label="${esc(it[0])} ${esc(fmt(it[2]))}">
        <span class="rk">${i+1}</span><span class="rn">${esc(it[0])}</span><span class="rv">${esc(fmt(it[2]))}</span></div>`).join("")+`</div></details>`;
   box.querySelectorAll(".rank-item").forEach(el=>{
@@ -1236,6 +1259,16 @@ function renderRank(){
       else if(t==="nutspref"){ if(currentLevel!=="nuts"){ loadNUTS(currentNUTS||"DE"); setTimeout(()=>showNUTSPanel(k),80); } else showNUTSPanel(k); }
     };
     el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); el.onclick(); } });   // P1b: 键盘可操作排行
+  });
+  /* 排行模式切换：数值 ↔ 增长（切换后原地重渲染，保留折叠状态） */
+  box.querySelectorAll(".rank-toggle button").forEach(b=>{
+    b.onclick=()=>{
+      const m=b.dataset.mode;
+      if(m===rankMode) return;
+      rankMode=m; renderRank();
+      const nb=document.querySelector(".rank-toggle button.on");   // 键盘可用性：焦点跟随选中项
+      if(nb) nb.focus({preventScroll:true});
+    };
   });
 }
 function doSearch(q){

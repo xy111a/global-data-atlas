@@ -1,5 +1,5 @@
 #!/bin/bash
-# 全量测试门禁（L5）：语法 → 数据自洽 → 回归截图 → 对比 → EXT → 深度断言 → 性能 → 视觉回归
+# 全量测试门禁（L5）：语法 → 数据自洽 → 回归截图 → 对比 → EXT → 深度断言 → 性能 → 视觉回归 → 排行模式切换
 # 用法: ./run_all_tests.sh   （任一步失败即退出非 0）
 # 依赖: L3j 视觉回归需要 Pillow + websocket-client（pip install -r tests/requirements.txt）；
 #       本机受管 venv 已装；无 websocket-client 时移动端溢出断言降级跳过（不误报）
@@ -80,6 +80,10 @@ echo "  ✓ L3j 通过"; PASS=$((PASS+1))
 step "L3k 搜索/ESC 回归（search_esc_test）"
 "$PY" tests/search_esc_test.py > /tmp/searchesc.log 2>&1 && tail -3 /tmp/searchesc.log || { echo "  ✗ 搜索/ESC 失败:"; tail -8 /tmp/searchesc.log; exit 1; }
 echo "  ✓ L3k 通过"; PASS=$((PASS+1))
+
+step "L3l 排行模式切换（rank_growth_test，T6）"
+"$PY" tests/rank_growth_test.py > /tmp/rankg.log 2>&1 && tail -3 /tmp/rankg.log || { echo "  ✗ 排行模式切换失败:"; tail -12 /tmp/rankg.log; exit 1; }
+echo "  ✓ L3l 通过"; PASS=$((PASS+1))
 
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"
