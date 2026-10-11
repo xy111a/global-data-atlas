@@ -46,9 +46,16 @@ done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
 # 缓存失效：给 app-core.js 引用注入内容指纹（?v=md5前8位）——JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存
+# 用 python3 做替换，兼容 toybox / macOS(BSD) / GNU sed 差异（toybox sed 无法正确解析 -i '' -E）
 CORE_HASH=$(HASH vendor/app-core.js | cut -c1-8)
 for f in dist/global-data-atlas.html dist/index.html dist/compare.html; do
-  sed -i '' -E "s|src=\"vendor/app-core.js(\\?v=[a-f0-9]+)?\"|src=\"vendor/app-core.js?v=${CORE_HASH}\"|g" "$f"
+  python3 - "$f" "$CORE_HASH" <<'PY'
+import sys, re
+p, h = sys.argv[1], sys.argv[2]
+s = open(p, encoding='utf-8').read()
+s2 = re.sub(r'src="vendor/app-core\.js(\?v=[a-f0-9]+)?"', 'src="vendor/app-core.js?v=' + h + '"', s)
+open(p, 'w', encoding='utf-8').write(s2)
+PY
 done
 echo "  ↻ app-core.js?v=${CORE_HASH}（缓存指纹已注入）"
 
