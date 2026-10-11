@@ -307,19 +307,27 @@
 <script src="vendor/echarts.min.js"></script>
 <script src="vendor/world.js"></script>
 <script src="vendor/jp_metrics.js"></script>
+<script src="vendor/jp_ts.js"></script>
 <script src="vendor/us_states_bea.js"></script>
+<script src="vendor/us_pop_ts.js"></script>
 <script src="vendor/cn/city_metrics.js"></script>
 <script src="vendor/cn/city_index.js"></script>
 <script src="vendor/cn/city_ts.js"></script>
 <script src="vendor/countries_wb.js"></script>
 <script src="vendor/fxrate.js"></script>
 <script src="vendor/meta.js"></script>
-<script src="vendor/app-core.js?v=1a97f4da"></script>
+<script src="vendor/app-core.js?v=e92b9814"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script>
 /* 轻量错误收集：仅 console，便于审计/调试（P3） */
 window.addEventListener("error", e=>{ console.error("[atlas]", e.message); });
 window.addEventListener("unhandledrejection", e=>{ console.error("[atlas] reject", e.reason); });
+</script>
+<script>
+/* PWA：注册 Service Worker（缓存 vendor，回访秒开） */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
 </script>
 <script>
 /* ============== 数据（公开整理近似值） ============== */
