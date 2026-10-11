@@ -116,6 +116,12 @@
 <script src="vendor/eu/eu_metrics.js"></script>
 <script src="vendor/app-core.js"></script>
 <script>
+/* PWA：注册 Service Worker（缓存 vendor，回访秒开） */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+<script>
 /* ============== 独立对比页（compare.html） ==============
    复用 app-core.js（METRICS/reg/cmpGetData/格式化）；本页仅对比 UI 与图表。 */
 let cmpList = [];        // [{t,name,k,pa}]

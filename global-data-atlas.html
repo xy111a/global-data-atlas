@@ -322,6 +322,12 @@ window.addEventListener("error", e=>{ console.error("[atlas]", e.message); });
 window.addEventListener("unhandledrejection", e=>{ console.error("[atlas] reject", e.reason); });
 </script>
 <script>
+/* PWA：注册 Service Worker（缓存 vendor，回访秒开） */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+<script>
 /* ============== 数据（公开整理近似值） ============== */
 /* 国家：多年度序列（GDP=World Bank 当期USD$, 人口/面积；另含不变价GDP gdpKd 与 PPP不变价 gdpPpKd 用于真实增长计算），运行时按所选年份取数；显示币种恒为美元（CNY 源经 gdpApply 折算） */
 
