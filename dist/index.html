@@ -55,10 +55,32 @@
 <script>
 (function(){
   try{
-    window.ATLAS_EMBED = (new URLSearchParams(location.search).get("embed") === "1");
+    var q = new URLSearchParams(location.search);
+    /* 嵌入入口：/embed.html 自动进入嵌入模式（该路径在 _headers 中放开了 frame-ancestors，
+       主站 index.html 仍为 SAMEORIGIN，故跨域嵌入必须走 embed.html）；其余页面沿用 ?embed=1 */
+    /* 同时匹配 /embed.html 与 /embed：Cloudflare Pages 会把 .html 308 重定向到无后缀路径，
+       实际运行时 location.pathname 是 "/embed"（2026-10-12 实测），只判 .html 会漏掉。 */
+    var byPath = /\/(embed\.html|embed)$/.test(location.pathname);
+    window.ATLAS_EMBED = byPath || (q.get("embed") === "1");
     if(window.ATLAS_EMBED) document.documentElement.classList.add("embed");
-  }catch(e){ window.ATLAS_EMBED = false; }
-  /* 向父页同步状态；非嵌入或不在 iframe 中则静默无效 */
+    /* 父页来源白名单：默认仅同源；跨域需在 URL 显式授权
+       ?allowOrigin=https://a.com,https://b.com （或 * 表示任意，不建议） */
+    var ao = q.get("allowOrigin");
+    window.ATLAS_ALLOWED_ORIGINS = ao ? ao.split(",").map(function(x){return x.trim();}).filter(Boolean) : [];
+  }catch(e){ window.ATLAS_EMBED = false; window.ATLAS_ALLOWED_ORIGINS = []; }
+
+  /* 指令来源校验：同源始终允许；跨域须在 ?allowOrigin= 白名单内 */
+  window.atlasOriginAllowed = function(o){
+    if(!o || o === "null") return false;
+    if(o === location.origin) return true;
+    var list = window.ATLAS_ALLOWED_ORIGINS || [];
+    for(var i=0;i<list.length;i++){ if(list[i] === "*" || list[i] === o) return true; }
+    return false;
+  };
+
+  /* 向父页同步状态；非嵌入或不在 iframe 中则静默无效。
+     说明：跨域父页的 origin 在 iframe 内不可读，故广播仍用 "*"；此处仅含视图状态（层级/指标/年份/配色），
+     不含任何用户数据或凭证，且父页本就已能直接看到渲染结果。指令方向另由 atlasOriginAllowed 把关。 */
   window.atlasPost = function(){
     try{
       if(!window.ATLAS_EMBED || window.parent === window) return;
@@ -403,7 +425,7 @@
 <script src="vendor/countries_wb.js"></script>
 <script src="vendor/fxrate.js"></script>
 <script src="vendor/meta.js"></script>
-<script src="vendor/app-core.js?v=e92b9814"></script>
+<script src="vendor/app-core.js?v=a39d23d5"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script>
 /* 轻量错误收集：仅 console，便于审计/调试（P3） */
@@ -1727,6 +1749,12 @@ window.atlasPostSoon=function(delay){ setTimeout(()=>window.atlasPost&&window.at
 window.addEventListener("message", e=>{
   try{
     const d=e.data; if(!d || typeof d!=="object" || d.type!=="atlas:cmd") return;
+    /* 来源校验（默认拒绝跨域）：未授权来源仅回一条错误提示，不执行任何指令 */
+    if(typeof window.atlasOriginAllowed==="function" && !window.atlasOriginAllowed(e.origin)){
+      try{ e.source && e.source.postMessage({type:"atlas:error", reason:"origin-not-allowed",
+           hint:'父页需同源，或在嵌入 URL 加 ?allowOrigin=<你的站点origin>'}, "*"); }catch(_){}
+      return;
+    }
     const cmd=d.cmd||d.action;
     if(cmd==="ping"){ window.atlasPost(); return; }
     if(cmd==="setYear" && d.year!=null){
@@ -1737,8 +1765,12 @@ window.addEventListener("message", e=>{
       return;
     }
     if(cmd==="setMetric" && d.metric){
-      const b=document.querySelector('#metricSeg button[data-m="'+String(d.metric).replace(/["<>]/g,"")+'"]');
-      if(b) b.click();
+      /* 不拼接选择器（避免选择器注入）：遍历按钮比对 data-m */
+      const want=String(d.metric);
+      const btns=document.querySelectorAll('#metricSeg button[data-m]');
+      let hit=null;
+      for(const b of btns){ if(b.getAttribute("data-m")===want){ hit=b; break; } }
+      if(hit) hit.click();
       window.atlasPost(); return;
     }
     if(cmd==="search" && d.q){ doSearch(String(d.q)); window.atlasPostSoon(800); return; }

@@ -5,7 +5,24 @@
   X-Frame-Options: SAMEORIGIN
   Permissions-Policy: geolocation=(), microphone=(), camera=()
   # 宽松 CSP 试点：同源 + DataV 边界 JSON + inline 样式/脚本（单页无打包，需 unsafe-inline）
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+  # 注意：此处刻意不写 frame-ancestors。多条 _headers 规则的同名头会合并下发，浏览器对多个
+  #      CSP 取交集，若这里写了 'self' 就会抵消 /embed 上放开的 frame-ancestors *（2026-10-12 实测）。
+  #      全站默认限制改由下面的 X-Frame-Options: SAMEORIGIN 承担。
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'
+
+# 嵌入专用入口：/embed.html 放开 frame-ancestors，允许被外部站点 iframe 承载。
+# 主站 index.html 仍保持 SAMEORIGIN，跨域嵌入必须走 /embed.html。
+# 依据 CSP 规范：frame-ancestors 存在时浏览器忽略 X-Frame-Options，故此处放开的 CSP 生效，
+# 从而覆盖从 /* 继承来的 X-Frame-Options: SAMEORIGIN。
+# 若要限定来源，把 frame-ancestors * 改为具体域名，如 frame-ancestors https://a.com https://b.com
+/embed.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *
+
+# ⚠️ Cloudflare Pages 会把 /embed.html 308 重定向到 /embed（去 .html 后缀），
+#    最终 200 响应落在 /embed 路径上，因此必须为无后缀路径再写一条规则，
+#    否则放开只会作用在 308 上，实际页面仍是 frame-ancestors 'self'（2026-10-12 实测踩坑）。
+/embed
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *
 
 /robots.txt
   Content-Type: text/plain; charset=utf-8

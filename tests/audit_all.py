@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""全面盘点：各层 总览/单击/双击 的仪表盘块 + 面板残留组件"""
+"""全面盘点：各层 总览/单击/双击 的仪表盘块 + 面板残留组件
+
+⚠️ 性质：**诊断盘点工具，不是断言型回归测试**。
+   它打印各层实际渲染的折叠块与面板残留组件，供人工比对；不产出 PASS/FAIL，
+   退出码恒为 0，因此**不适合作为 CI 门禁步骤**（加入门禁只会给出虚假的绿灯）。
+   门禁断言请看 tests/visual_assert.py、eu_test.py 等。
+   用法：python3 tests/audit_all.py（在 UI 改动后人工核对输出是否异常）
+"""
 import subprocess, os, re
 
 CHROME = os.environ.get("CHROME_BIN")

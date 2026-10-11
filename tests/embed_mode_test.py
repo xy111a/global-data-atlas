@@ -36,6 +36,32 @@ def out_of(dom):
     except Exception as e:
         return {"err": f"decode-fail:{e}"}
 
+def run_iframe_roundtrip(parent_url, wait_ms=45000):
+    """用 playwright 真实等待跑 iframe+postMessage 往返；无 playwright 时回退 headless virtual-time。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        return out_of(dump(parent_url, 60))
+    try:
+        import os as _os
+        _env = dict(_os.environ)
+        for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
+            _env.pop(k, None)
+        _os.environ.clear(); _os.environ.update(_env)
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            pg = b.new_page()
+            pg.goto(parent_url)
+            try:
+                pg.wait_for_function("window.__done === true", timeout=wait_ms)
+            except Exception:
+                pass
+            data = pg.evaluate("window.__msgs || []")
+            b.close()
+        return {"n": len(data), "msgs": data}
+    except Exception as e:
+        return {"err": f"playwright-fail:{e}"}
+
 ok = 0; total = 0
 def check(label, cond, detail=""):
     global ok, total
@@ -72,6 +98,7 @@ def without_sw(html):
     return re.sub(
         r"<script>\s*if \('serviceWorker' in navigator\)[\s\S]*?</script>\s*", "", html)
 
+p_path = p_allow = None
 p_embed = os.path.join(ROOT, "embed_direct_tmp.html")
 p_plain = os.path.join(ROOT, "embed_plain_tmp.html")
 # ⚠️ EMIT 必须包在 <script> 里，否则只是被当作正文文本渲染，__emit 永远不会被定义
@@ -84,7 +111,7 @@ open(p_plain, "w", encoding="utf-8").write(
 parent_html = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>embed parent</title></head><body>
 <iframe id="fr" src="/embed_direct_tmp.html?embed=1" style="width:900px;height:600px;border:0"></iframe>
 <script>
-var msgs=[];
+var msgs=[]; window.__msgs=msgs; window.__done=false;   // 供 playwright 直接读取（真实等待方案）
 window.addEventListener('message', function(e){ msgs.push(e.data); });
 function __emit(o){
   var b64=btoa(unescape(encodeURIComponent(JSON.stringify(o))));
@@ -92,25 +119,27 @@ function __emit(o){
   document.body.appendChild(el);
 }
 function send(o){ document.getElementById('fr').contentWindow.postMessage(o,'*'); }
-/* 事件驱动：收到一条就推进下一步（固定 sleep 在 virtual-time 下不稳定，易漏消息） */
-var stage=0, done=false;
-function finish(){ if(done) return; done=true;
+/* 事件驱动 + 明确起点：iframe load 后主动 ping，不依赖子页自动上报
+   （子页自动上报在 restoreState().then() 里，virtual-time 下可能晚于父页兜底，曾导致 n=0 假失败） */
+var stage=0, finished=false;
+function finish(){ if(finished) return; finished=true; window.__done=true;
   __emit({n:msgs.length, msgs:msgs.map(function(m){
     return {type:m&&m.type, cmd:m&&m.cmd, level:m&&m.level, metric:m&&m.metric,
             year:m&&m.year, embed:m&&m.embed, kind:m&&m.sel?m.sel.kind:null};
   })});
 }
-function step(){
+function next(){
+  if(finished) return;
   try{
-    if(stage===0) send({type:'atlas:cmd',cmd:'ping'});
-    else if(stage===1) send({type:'atlas:cmd',cmd:'setYear',year:2020});
-    else if(stage===2) send({type:'atlas:cmd',cmd:'setMetric',metric:'pop'});
-    else { setTimeout(finish, 600); return; }
-    stage++;
+    if(stage===0){ stage=1; send({type:'atlas:cmd',cmd:'ping'}); return; }
+    if(stage===1){ stage=2; send({type:'atlas:cmd',cmd:'setYear',year:2020}); return; }
+    if(stage===2){ stage=3; send({type:'atlas:cmd',cmd:'setMetric',metric:'pop'}); return; }
+    setTimeout(finish, 700);
   }catch(e){ finish(); }
 }
-window.addEventListener('message', function(e){ msgs.push(e.data); step(); });
-setTimeout(finish, 20000);   // 兜底：即使消息不来也能产出诊断结果
+window.addEventListener('message', function(e){ msgs.push(e.data); setTimeout(next, 300); });
+document.getElementById('fr').addEventListener('load', function(){ setTimeout(next, 1500); });
+setTimeout(finish, 30000);   // 兜底：即使消息不来也能产出诊断结果
 </script></body></html>"""
 p_parent = os.path.join(ROOT, "embed_parent_tmp.html")
 open(p_parent, "w", encoding="utf-8").write(parent_html)
@@ -120,8 +149,16 @@ def free_port():
     s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
 
 PORT = free_port()
-Handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=ROOT)
-Handler.log_message = lambda *a, **k: None
+class _AtlasHandler(http.server.SimpleHTTPRequestHandler):
+    def guess_type(self, path):
+        # 无扩展名的 /embed 必须按 HTML 处理（对齐 Cloudflare Pages：/embed.html 重定向后落在 /embed）
+        base = os.path.basename(str(path).rstrip("/"))
+        if base == "embed":
+            return "text/html"
+        return super().guess_type(path)
+    def log_message(self, *a, **k):
+        pass
+Handler = functools.partial(_AtlasHandler, directory=ROOT)
 httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
 t = threading.Thread(target=httpd.serve_forever, daemon=True); t.start()
 BASE_URL = f"http://127.0.0.1:{PORT}"
@@ -146,7 +183,10 @@ try:
         check("C 顶栏保持可见（不误精简）", oC.get("headerHidden") is False, f"({oC.get('headerHidden')})")
 
     # B) iframe + postMessage 往返
-    oB = out_of(dump(f"{BASE_URL}/embed_parent_tmp.html", 40))
+    #    ⚠️ 改用 playwright 真实等待：此场景在 --virtual-time-budget 下不稳定
+    #    （iframe 内需加载 ~1.6MB vendor，虚拟时钟常在资源到达前耗尽，导致 n=0 假失败）。
+    #    playwright 用真实时间等待，稳定且更快；不可用时回退到原来的 headless 方案。
+    oB = run_iframe_roundtrip(f"{BASE_URL}/embed_parent_tmp.html")
     if not oB or "err" in oB:
         check("B 父页脚本执行", False, f"({oB})")
     else:
@@ -170,10 +210,71 @@ try:
               bool(last_with(metric="pop")), f"(metrics={[m.get('metric') for m in msgs]})")
         check("B 状态含层级信息", any(m.get("level") for m in msgs),
               f"(levels={[m.get('level') for m in msgs][:3]})")
+
+    # ── 场景 D：/embed.html 路径入口 + 父页来源白名单（2026-10-12 审计修复项） ──
+    # D1 路径为 /embed.html 且不带 ?embed=1 时自动进入嵌入模式（跨域嵌入唯一入口）
+    # D2 来源校验：同源放行；未授权跨域拒绝；?allowOrigin= 授权后放行
+    ORIGIN_INJECT = """<script>(function(){
+try{
+  var out={embed:!!window.ATLAS_EMBED,
+           htmlClass:document.documentElement.classList.contains('embed'),
+           selfAllowed: window.atlasOriginAllowed ? window.atlasOriginAllowed(location.origin) : null,
+           evilAllowed: window.atlasOriginAllowed ? window.atlasOriginAllowed('https://evil.example') : null,
+           allowList: window.ATLAS_ALLOWED_ORIGINS || []};
+  __emit(out);
+}catch(e){ __emit({err:e.message}) }
+})();</script>"""
+
+    p_path = os.path.join(ROOT, "embed.html")     # 文件名必须精确为 embed.html（路径判定）
+    p_allow = os.path.join(ROOT, "embed_direct_tmp.html")
+    open(p_path, "w", encoding="utf-8").write(
+        without_sw(ATLAS).replace("</body>", EMIT_SCRIPT + ORIGIN_INJECT + "\n</body>"))
+    open(p_allow, "w", encoding="utf-8").write(
+        without_sw(ATLAS).replace("</body>", EMIT_SCRIPT + ORIGIN_INJECT + "\n</body>"))
+
+    oD1 = out_of(dump(f"{BASE_URL}/embed.html", 14))
+    if not oD1 or oD1.get("err"):
+        check("D 脚本执行", False, f"({oD1})")
+    else:
+        check("D1 /embed.html 路径自动进入嵌入模式（无需 ?embed=1）",
+              oD1.get("embed") is True, f"(embed={oD1.get('embed')})")
+        check("D1 /embed.html 带 embed 样式标记",
+              oD1.get("htmlClass") is True, f"(htmlClass={oD1.get('htmlClass')})")
+        check("D2 同源父页放行", oD1.get("selfAllowed") is True, f"({oD1.get('selfAllowed')})")
+        check("D2 未授权跨域来源被拒（默认拒绝）",
+              oD1.get("evilAllowed") is False, f"({oD1.get('evilAllowed')})")
+
+    # D4: 无 .html 后缀的 /embed（Cloudflare Pages 会把 /embed.html 308 重定向到 /embed，
+    #     实际 pathname 是 "/embed"，路径判定必须同时覆盖，否则线上嵌入态失效）
+    p_bare = os.path.join(ROOT, "embed")
+    open(p_bare, "w", encoding="utf-8").write(
+        without_sw(ATLAS).replace("</body>", EMIT_SCRIPT + ORIGIN_INJECT + "\n</body>"))
+    oD4 = out_of(dump(f"{BASE_URL}/embed", 14))
+    if not oD4 or oD4.get("err"):
+        check("D4 脚本执行", False, f"({oD4})")
+    else:
+        check("D4 /embed（无后缀，重定向后的真实路径）也进入嵌入模式",
+              oD4.get("embed") is True, f"(embed={oD4.get('embed')})")
+    try: os.remove(p_bare)
+    except Exception: pass
+
+    oD3 = out_of(dump(f"{BASE_URL}/embed_direct_tmp.html?embed=1&allowOrigin=https://evil.example", 14))
+    if not oD3 or oD3.get("err"):
+        check("D3 脚本执行", False, f"({oD3})")
+    else:
+        check("D3 ?allowOrigin= 授权后该来源放行",
+              oD3.get("evilAllowed") is True, f"({oD3.get('evilAllowed')})")
+        check("D3 白名单解析正确",
+              "https://evil.example" in (oD3.get("allowList") or []), f"({oD3.get('allowList')})")
+
+
 finally:
     httpd.shutdown(); httpd.server_close()
     for f in (p_embed, p_plain, p_parent):
         try: os.remove(f)
+        except Exception: pass
+    for f in ("embed.html", "embed_direct_tmp.html"):
+        try: os.remove(os.path.join(ROOT, f))
         except Exception: pass
 
 print(f"\n嵌入模式(T11)回归: {ok}/{total} 通过")

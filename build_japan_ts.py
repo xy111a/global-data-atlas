@@ -2,14 +2,58 @@
 # 构建日本 47 都道府县「県内総生産（名目）」多年序列（2011-2022）
 # 数据源：内阁府 ESRI 県民経済計算（免 key 直接下载 xlsx）
 #   https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/<年>/soukatu1.xlsx
-# 单位：xlsx 中为「百万円」→ 转换与现有 JP_METRICS 一致口径为 CNY（×1e6 ×0.05）
-# 输出：vendor/jp_ts.js  ->  window.JP_TS = { "北海道": {"2011": 9.26e11, ...}, ... }
+#
+# ⚠️ 货币口径（2026-10-12 修正 · 原 P0 数据缺陷）：
+#   旧实现用「固定 JPY→CNY = 0.05」把 2011-2022 全部年份折成 CNY，再由 app-core 的
+#   gdpApply 按「年度 USD/CNY」折成美元 —— 等价于假设 12 年间日元/人民币汇率恒定。
+#   实际日元对美元 2011→2022 贬值约 39%（1USD=79.6円 → 130.7円），导致：
+#     2011 年美元值低估约 38%，2022 年低估约 2.4%；
+#     北海道 2011→2022 显示 +8.1%，真实美元计价为 -31.6%（增长方向相反）。
+#   现改为与 build_eu_ts.py 同一范式：逐年 JPY→USD（ECB 当年日均，frankfurter）直折美元。
+#
+# 单位：xlsx 为「百万円」→ ×1e6 得円 → × 当年 JPY→USD → USD
+# 输出：vendor/jp_ts.js -> window.JP_TS = {"北海道":{"2011":..., ...}, ...}（USD 口径）
 import subprocess, os, sys, json, re
 
 OUT = "vendor/jp_ts.js"
 XLSX_URL = "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2022/soukatu1.xlsx"
 XLSX = "/tmp/soukatu1.xlsx"
-JPY2CNY = 0.05  # 与 JP_METRICS 既有口径一致（1 日元≈0.05 元）
+
+# 逐年 JPY→USD 基线（1 日元 = ? 美元）。
+# 来源：ECB 参考汇率，经 api.frankfurter.app 取当年全部交易日的算术平均，抓取于 2026-10-12。
+# 内置基线保证离线可重现；联网时会尝试刷新（见 fetch_rate_map），失败则回退基线。
+JPY_USD_BASELINE = {
+    "2011": 0.012559, "2012": 0.012546, "2013": 0.010260, "2014": 0.009476,
+    "2015": 0.008261, "2016": 0.009229, "2017": 0.008915, "2018": 0.009056,
+    "2019": 0.009178, "2020": 0.009372, "2021": 0.009108, "2022": 0.007652,
+}
+# 对应 1 USD = ? 円（仅用于日志/校验展示）
+USD_JPY_BASELINE = {y: round(1 / v, 2) for y, v in JPY_USD_BASELINE.items()}
+
+
+def fetch_rate_map(years):
+    """尝试联网刷新逐年 JPY→USD（ECB 日均年均）；失败回退内置基线。"""
+    lo, hi = min(years), max(years)
+    try:
+        import urllib.request
+        url = f"https://api.frankfurter.app/{lo}-01-01..{hi}-12-31?from=JPY&to=USD"
+        # frankfurter 对无 UA 的 urllib 默认请求返回 403，需显式声明 UA
+        req = urllib.request.Request(url, headers={"User-Agent": "atlas-build/1.0 (+https://atlas.huajun.wang)"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        by_year = {}
+        for date, v in (d.get("rates") or {}).items():
+            usd = v.get("USD")
+            if usd is None:
+                continue
+            by_year.setdefault(int(date[:4]), []).append(usd)
+        rm = {str(y): sum(x) / len(x) for y, x in by_year.items() if x}
+        if rm:
+            print(f"  汇率刷新成功（ECB 日均年均），覆盖 {len(rm)} 年", flush=True)
+            return rm
+    except Exception as e:
+        print(f"  [warn] 汇率刷新失败（{e}），使用内置基线", flush=True)
+    return dict(JPY_USD_BASELINE)
 
 
 def download():
@@ -63,6 +107,11 @@ def build():
             year_cols[i] = y
     print("years:", sorted(year_cols.values()))
 
+    rate_map = fetch_rate_map(sorted(year_cols.values()))
+    missing = [str(y) for y in year_cols.values() if str(y) not in rate_map]
+    if missing:
+        sys.exit(f"汇率缺失年份: {missing}")
+
     jp_names = load_jp_names()
     out = {}
     for r in rows[6:]:
@@ -78,21 +127,31 @@ def build():
         for ci, y in year_cols.items():
             v = r[ci]
             if isinstance(v, (int, float)) and v > 0:
-                # 百万円 → 円 → CNY（×1e6 ×0.05）
-                series[str(y)] = round(v * 1e6 * JPY2CNY)
+                # 百万円 → 円 → USD（×1e6 × 当年 JPY→USD）
+                series[str(y)] = round(v * 1e6 * rate_map[str(y)])
         if series:
             out[name] = series
     print("prefectures:", len(out))
-    # 校验：北海道应有 2011
+    # 校验：北海道应有 2011；并打印美元口径值供人工比对
     if "北海道" in out:
-        print("北海道 2011:", out["北海道"].get("2011"), "2022:", out["北海道"].get("2022"))
+        h = out["北海道"]
+        print(f"北海道 2011: {h.get('2011')} USD ({h.get('2011', 0)/1e8:.0f} 亿美元)"
+              f" | 2022: {h.get('2022')} USD ({h.get('2022', 0)/1e8:.0f} 亿美元)")
+        if h.get("2011") and h.get("2022"):
+            g = (h["2022"] / h["2011"] - 1) * 100
+            print(f"北海道 2011→2022 名义增长（USD 口径）: {g:+.1f}%  [修正前为 +8.1%，真实约 -31.6%]")
     return out
 
 
 def emit(out):
     os.makedirs("vendor", exist_ok=True)
-    lines = ["/* 日本都道府县 GDP 多年序列（2011-2022，名义，CNY 口径；源：内阁府 ESRI 県民経済計算）",
-             " * 与 JP_METRICS 单年值口径一致（1日元≈0.05元）。由 build_japan_ts.py 自动生成，勿手改。 */",
+    yrs = sorted({y for s in out.values() for y in s}, key=int)
+    rate_line = ", ".join(f"{y}:{USD_JPY_BASELINE.get(y,'?')}" for y in yrs if y in USD_JPY_BASELINE)
+    lines = ["/* 日本都道府县 GDP 多年序列（" + yrs[0] + "-" + yrs[-1] + "，名义，USD 口径；源：内阁府 ESRI 県民経済計算）",
+             " * 汇率：逐年 JPY→USD（ECB 当年日均年均，frankfurter）；1USD≈" + rate_line + " 円",
+             " * ⚠️ 2026-10-12 修正：旧版用固定 JPY→CNY=0.05 再按年度 USD/CNY 折算，等价于假设日/中汇率恒定，",
+             " *    导致 2011 年美元值低估约 38%、增长方向失真（北海道 +8.1% vs 真实 -31.6%）。现直折逐年 USD。",
+             " * 由 build_japan_ts.py 自动生成，勿手改。 */",
              "window.JP_TS = {"]
     items = []
     for k in sorted(out.keys()):

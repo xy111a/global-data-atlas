@@ -20,6 +20,8 @@ for f in global-data-atlas.html compare.html about.html 404.html robots.txt site
   if [ -f "$f" ]; then cp "$f" "dist/$f"; fi
 done
 cp global-data-atlas.html dist/index.html
+# 嵌入专用入口：/embed.html（_headers 对其放开 frame-ancestors，跨域嵌入走此路径）
+cp global-data-atlas.html dist/embed.html
 # 兼容：about/compare 返回链接指向 index.html；保留 global-data-atlas.html 副本
 
 echo "── 同步 vendor → dist/vendor ──"
@@ -48,7 +50,7 @@ done
 # 缓存失效：给 app-core.js 引用注入内容指纹（?v=md5前8位）——JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存
 # 用 python3 做替换，兼容 toybox / macOS(BSD) / GNU sed 差异（toybox sed 无法正确解析 -i '' -E）
 CORE_HASH=$(HASH vendor/app-core.js | cut -c1-8)
-for f in dist/global-data-atlas.html dist/index.html dist/compare.html; do
+for f in dist/global-data-atlas.html dist/index.html dist/embed.html dist/compare.html; do
   python3 - "$f" "$CORE_HASH" <<'PY'
 import sys, re
 p, h = sys.argv[1], sys.argv[2]

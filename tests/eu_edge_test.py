@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""欧盟边界行为验证：指标切换守卫/年份切换/对比趋势图/移动端"""
+"""欧盟边界行为验证：指标切换守卫/年份切换/对比趋势图/移动端
+
+⚠️ 性质：**诊断输出工具，不是断言型回归测试**。
+   打印各项边界行为的实际观测值（如 trade 按钮 disabled 状态、切年后层级、截图字节数），
+   不产出 PASS/FAIL，退出码恒为 0，因此**不适合作为 CI 门禁步骤**。
+   欧盟的门禁断言在 tests/eu_test.py。
+   用法：python3 tests/eu_edge_test.py（欧盟相关改动后人工核对观测值）
+"""
 import subprocess, os, re
 
 CHROME = os.environ.get("CHROME_BIN")

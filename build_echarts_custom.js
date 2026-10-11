@@ -15,21 +15,31 @@ import { LineChart, BarChart, MapChart } from 'echarts/charts';
 import {
   GridComponent, TooltipComponent, LegendComponent,
   TitleComponent, AxisPointerComponent, DataZoomComponent,
+  // ⚠️ 2026-10-12 审计修复：地图 choropleth 的 visualMap（颜色刻度图例）此前从未渲染，
+  //    原因是定制构建漏了 VisualMapComponent，浏览器控制台持续报
+  //    "[ECharts] Component visualMap is used but not imported"，用户看不到颜色↔数值对应关系。
+  //    （既有测试只断言 getOption().visualMap 的配置对象，未验证渲染，故长期未被发现。）
+  VisualMapComponent, VisualMapPiecewiseComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 echarts.use([
   LineChart, BarChart, MapChart,
   GridComponent, TooltipComponent, LegendComponent,
   TitleComponent, AxisPointerComponent, DataZoomComponent,
+  VisualMapComponent, VisualMapPiecewiseComponent,
   CanvasRenderer,
 ]);
 window.echarts = echarts;
 `);
 
 async function main() {
+  // 允许从 NODE_PATH（受管 node workspace）解析 echarts/esbuild/terser，
+  // 避免在项目目录留下 node_modules（本项目是零构建仓库，不入库依赖）。
+  const nodePaths = (process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean);
   const res = await esbuild.build({
     entryPoints: [ENTRY],
     bundle: true,
+    nodePaths,
     format: 'iife',
     minify: false,
     write: false,

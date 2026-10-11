@@ -121,6 +121,36 @@ check("加总[50州+DC vs 美国]", 0.85 < st_sum/us_all < 1.15, f"{st_sum/1e6:.
 jp_sum = sum(o['gdp'] for o in JP.values())
 check("加总[47县 vs 日本]", 0.6 < jp_sum/25e12 < 1.4, f"{jp_sum/1e12:.1f} vs ~25 万亿CNY(近似)")
 
+# 2c-2 日本多年序列（JP_TS）口径校验 —— 2026-10-12 审计新增
+#  背景：旧实现用「固定 JPY→CNY=0.05」折全部年份再按年度 USD/CNY 折算，等价于假设日/中汇率恒定，
+#        导致 2011 年美元值低估约 38%，且 2011→2022 增长方向失真（北海道显示 +8.1% vs 真实 -31.6%）。
+#  现值：逐年 JPY→USD（ECB 日均年均）直折美元。以下断言用于防止该缺陷回归。
+JP_TS = load_js('vendor/jp_ts.js', 'JP_TS')
+check("覆盖[日本县多年序列 47]", len(JP_TS) == 47, f"{len(JP_TS)} 县")
+if JP_TS:
+    # 1) 加总 vs 日本全国名义 GDP（2022 ≈ 4.26 万亿美元，县级合计略高属正常）
+    tot22 = sum(v.get('2022', 0) for v in JP_TS.values() if isinstance(v.get('2022'), (int, float)))
+    check("加总[47县2022 vs 日本全国]", 0.8 < tot22/4.26e12 < 1.25,
+          f"{tot22/1e12:.2f} vs ~4.26 万亿美元")
+    # 2) 量级抽查：东京都 2022 应在 5000亿~15000亿 美元
+    tk = (JP_TS.get('东京都') or {}).get('2022')
+    check("量级[东京都2022 USD]", tk is not None and 5e11 < tk < 1.5e12,
+          f"{tk/1e8:.0f} 亿美元" if tk else "缺失")
+    # 3) 方向性（最关键）：日元 2011→2022 对美元贬值约 39%，故美元计价应为负增长。
+    #    若该断言失败，说明又退回「固定汇率折算序列」的错误口径。
+    dirs = []
+    for k, v in JP_TS.items():
+        a, b = v.get('2011'), v.get('2022')
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a > 0:
+            dirs.append((b/a - 1, k))
+    neg = sum(1 for g, _ in dirs if g < 0)
+    check("方向[日本县2011→2022 美元计价应为负增长]",
+          len(dirs) >= 40 and neg == len(dirs),
+          f"{neg}/{len(dirs)} 县为负增长（日元贬值所致；若出现正增长即为汇率口径错误）")
+    if dirs:
+        gs = sorted(g for g, _ in dirs)
+        print(f"  ℹ 日本县 2011→2022 美元计价增长区间: {gs[0]*100:.1f}% ~ {gs[-1]*100:.1f}%")
+
 # 2d 城市 GDP < 所属省 GDP（抽查 + 全量）
 prov_map = {'330000':'浙江','440000':'广东','320000':'江苏'}  # 主要抽查
 for ad in list(CITY)[:200]:

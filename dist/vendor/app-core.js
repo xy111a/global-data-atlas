@@ -486,10 +486,15 @@ function regJapanPref(nm){
   const d=window.JP_METRICS&&window.JP_METRICS[nm]; if(!d) return null;
   const ts=window.JP_TS&&window.JP_TS[nm];                       // 多年序列（build_japan_ts.py，2011-2022）
   const yl = ts ? Object.keys(ts).map(Number).sort((a,b)=>a-b) : [];
+  /* 口径：JP_TS 已是「逐年 JPY→USD」直折的美元值（build_japan_ts.py，2026-10-12 修正）。
+     旧版此处为 CNY 口径（固定 JPY→CNY=0.05 再按年度 USD/CNY 折算），等价于假设日/中汇率恒定，
+     使 2011 年美元值低估约 38%、2011→2022 增长方向失真（北海道 +8.1% vs 真实 -31.6%）。 */
   const getGdp=(year)=>{
-    if(ts && ts[year]!=null) return gdpApply(ts[year],"CNY",year);
-    if(d.gdp!=null) return gdpApply(d.gdp,"CNY",d.year||2021);   // 兜底单年
-    return null;
+    const y=(year==null?+dataYear:+year);
+    if(ts && ts[y]!=null) return gdpApply(ts[y],"USD",y);
+    // 序列缺该年 → 取序列最近年，保持同一 USD 口径（避免与 JP_METRICS 的 CNY 单年值跨源混用）
+    if(yl.length){ const n=nearestByDist(yl,y); if(n!=null && ts[n]!=null) return gdpApply(ts[n],"USD",n); }
+    return d.gdp!=null ? gdpApply(d.gdp,"CNY",d.year||2021) : null;   // 极兜底：JP_METRICS 旧 CNY 单年值
   };
   const r={
     name:nm, cn:nm,
@@ -505,7 +510,7 @@ function regJapanPref(nm){
       const b=base==null?yl[0]:+base, lo=yl[0], hi=yl[yl.length-1];
       const bv = ts[b]!=null?ts[b]:(b<lo?ts[lo]:ts[hi]);
       if(bv==null) return null; return (ts[hi]-bv)/bv; },
-    gdpSeries(){ if(!ts) return null; return {years:yl, values:yl.map(y=>gdpApply(ts[y],"CNY",y))}; },
+    gdpSeries(){ if(!ts) return null; return {years:yl, values:yl.map(y=>gdpApply(ts[y],"USD",y))}; },
     series(m){ return m==="gdp"?this.gdpSeries():null; }
   };
   __regCache.jp[nm]=r; return r;
