@@ -93,5 +93,17 @@ step "L3n 数据新鲜度标注（freshness_test，T8）"
 "$PY" tests/freshness_test.py > /tmp/fresh.log 2>&1 && tail -3 /tmp/fresh.log || { echo "  ✗ 新鲜度标注失败:"; tail -12 /tmp/fresh.log; exit 1; }
 echo "  ✓ L3n 通过"; PASS=$((PASS+1))
 
+step "L3o 可信度/SEO 结构化数据（seo_methodology_test，T9）"
+"$PY" tests/seo_methodology_test.py > /tmp/seo.log 2>&1 && tail -3 /tmp/seo.log || { echo "  ✗ SEO/方法论失败:"; tail -12 /tmp/seo.log; exit 1; }
+echo "  ✓ L3o 通过"; PASS=$((PASS+1))
+
+step "L3p 搜索键盘可达性（a11y_search_test，T10）"
+"$PY" tests/a11y_search_test.py > /tmp/a11y.log 2>&1 && tail -3 /tmp/a11y.log || { echo "  ✗ 键盘可达性失败:"; tail -12 /tmp/a11y.log; exit 1; }
+echo "  ✓ L3p 通过"; PASS=$((PASS+1))
+
+step "L3q 嵌入模式 ?embed=1（embed_mode_test，T11）"
+"$PY" tests/embed_mode_test.py > /tmp/embed.log 2>&1 && tail -3 /tmp/embed.log || { echo "  ✗ 嵌入模式失败:"; tail -12 /tmp/embed.log; exit 1; }
+echo "  ✓ L3q 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

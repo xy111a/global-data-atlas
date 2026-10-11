@@ -10,6 +10,64 @@
 <meta property="og:description" content="交互式全球行政区划数据地图：多层级下钻与经济数据对比，GDP 统一以美元计价。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://atlas.huajun.wang/" />
+<!-- T9/SEO：schema.org 结构化数据，帮助搜索引擎/AI 抓取理解本站性质、覆盖时空范围与数据来源 -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Dataset",
+      "@id": "https://atlas.huajun.wang/#dataset",
+      "name": "全球行政区划经济数据集（Global Data Atlas）",
+      "description": "按行政层级下钻的全球经济数据：世界 214 国 + 中国31省/321地级市、美国51州、日本47都道府县、欧盟27国 NUTS2；指标含 GDP、人口、面积及 8 项扩展指标，GDP 统一按逐年汇率折算为美元。",
+      "url": "https://atlas.huajun.wang/",
+      "conditionsOfAccess": "免费公开查询，转载请注明来源",
+      "isAccessibleForFree": true,
+      "temporalCoverage": "2000/2025",
+      "spatialCoverage": { "@type": "Place", "name": "全球" },
+      "creator": { "@type": "Organization", "name": "Global Data Atlas", "url": "https://atlas.huajun.wang/" },
+      "keywords": ["GDP", "人口", "面积", "行政区划", "下钻地图", "世界银行", "BEA", "Eurostat", "内阁府県民経済計算"],
+      "sourceOrganization": [
+        { "@type": "Organization", "name": "World Bank Open Data" },
+        { "@type": "Organization", "name": "U.S. Bureau of Economic Analysis (BEA)" },
+        { "@type": "Organization", "name": "Eurostat" },
+        { "@type": "Organization", "name": "日本内阁府 ESRI 県民経済計算" },
+        { "@type": "Organization", "name": "阿里云 DataV GeoAtlas（中国行政区边界）" }
+      ]
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://atlas.huajun.wang/#app",
+      "name": "全球数据地图 · Global Data Atlas",
+      "url": "https://atlas.huajun.wang/",
+      "applicationCategory": "DataVisualization",
+      "operatingSystem": "Any",
+      "browserRequirements": "需要支持 JavaScript 的现代浏览器",
+      "inLanguage": "zh-CN",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "featureList": ["多层级下钻", "年份切换与逐年播放", "指标切换", "多区域对比", "区域增长排行榜", "线性/对数配色刻度", "数据年份回退标注"],
+      "publisher": { "@type": "Organization", "name": "Global Data Atlas", "url": "https://atlas.huajun.wang/" }
+    }
+  ]
+}
+</script>
+<!-- T11 嵌入模式 ?embed=1：尽早给 <html> 打标记，避免父页 iframe 里导航短暂闪现 -->
+<script>
+(function(){
+  try{
+    window.ATLAS_EMBED = (new URLSearchParams(location.search).get("embed") === "1");
+    if(window.ATLAS_EMBED) document.documentElement.classList.add("embed");
+  }catch(e){ window.ATLAS_EMBED = false; }
+  /* 向父页同步状态；非嵌入或不在 iframe 中则静默无效 */
+  window.atlasPost = function(){
+    try{
+      if(!window.ATLAS_EMBED || window.parent === window) return;
+      var s = (typeof atlasSnapshot === "function") ? atlasSnapshot() : {type:"atlas:state"};
+      window.parent.postMessage(s, "*");
+    }catch(e){}
+  };
+})();
+</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="alternate icon" href="favicon.ico" />
 <style>
@@ -259,6 +317,26 @@
   .footer-sources b{color:var(--text);font-weight:600;letter-spacing:.4px;}
   .footer-sources span{opacity:.82;}
   .footer-note{opacity:.7;text-align:right;}
+  /* ===== T10 搜索建议下拉（键盘可达 a11y） ===== */
+  .sug-wrap{position:relative;display:inline-flex;align-items:center;}
+  .sug-list{position:absolute;top:calc(100% + 4px);left:0;min-width:100%;max-height:280px;overflow-y:auto;
+    margin:0;padding:4px;list-style:none;z-index:60;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel-float);box-shadow:0 8px 24px rgba(0,0,0,.45);}
+  .sug-item{display:flex;align-items:baseline;gap:10px;padding:6px 10px;border-radius:6px;
+    cursor:pointer;font-size:12.5px;color:var(--text);}
+  .sug-item .sl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sug-item .ss{color:var(--muted);font-size:11px;flex:0 0 auto;}
+  .sug-item:hover{background:var(--hover);}
+  .sug-item.active{background:var(--hover);}
+  .sug-item.active .sl{color:var(--cyan);font-weight:600;}
+  .sug-item:focus-visible,.sug-item.active{outline:2px solid var(--cyan);outline-offset:-2px;}
+  /* ===== T11 嵌入模式 ?embed=1：精简外壳（隐藏导航/页脚），地图铺满 iframe ===== */
+  html.embed, html.embed body{height:100%;overflow:hidden;}
+  html.embed header{display:none;}
+  html.embed footer{display:none;}
+  html.embed #app{height:100vh;display:flex;flex-direction:column;}
+  html.embed #main{flex:1 1 auto;min-height:0;}
+  html.embed #chart, html.embed #panel{min-height:0;}
 </style>
 </head>
 <body>
@@ -1363,7 +1441,9 @@ let lastShown=null;   // 当前面板显示的区域（切维度时恢复并跟�
 let clickTimer=null;
 function onChartClick(p){
   if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
-  clickTimer=setTimeout(()=>{ clickTimer=null; showContentFor(p); }, 260);
+  clickTimer=setTimeout(()=>{ clickTimer=null; showContentFor(p);
+    if(window.atlasPostSoon) window.atlasPostSoon(450);   // T11：区域选中后向父页同步
+  }, 260);
 }
 function onChartDblClick(p){
   if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; }
@@ -1448,6 +1528,7 @@ window.addEventListener("load", ()=>{
   if(gj){ worldGeo=gj; echarts.registerMap("world", gj); }
   else { showBanner("警告：world.js 未加载，世界地图不可用"); }
   restoreState().then(ok=>{ if(!ok){ renderWorld2D(); renderRank(); } });   // 优化3：有 URL 状态则恢复视图（层级/指标/年份/面板/对比），否则默认世界
+  setTimeout(()=>window.atlasPost && window.atlasPost(), 900);   // T11：嵌入模式下向父页上报就绪/初始状态
 
   document.getElementById("metricSeg").addEventListener("click", async e=>{
     const b=e.target.closest("button"); if(!b)return;
@@ -1481,6 +1562,7 @@ window.addEventListener("load", ()=>{
     dataYear = e.target.value;
     redrawByYear();
     saveState();   // 优化3：年份变化保存 URL 状态
+    if(window.atlasPostSoon) window.atlasPostSoon(500);   // T11：年份变化向父页同步
   });
   /* 年份播放动画（B4）：从当前年份逐年推进，复用 redrawByYear 单点重绘 */
   let playTimer=null, playYears=[], playIdx=0;
@@ -1524,8 +1606,147 @@ window.addEventListener("load", ()=>{
     document.getElementById("backBtn").click();
   });
   const searchEl=document.getElementById("search");
-  searchEl.addEventListener("keydown", e=>{ if(e.key==="Enter") doSearch(e.target.value); });
-  searchEl.addEventListener("blur", e=>{ /* 不搜索：避免点击地图/排行时误触发跳转（M10 修复） */ });
+  /* ===== T10 搜索建议下拉：键盘可达（↑↓ 移动 / Enter 选择 / ESC 关闭）+ ARIA combobox/listbox =====
+     原实现只有「Enter 触发首个包含匹配」，无候选列表、不可键盘遍历。此处补齐：
+     input 外包一层 .sug-wrap → ul[role=listbox] + li[role=option]，输入即时匹配（国家/省/州/县/市/欧盟）。 */
+  (function(){
+    let box=null, items=[], idx=-1, open=false;
+    function buildPool(){
+      const pool=[];
+      try{
+        if(window.COUNTRIES) COUNTRIES.forEach(c=>{ pool.push({label:c[0], kind:"国家"}); });
+        if(window.CN) Object.keys(CN).forEach(k=> pool.push({label:k, kind:"省"}));
+        if(window.US_STATES_GDP) Object.keys(US_STATES_GDP).forEach(k=> pool.push({label:k, kind:"州"}));
+        if(window.JP_METRICS) Object.keys(JP_METRICS).forEach(k=> pool.push({label:k, kind:"县"}));
+        if(window.CITY_INDEX) CITY_INDEX.forEach(x=>{ if(x&&x[0]) pool.push({label:x[0], kind:"市"}); });
+        if(window.EU_METRICS) Object.keys(EU_METRICS).forEach(k=>{ const d=EU_METRICS[k]||{}; pool.push({label:d.name||k, kind:"区域"}); });
+      }catch(e){}
+      return pool;
+    }
+    function matchPool(q, pool){
+      q=(q||"").trim().toLowerCase(); if(!q) return [];
+      const exact=[], starts=[], has=[];
+      for(const it of pool){
+        const l=(it.label||"").toLowerCase();
+        if(l===q) exact.push(it); else if(l.indexOf(q)===0) starts.push(it); else if(l.indexOf(q)>0) has.push(it);
+        if(exact.length+starts.length+has.length>300) break;
+      }
+      return exact.concat(starts, has).slice(0,8);
+    }
+    function ensureBox(){
+      if(box) return box;
+      const wrap=document.createElement("span"); wrap.className="sug-wrap";
+      searchEl.parentNode.insertBefore(wrap, searchEl); wrap.appendChild(searchEl);
+      box=document.createElement("ul"); box.id="sugList"; box.className="sug-list";
+      box.setAttribute("role","listbox"); box.setAttribute("aria-label","搜索建议");
+      box.style.display="none";
+      wrap.appendChild(box);
+      searchEl.setAttribute("role","combobox");
+      searchEl.setAttribute("aria-autocomplete","list");
+      searchEl.setAttribute("aria-expanded","false");
+      searchEl.setAttribute("aria-controls","sugList");
+      return box;
+    }
+    function paint(){
+      if(!box) return;
+      box.innerHTML="";
+      if(!items.length){ box.style.display="none"; close(); return; }
+      box.style.display="block"; open=true; searchEl.setAttribute("aria-expanded","true");
+      items.forEach((it,i)=>{
+        const li=document.createElement("li");
+        li.className="sug-item"+(i===idx?" active":"");
+        li.setAttribute("role","option"); li.id="sug-opt-"+i;
+        li.setAttribute("aria-selected", i===idx?"true":"false");
+        li.innerHTML=`<span class="sl">${esc(it.label)}</span><span class="ss">${esc(it.kind)}</span>`;
+        li.addEventListener("mouseenter", ()=>{ idx=i; paint(); });
+        li.addEventListener("mousedown", e=>e.preventDefault());   // 防止 blur 抢先关闭
+        li.addEventListener("click", ()=>choose(i));
+        box.appendChild(li);
+      });
+      if(idx>=0){
+        searchEl.setAttribute("aria-activedescendant","sug-opt-"+idx);
+        const el=document.getElementById("sug-opt-"+idx); if(el&&el.scrollIntoView) el.scrollIntoView({block:"nearest"});
+      } else searchEl.removeAttribute("aria-activedescendant");
+    }
+    function close(){
+      open=false; idx=-1;
+      if(box){ box.innerHTML=""; box.style.display="none"; }
+      searchEl.setAttribute("aria-expanded","false");
+      searchEl.removeAttribute("aria-activedescendant");
+    }
+    function move(d){ if(!items.length) return; idx=(idx+d+items.length)%items.length; paint(); }
+    function choose(i){
+      const it=items[i], t=it?it.label:null;
+      close(); items=[];
+      if(t){ searchEl.value=t; doSearch(t); }
+    }
+    ensureBox();   /* 必须预先建立 DOM：若在首次输入时才把 input 塞进 wrapper，reparent 会触发 blur →
+                     下拉被 blur 处理器关掉，表现为「打第一个字时建议闪一下就消失」 */
+    searchEl.addEventListener("input", ()=>{
+      items=matchPool(searchEl.value, buildPool()); idx=items.length?0:-1; paint();
+    });
+    searchEl.addEventListener("focus", ()=>{
+      if(searchEl.value && items.length){ ensureBox(); idx=0; paint(); }
+    });
+    searchEl.addEventListener("keydown", e=>{
+      const k=e.key;
+      if(k==="ArrowDown"){ e.preventDefault(); ensureBox();
+        if(!items.length){ items=matchPool(searchEl.value, buildPool()); idx=0; } else move(1);
+        paint(); return; }
+      if(k==="ArrowUp"){ e.preventDefault(); if(open) move(-1); return; }
+      if(k==="Enter"){
+        if(open && idx>=0){ e.preventDefault(); choose(idx); return; }
+        doSearch(searchEl.value); close(); return; }
+      if(k==="Escape"){ if(open){ e.preventDefault(); close(); } return; }
+    });
+    searchEl.addEventListener("blur", ()=>{ setTimeout(close,150); });   // 延迟：让点击建议先生效
+    document.addEventListener("click", e=>{ if(open && box && !box.contains(e.target) && e.target!==searchEl) close(); });
+  })();
   window.addEventListener("resize", ()=>chart && chart.resize());
+});
+
+/* ===== T11 嵌入模式对外桥接（?embed=1 + postMessage） =====
+   ⚠️ 范围说明：仅在本页被 iframe 承载且 URL 带 embed=1 时生效；不读写任何外部站点
+   （不含 gtm.huajun.wang），父页指令也只驱动本页自身视图。 */
+function atlasSnapshot(){
+  let sel=null;
+  try{
+    const ls=lastShown, t=ls&&ls.type;
+    if(t==="country"&&ls.data) sel={kind:t, name:ls.data[0], iso2:ls.data[2]};
+    else if(t==="prov"&&ls.short) sel={kind:t, name:ls.short};
+    else if(t==="city"&&ls.name) sel={kind:t, name:ls.name};
+    else if((t==="usstate"||t==="jppref"||t==="nutspref")&&ls.nm) sel={kind:t, name:ls.nm};
+  }catch(e){}
+  return {type:"atlas:state", embed:true, level:currentLevel, metric:metric, year:dataYear,
+          colorScale:colorScale, rankMode:rankMode, sel:sel};
+}
+window.atlasSnapshot=atlasSnapshot;
+/* 区域选中/维度切换后向父页同步（供 hooks 调用） */
+window.atlasPostSoon=function(delay){ setTimeout(()=>window.atlasPost&&window.atlasPost(), delay||350); };
+/* 接受父页指令：ping / setYear / setMetric / search / setColorScale */
+window.addEventListener("message", e=>{
+  try{
+    const d=e.data; if(!d || typeof d!=="object" || d.type!=="atlas:cmd") return;
+    const cmd=d.cmd||d.action;
+    if(cmd==="ping"){ window.atlasPost(); return; }
+    if(cmd==="setYear" && d.year!=null){
+      const se=document.getElementById("yearSel");
+      if(se){ se.value=String(d.year); dataYear=String(d.year);
+        const L=layerGet(); if(L){ L.render(); L.restore(); } renderRank();
+        if(typeof saveState==="function") saveState(); window.atlasPost(); }
+      return;
+    }
+    if(cmd==="setMetric" && d.metric){
+      const b=document.querySelector('#metricSeg button[data-m="'+String(d.metric).replace(/["<>]/g,"")+'"]');
+      if(b) b.click();
+      window.atlasPost(); return;
+    }
+    if(cmd==="search" && d.q){ doSearch(String(d.q)); window.atlasPostSoon(800); return; }
+    if(cmd==="setColorScale" && (d.value==="linear"||d.value==="log")){
+      const sb=document.getElementById("scaleBtn");
+      if(sb && ((d.value==="log")!==(colorScale==="log"))) sb.click();
+      window.atlasPost(); return;
+    }
+  }catch(err){}
 });
 </script></body></html>
