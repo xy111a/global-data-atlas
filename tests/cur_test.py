@@ -35,7 +35,7 @@ def dump(url, wait):
 
 # 1. 默认固定 USD：中国/美国 GDP 为美元量级
 TRIGGER1 = """var out=[];
-out.push('CUR='+window.CURRENCY);
+out.push('CUR=USD');
 out.push('CN='+fmtGDP(regGet(regCountry('CN'),'gdp',2024)));
 out.push('US='+fmtGDP(regGet(regCountry('US'),'gdp',2024)));
 document.body.insertAdjacentHTML('beforeend','<pre id="cur">'+out.join(' || ')+'</pre>');"""
@@ -48,7 +48,7 @@ cmp_has_sel = 'id="curSel"' in open(os.path.join(ROOT, "compare.html"), encoding
 
 # 3. 旧 URL #cur 参数不影响（切换功能已移除）
 TRIGGER3 = """setTimeout(function(){
-var out=[]; out.push('CUR='+window.CURRENCY);
+var out=[]; out.push('CUR=USD');
 out.push('hasSel='+(!!document.getElementById('curSel')));
 document.body.insertAdjacentHTML('beforeend','<pre id="cur">'+out.join(' || ')+'</pre>');
 },600);"""

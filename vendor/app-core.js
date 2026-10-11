@@ -89,16 +89,14 @@ window.METRICS = {
   }
 };
 window.USD_CNY = 7.2;
-/* ===== 货币：固定显示美元（USD） =====
-   gdpRate(y)=USD→CNY 系数（逐年 FXRATE，缺失兜底 7.2）——仅用于把 CNY 基准源数据折算为 USD；
-   gdpApply(v, from, y)：把基准币种值折算到当前显示币种（恒为 "USD"）。 */
-window.CURRENCY = "USD";
+/* ===== 货币：统一以美元（USD）展示，无币种切换 =====
+   gdpRate(y)=USD→CNY 系数（逐年 FXRATE，缺失兜底 7.2），仅用于把 CNY 基准源数据折算为 USD；
+   gdpApply(v, from, y)：from==="USD" 直接返回；from==="CNY" 除以年汇率折算为 USD。展示恒为美元。 */
 window.gdpRate = y => (window.FXRATE && window.FXRATE[y]) || window.USD_CNY;
 window.gdpApply = (v, from, y) => {
   if (v == null || isNaN(v)) return null;
-  if (window.CURRENCY === from) return v;
-  const r = window.gdpRate(y);
-  return from === "USD" ? v * r : v / r;
+  if (from === "USD") return v;                 // 已是美元，无需折算
+  return v / window.gdpRate(y);                 // CNY 基准 → USD（除以 USD/CNY 年汇率）
 };
 window.CN = {
   "广东":{pop:12706,area:179725,"adcode":440000},
