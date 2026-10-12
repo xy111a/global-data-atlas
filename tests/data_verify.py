@@ -265,6 +265,22 @@ check("覆盖[地图可着色]", matched >= 200, f"{matched}/{len(WORLD['feature
 ext_countries = sum(1 for iso in EXT if any(EXT[iso].get(m) for m in ('trade','health','edu')))
 check("覆盖[EXT 国家]", ext_countries >= 180, f"{ext_countries}")
 
+# 4e-2 B4 新增指标 urban/inflation（World Bank EXT，2026-10-12）
+_urban = {iso: EXT[iso]['urban'] for iso in EXT if EXT[iso].get('urban')}
+_infl  = {iso: EXT[iso]['inflation'] for iso in EXT if EXT[iso].get('inflation')}
+check("覆盖[B4 urban 城镇化]", len(_urban) >= 150, f"{len(_urban)} 国")
+check("覆盖[B4 inflation 通胀]", len(_infl) >= 150, f"{len(_infl)} 国")
+# 量级/方向：城镇化 ∈ [0,100]
+_urban_bad = [(iso, y, v) for iso, d in _urban.items() for y, v in d.items() if not (0 <= float(v) <= 100)]
+check("量级[urban ∈ 0–100]", not _urban_bad, f"越界 {len(_urban_bad)} 例")
+# 通胀可为负(通缩)，但排除异常巨值(|v|>3000%)
+_infl_ext = [(iso, y, v) for iso, d in _infl.items() for y, v in d.items() if abs(float(v)) > 3000]
+check("量级[inflation 合理(可负)]", not _infl_ext, f"极端 {len(_infl_ext)} 例")
+check("锚点[CN/US inflation 2023]", '2023' in _infl.get('CN', {}) and '2023' in _infl.get('US', {}),
+      f"CN={_infl.get('CN', {}).get('2023')} US={_infl.get('US', {}).get('2023')}")
+_cnu = _urban.get('CN', {}).get('2023')
+check("锚点[CN urban 2023 ∈ 60–72]", _cnu is not None and 60 <= float(_cnu) <= 72, f"CN urban2023={_cnu}")
+
 # ---------- 4f 欧盟 NUTS2（EU27） ----------
 EU27 = ["AT","BE","BG","CY","CZ","DE","DK","EE","EL","ES","FI","FR","HR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"]
 eu_files = os.listdir('vendor/eu')

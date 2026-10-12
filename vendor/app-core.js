@@ -123,6 +123,19 @@ window.METRICS = {
     label:"军费", fmt:v=>fmtPct(v), unit:"% GDP",
     near(o,year){ return (o&&o.ext)?o.ext("military",year):null; },
     series(){ return null; }, growth(){ return null; }
+  },
+  /* ===== B4 新增国家指标（2026-10-12）：World Bank EXT，仅国家层 ===== */
+  urban: {
+    scope:"world",
+    label:"城镇化率", fmt:v=>fmtPct(v), unit:"% 城镇人口",
+    near(o,year){ return (o&&o.ext)?o.ext("urban",year):null; },
+    series(){ return null; }, growth(){ return null; }
+  },
+  inflation: {
+    scope:"world",
+    label:"通胀率", fmt:v=>fmtPct(v), unit:"% CPI(年, 可负)",
+    near(o,year){ return (o&&o.ext)?o.ext("inflation",year):null; },
+    series(){ return null; }, growth(){ return null; }
   }
 };
 window.USD_CNY = 7.2;
