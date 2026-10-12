@@ -38,6 +38,20 @@ step "L2 数据自洽校验"
 "$PY" tests/data_verify.py > /tmp/verify.log 2>&1 && tail -1 /tmp/verify.log || { echo "  ✗ 数据自洽失败:"; grep ✗ /tmp/verify.log | head -5; exit 1; }
 echo "  ✓ L2 通过"; PASS=$((PASS+1))
 
+step "L2b 增长口径一致性（growth_currency_test，P0 回归护栏）"
+# reg.growth() 必须与「展示币种(USD)端点之比」完全吻合。
+# 2026-10-12 曾发现 EU NUTS2 / 中国省级 / 中国城市 三层在源币种(CNY)上算增长、
+# 却以 USD 展示，导致同屏数值与百分比不自洽（省最大偏差 383pp、EU 最大 177pp）。
+NODE="${NODE:-node}"
+"$NODE" tests/growth_currency_test.js > /tmp/growthcur.log 2>&1 && tail -1 /tmp/growthcur.log || { echo "  ✗ 增长口径失败:"; grep '✗' /tmp/growthcur.log | head -8; exit 1; }
+echo "  ✓ L2b 通过"; PASS=$((PASS+1))
+
+step "L2c ATLAS_META 新鲜度（meta_freshness_test，含浏览器渲染断言）"
+# meta.js 的 datasets 曾是零引用死元数据，us/japan 年份写错也无人发现。
+# 此处同时守住「声明年==数据实际年」与「about.html 真的把表渲染出来」。
+"$PY" tests/meta_freshness_test.py > /tmp/metafresh.log 2>&1 && tail -1 /tmp/metafresh.log || { echo "  ✗ meta 新鲜度失败:"; grep '❌' /tmp/metafresh.log | head -8; exit 1; }
+echo "  ✓ L2c 通过"; PASS=$((PASS+1))
+
 step "L3a 回归截图（offline_test）"
 "$PY" tests/offline_test.py > /tmp/offline.log 2>&1 && grep -c "OK" /tmp/offline.log || { echo "  ✗ 回归失败:"; grep -E "FAIL|Error" /tmp/offline.log | head -5; exit 1; }
 echo "  ✓ L3a 通过"; PASS=$((PASS+1))
@@ -104,6 +118,17 @@ echo "  ✓ L3p 通过"; PASS=$((PASS+1))
 step "L3q 嵌入模式 ?embed=1（embed_mode_test，T11）"
 "$PY" tests/embed_mode_test.py > /tmp/embed.log 2>&1 && tail -3 /tmp/embed.log || { echo "  ✗ 嵌入模式失败:"; tail -12 /tmp/embed.log; exit 1; }
 echo "  ✓ L3q 通过"; PASS=$((PASS+1))
+
+step "L3r 欧盟多年序列+派生指标（eu_year_metric_test，浏览器实测）"
+# 不信任文档：FEATURES.md/meta.js 长期写着欧盟「2023 单年」，但数据其实早就是 2000–2024
+# 多年序列。这里在真实浏览器里验证年份切换生效、派生指标可用、排行榜能出结果。
+"$PY" tests/eu_year_metric_test.py > /tmp/euym.log 2>&1 && tail -1 /tmp/euym.log || { echo "  ✗ 欧盟年份/派生指标失败:"; grep '❌' /tmp/euym.log | head -8; exit 1; }
+echo "  ✓ L3r 通过"; PASS=$((PASS+1))
+
+step "L3s 主页导出 CSV/PNG（export_test）"
+# 导出此前只在 compare.html 有：主页排行/地图拿不到数据。断言落在生成的字节与渲染链路上。
+"$PY" tests/export_test.py > /tmp/export.log 2>&1 && tail -1 /tmp/export.log || { echo "  ✗ 导出失败:"; grep '❌' /tmp/export.log | head -8; exit 1; }
+echo "  ✓ L3s 通过"; PASS=$((PASS+1))
 
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

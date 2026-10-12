@@ -35,6 +35,43 @@ window.METRICS = {
     near(o,year){ return (o&&o.get)?o.get("area",year):null; },
     series(){ return null; }, growth(){ return null; }
   },
+  /* ===== 派生指标（全部层级）：由 gdp 与 pop/area 现算，不需要新数据源 =====
+     此前「人均GDP(gdpcap)」是 World Bank 扩展指标、scope:"world"，导致省/州/县/NUTS2/城市
+     明明有人口与面积却看不到人均与地均。派生版与展示币种(USD)同源，6 层全部生效。 */
+  gdppc: {
+    label:"人均GDP·现价", fmt:v=>v!=null?"$"+v.toFixed(0):null, unit:"美元/人",
+    near(o,year){
+      if(!o||!o.get) return null;
+      const g=o.get("gdp",year), p=o.get("pop",year);
+      if(g==null||p==null||!isFinite(g)||!isFinite(p)||p<=0) return null;
+      return g/p;
+    },
+    series(){ return null; },
+    growth(o,base){
+      if(!o||!o.get) return null;
+      const b=base==null?null:+base;
+      const g0=o.get("gdp",b), p0=o.get("pop",b), g1=o.get("gdp",dataYear), p1=o.get("pop",dataYear);
+      if([g0,p0,g1,p1].some(x=>x==null||!isFinite(x))||p0<=0||p1<=0) return null;
+      return (g1/p1)/(g0/p0)-1;
+    }
+  },
+  gdpden: {
+    label:"地均GDP", fmt:v=>v!=null?fmtGDP(v)+"/km²":null, unit:"美元/km²",
+    near(o,year){
+      if(!o||!o.get) return null;
+      const g=o.get("gdp",year), a=o.get("area",year);
+      if(g==null||a==null||!isFinite(g)||!isFinite(a)||a<=0) return null;
+      return g/a;
+    },
+    series(){ return null; },
+    growth(o,base){
+      if(!o||!o.get) return null;
+      const b=base==null?null:+base;
+      const g0=o.get("gdp",b), a0=o.get("area",b), g1=o.get("gdp",dataYear), a1=o.get("area",dataYear);
+      if([g0,a0,g1,a1].some(x=>x==null||!isFinite(x))||a0<=0||a1<=0) return null;
+      return (g1/a1)/(g0/a0)-1;
+    }
+  },
   /* ===== 扩展指标（World Bank EXT，国家层） =====
      通用取数器：reg.ext(m, year) 返回最近可得值，缺失返回 null。
      省/州/市 reg 无 ext → 自动显示"暂无"，无需各自实现。 */
@@ -315,8 +352,14 @@ function cnGdpYear(short, year){           // cnGdpRMB 实际采用的年份（�
   if(!avail.length) return year;
   return nearestByDist(avail, year);
 }
-function cnNominalGrowth(short, baseYear){ // 较基准年 名义(现价)增长, 返回小数, 缺失返回 null
-  const b = cnGdpRMB(short, baseYear), e = cnGdpRMB(short, dataYear);
+function cnNominalGrowth(short, baseYear){ // 较基准年 名义(现价)增长（展示币种 USD）, 返回小数, 缺失返回 null
+  /* ⚠️ 口径：源 gdpRMB 是人民币元，页面展示为 USD。增长必须在「展示币种」上计算，
+     否则同屏 USD 数值与增长百分比不自洽——人民币兑美元升值会把美元增长系统性放大，
+     实测 31 省偏差中位 232pp、最大 383pp（西藏 2000→2025：CNY 口径 2450% vs USD 口径 2833%）。
+     两端各自用「实际采用年份」的逐年汇率折算（稀疏年份经 cnGdpYear 诚实定位）。 */
+  const yb = cnGdpYear(short, baseYear), ye = cnGdpYear(short, dataYear);
+  const b = gdpApply(cnGdpRMB(short, baseYear), "CNY", yb);
+  const e = gdpApply(cnGdpRMB(short, dataYear), "CNY", ye);
   if(b==null || e==null || b===0) return null;
   return e/b - 1;
 }
@@ -448,7 +491,18 @@ function regCity(cm, adcode){
   if(!cm) return null;
   if(__regCache.city[adcode]) return __regCache.city[adcode];
   /* 多年序列（Phase E）：CITY_TS[adcode] = {年份: 亿元} */
-  const ts = adcode && window.CITY_TS && window.CITY_TS[String(adcode)];
+  const rawTs = adcode && window.CITY_TS && window.CITY_TS[String(adcode)];
+  /* ⚠️ 2026-10-12 修复：46 个有序列的城市，其 ts 只到 2020（部分只到 2012），
+     而 CITY_METRICS 里还有一份更新的 2023 单年快照。若不把 2023 快照并入序列，
+     dataYear=2025 时会回退到更旧的 2020/2012 值，而同层另外 275 个无序列城市用的是
+     2023 快照 —— 同一张排行里出现不同基准年，横向比较失真。
+     并入后：2009–2012 / 2020 / 2023 全在序列里，就近取年自然落到最新的 2023。 */
+  const ts = (() => {
+    if (!rawTs) return null;
+    const merged = Object.assign({}, rawTs);
+    if (cm && cm.gdp != null && merged[2023] == null) merged["2023"] = cm.gdp / 1e8;   // 元 → 亿元
+    return merged;
+  })();
   const ylist = ts ? Object.keys(ts).map(Number).sort((a,b)=>a-b) : [];
   const r = {
     name:cm.name||"", cn:cm.name||"",
@@ -471,9 +525,14 @@ function regCity(cm, adcode){
       if(m!=="gdp" || !ts || ylist.length<2) return null;
       const b=base==null?ylist[0]:+base;
       const lo=ylist[0], hi=ylist[ylist.length-1];
-      const bv=ts[b]!=null?ts[b]:(b<lo?ts[lo]:ts[hi]);
-      if(bv==null) return null;
-      return (ts[hi]-bv)/bv;
+      const by=ts[b]!=null?b:(b<lo?lo:hi);
+      const br=ts[by], hr=ts[hi];
+      if(br==null||hr==null) return null;
+      /* 口径：ts 单位为人民币亿元，展示为 USD → 增长必须在 USD 上算（两端各用其年汇率）。
+         实测 36 城有序列，CNY 口径偏差中位 4.0pp、最大 16.4pp。 */
+      const bv=gdpApply(br*1e8,"CNY",by), hv=gdpApply(hr*1e8,"CNY",hi);
+      if(bv==null||bv===0) return null;
+      return (hv-bv)/bv;
     },
     gdpSeries(){ if(!ts) return null;
       return {years:ylist, values:ylist.map(y=>gdpApply(ts[y]*1e8,"CNY",y))}; },
@@ -553,9 +612,15 @@ function regNUTS(nid){
       if(m!=="gdp"||!gdpObj||yl.length<2) return null;
       const b = (base==null)?yl[0]:+base;
       const lo=yl[0], hi=yl[yl.length-1];
-      const bv = gdpObj[b]!=null ? gdpObj[b] : (b<lo?gdpObj[lo]:gdpObj[hi]);
-      if(bv==null) return null;
-      return (gdpObj[hi]-bv)/bv;
+      const by = gdpObj[b]!=null ? b : (b<lo?lo:hi);
+      const br=gdpObj[by], hr=gdpObj[hi];
+      if(br==null||hr==null) return null;
+      /* 口径：gdpObj 为人民币元（EUR→CNY 逐年 ECB），展示为 USD → 增长必须在 USD 上算。
+         实测 237 个有序列区域全部偏差，中位 33pp、最大 177pp（RO32 布加勒斯特
+         2000→2024：CNY 口径 1076% vs USD 口径 1253%）。 */
+      const bv=gdpApply(br,"CNY",by), hv=gdpApply(hr,"CNY",hi);
+      if(bv==null||bv===0) return null;
+      return (hv-bv)/bv;
     },
     gdpSeries(){ if(!gdpObj) return null;
       return {name:d.name, years:yl, values:yl.map(y=>gdpApply(gdpObj[y],"CNY",y))}; },
@@ -564,6 +629,21 @@ function regNUTS(nid){
   __regCache.nuts[nid]=r; return r;
 }
 function regGet(reg, m, year){ return METRICS[m] && reg ? METRICS[m].near(reg, year) : null; }
+/* 统一取增长（2026-10-12）：优先走 METRICS 注册表，再回退到区域自身的 growth()。
+   原因：派生指标（gdppc 人均 / gdpden 地均）的增长只在**注册表**里定义，而各层
+   reg.growth() 内部只实现了 m==="gdp"，直接调 reg.growth(metric) 会让这两种指标
+   永远返回 null —— 排行「名义增长」模式一切到人均 GDP 就空列表。 */
+function regGrowth(reg, m, base){
+  if(!reg || !m) return null;
+  const M = METRICS[m];
+  if(M && typeof M.growth === "function"){
+    try{ const g = M.growth(reg, base); if(g!=null && isFinite(g)) return g; }catch(e){}
+  }
+  if(typeof reg.growth === "function"){
+    try{ const g = reg.growth(m, base); return (g!=null && isFinite(g)) ? g : null; }catch(e){}
+  }
+  return null;
+}
 function countryTrend(iso2){
   const o=window.WB&&window.WB[iso2]; if(!o||!o.years) return null;
   const ys=Object.keys(o.years).map(Number).filter(y=>o.years[y].gdp!=null).sort((a,b)=>a-b);

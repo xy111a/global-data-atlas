@@ -270,6 +270,40 @@ for cc in ("DE", "EL"):
     metric_ids = {k for k, v in EU_M.items() if v.get('cc') == cc}
     check(f"交叉[{cc} 边界vs指标]", geo_ids == metric_ids, f"边界{len(geo_ids)} vs 指标{len(metric_ids)}")
 
+# ---------- ATLAS_META 年份口径（防漂移硬断言） ----------
+# 背景：2026-10-12 发现 vendor/meta.js 里 us 写 2023（US_TS 实际到 2024）、
+# japan 写 2021（JP_TS 实际到 2022）；而 datasets 字段当时全仓零引用，错误从未暴露。
+# 现已把 datasets 接入 about.html「数据新鲜度」表，并在此以数据文件实际最大年做硬断言。
+META = load_js('vendor/meta.js', 'ATLAS_META')
+META_DS = META.get('datasets', {})
+check("meta[字段完整]", len(META_DS) >= 6 and bool(META.get('built')),
+      f"{len(META_DS)} 数据集 / built={META.get('built')}")
+
+def _max_year(d, pick):
+    ys = set()
+    for v in d.values():
+        for y, x in (pick(v) or {}).items():
+            if x is not None:
+                try: ys.add(int(y))
+                except (TypeError, ValueError): pass
+    return max(ys) if ys else None
+
+ACTUAL = {
+    'world': _max_year(WB,    lambda v: {y: (dd or {}).get('gdp') for y, dd in (v.get('years') or {}).items()}),
+    'china': _max_year(CN_TS, lambda v: v.get('gdpRMB')),
+    'us':    _max_year(US_TS, lambda v: v.get('years')),
+    'eu':    _max_year(EU_M,  lambda v: v.get('gdp') if isinstance(v.get('gdp'), dict) else None),
+    'japan': _max_year(JP_TS, lambda v: v),
+}
+for _k, _actual in ACTUAL.items():
+    _declared = (META_DS.get(_k) or {}).get('latest')
+    check(f"meta[{_k} 最新年与数据实际一致]", _actual is not None and _declared == _actual,
+          f"声明 {_declared} vs 数据实际 {_actual}")
+# city 为单年快照（数据文件无年份字段可推导），仅做区间 sanity
+_city_declared = (META_DS.get('city') or {}).get('latest')
+check("meta[city 最新年合理]", isinstance(_city_declared, int) and 2022 <= _city_declared <= 2026,
+      f"声明 {_city_declared}")
+
 # ---------- 输出 ----------
 print(f"\n=== 校验结果: OK {len(ok)} | WARN {len(warn)} | ERROR {len(err)} ===")
 for w in warn: print(f"  ⚠ {w}")

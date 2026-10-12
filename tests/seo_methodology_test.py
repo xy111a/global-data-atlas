@@ -18,6 +18,18 @@ about = open(os.path.join(root, "about.html"), encoding="utf-8").read()
 sitemap = open(os.path.join(root, "sitemap.xml"), encoding="utf-8").read()
 robots = open(os.path.join(root, "robots.txt"), encoding="utf-8").read()
 
+# 0.5 社交分享卡片（2026-10-12）：缺 og:image / twitter:card 时，X 等平台分享只出裸链接
+check("og:image 存在且指向绝对 URL", 'property="og:image" content="https://' in main)
+check("og:image 尺寸声明 1200x630", 'property="og:image:width" content="1200"' in main
+      and 'property="og:image:height" content="630"' in main)
+check("og:image 文件已入库", os.path.exists(os.path.join(root, "og-image.png")))
+check("twitter:card = summary_large_image", 'name="twitter:card" content="summary_large_image"' in main)
+check("twitter:image 存在", 'name="twitter:image" content="https://' in main)
+_ogimg = re.search(r'property="og:image" content="([^"]+)"', main)
+check("og:image 指向与入库文件一致",
+      _ogimg is not None and _ogimg.group(1).rstrip("/").endswith("/og-image.png"),
+      f"({_ogimg.group(1) if _ogimg else None})")
+
 # 1. JSON-LD 存在且合法
 blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', main, re.S)
 check("存在 application/ld+json 块", len(blocks) >= 1, f"(n={len(blocks)})")
