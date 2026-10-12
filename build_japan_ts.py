@@ -16,16 +16,19 @@
 import subprocess, os, sys, json, re
 
 OUT = "vendor/jp_ts.js"
+# 2024/2025 表尚不存在(404)；/2023/ 表虽存在但对 石川·奈良·徳島·香川·宮崎 5 县 GDP 单元格为 '-'（缺值），
+# 直接用会把覆盖从 47 降到 42、破坏完整性 → 暂沿用 /2022/（2011-2022 全 47 县）。见 build 注释。
 XLSX_URL = "https://www.esri.cao.go.jp/jp/sna/data/data_list/kenmin/files/contents/tables/2022/soukatu1.xlsx"
 XLSX = "/tmp/soukatu1.xlsx"
 
 # 逐年 JPY→USD 基线（1 日元 = ? 美元）。
-# 来源：ECB 参考汇率，经 api.frankfurter.app 取当年全部交易日的算术平均，抓取于 2026-10-12。
+# 来源：ECB 参考汇率，经 api.frankfurter.dev/v1 取当年全部交易日的算术平均，抓取于 2026-10-12。
 # 内置基线保证离线可重现；联网时会尝试刷新（见 fetch_rate_map），失败则回退基线。
 JPY_USD_BASELINE = {
     "2011": 0.012559, "2012": 0.012546, "2013": 0.010260, "2014": 0.009476,
     "2015": 0.008261, "2016": 0.009229, "2017": 0.008915, "2018": 0.009056,
     "2019": 0.009178, "2020": 0.009372, "2021": 0.009108, "2022": 0.007652,
+    "2023": 0.007132,
 }
 # 对应 1 USD = ? 円（仅用于日志/校验展示）
 USD_JPY_BASELINE = {y: round(1 / v, 2) for y, v in JPY_USD_BASELINE.items()}
@@ -36,7 +39,7 @@ def fetch_rate_map(years):
     lo, hi = min(years), max(years)
     try:
         import urllib.request
-        url = f"https://api.frankfurter.app/{lo}-01-01..{hi}-12-31?from=JPY&to=USD"
+        url = f"https://api.frankfurter.dev/v1/{lo}-01-01..{hi}-12-31?base=JPY&symbols=USD"
         # frankfurter 对无 UA 的 urllib 默认请求返回 403，需显式声明 UA
         req = urllib.request.Request(url, headers={"User-Agent": "atlas-build/1.0 (+https://atlas.huajun.wang)"})
         with urllib.request.urlopen(req, timeout=60) as resp:
