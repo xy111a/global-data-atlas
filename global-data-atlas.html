@@ -167,6 +167,8 @@
   .drop>button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
   .drop.open>button{color:var(--text);border-color:var(--line-bright);background:var(--hover);}
   .drop>button .arrow{font-size:10px;transition:transform var(--t-fast);}
+  .drop>button.has-active{color:var(--cyan);border-color:var(--line-bright);}
+  .drop>button#metricMoreBtn{max-width:172px;overflow:hidden;}
   .drop.open>button .arrow{transform:rotate(180deg);}
   .drop .dropdown{position:absolute;top:calc(100% + 6px);left:0;z-index:30;display:none;
     background:var(--panel-float);border:1px solid var(--line);border-radius:var(--r-md);
@@ -715,6 +717,17 @@ function syncMetricActive(){
   const dropdown=document.getElementById("metricMoreDropdown");
   if(seg) seg.querySelectorAll("button").forEach(b=>{ b.classList.toggle("active", b.dataset.m===metric); });
   if(dropdown) dropdown.querySelectorAll("button").forEach(b=>{ b.classList.toggle("active", b.dataset.m===metric); });
+  /* 当前指标若落在下拉里，顶栏「更多指标」按钮显示该指标名——否则用户看不到当前选中项
+     （旧结构所有指标都在 seg 里，不存在这个问题） */
+  const moreBtn=document.getElementById("metricMoreBtn");
+  if(moreBtn){
+    const inDrop = !!(dropdown && dropdown.querySelector('button[data-m="'+metric+'"]'));
+    const label = (METRICS[metric]||{}).label || "";
+    moreBtn.innerHTML = (inDrop && label) ? ('更多指标 · '+label+' <span class="arrow">▾</span>')
+                                          : ('更多指标 <span class="arrow">▾</span>');
+    moreBtn.classList.toggle("has-active", inDrop);
+    moreBtn.title = inDrop ? ('当前指标：'+label+'（在下拉中）') : "展开更多指标";
+  }
 }
 /* 收起顶栏下拉（更多指标 / 工具） */
 function closeDrop(wrap, btn){
