@@ -52,6 +52,40 @@ for f in vendor/app-core.js vendor/meta.js vendor/eu/eu_metrics.js vendor/world.
 done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
+# 动态资源指纹清单（#4, 2026-10-12）：walk dist/vendor 全部 .js → md5[:8]，把 window.VHASH 内联
+# 注入引用了 app-core 的页面。loadScript()/loadCnProvGeo() 运行时按「原始路径」查表注 ?v，
+# 覆盖静态 <script src> 之外的动态拼接路径（ext_indicators / japan / us-states / cn·eu 边界等），
+# 使这些文件内容刷新后也能即时到达用户（此前只能靠 _headers max-age=0 回源兜底）。
+python3 - <<'PYEOF'
+import os, json, hashlib
+def h8(p): return hashlib.md5(open(p, 'rb').read()).hexdigest()[:8]
+vhash = {}
+for root, _, files in os.walk('dist/vendor'):
+    for fn in files:
+        if fn.endswith('.js'):
+            full = os.path.join(root, fn)
+            vhash[full[len('dist/'):] if full.startswith('dist/') else full] = h8(full)   # 键形如 vendor/eu/de.js
+blob = "<script>window.VHASH=" + json.dumps(vhash, separators=(',', ':'), ensure_ascii=False) + ";</script>"
+targets = ["dist/global-data-atlas.html", "dist/index.html", "dist/embed.html", "dist/compare.html", "dist/about.html"]
+marker = 'src="vendor/app-core.js'
+n = 0
+for p in targets:
+    if not os.path.exists(p):
+        continue
+    s = open(p, encoding='utf-8').read()
+    if 'window.VHASH=' in s:          # 幂等（dist 每次从源码重 cp，正常不命中）
+        continue
+    i = s.find(marker)
+    if i == -1:
+        continue
+    j = s.rfind('<script', 0, i)      # 定位该 <script> 标签起始，插到它前面
+    if j == -1:
+        j = i
+    open(p, 'w', encoding='utf-8').write(s[:j] + blob + s[j:])
+    n += 1
+print("  ↻ 已内联 window.VHASH（%d 个动态资源指纹）于 %d 个页面" % (len(vhash), n))
+PYEOF
+
 # 缓存失效（A2, 2026-10-12）：给所有「静态 <script src=vendor/*.js>」引用注入 ?v=<md5前8位>。
 # 内容变→URL变→同时绕过 浏览器强缓存 / CDN(_headers max-age) / Service Worker(cache-first 键含 ?query)。
 # 用 Python hashlib.md5：跨机确定，顺带根治 build 机缺 md5/md5sum 时 ?v 落到 sha1 的漂移（P3）。

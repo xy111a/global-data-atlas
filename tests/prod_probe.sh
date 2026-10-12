@@ -20,7 +20,10 @@ check "响应含 Content-Security-Policy" "printf '%s' '$HDR' | grep -qi 'conten
 check "响应含 X-Content-Type-Options: nosniff" "printf '%s' '$HDR' | grep -qi 'x-content-type-options: *nosniff'"
 
 # 3) 数据文件指纹已生效：从生产首页解析 us_pop_ts.js 的引用 URL
-POPREF="$(printf '%s' "$HDR" >/dev/null 2>&1; curl -m 25 -sS "$BASE/" 2>/dev/null | grep -oE 'vendor/us_pop_ts\.js(\?v=[a-f0-9]+)?' | head -1 || true)"
+# 3) 取指纹：只认真正的 <script src="vendor/us_pop_ts.js?v=…"> 形式
+#    （生产 HTML 里还内联了 window.VHASH JSON，含裸串 vendor/us_pop_ts.js":"hash"，
+#     若用宽松正则 head -1 会误抓 VHASH 那条 → 假报「无 ?v/陈旧」。必须锚定 src="…?v=…"）
+POPREF="$(curl -m 25 -sS "$BASE/" 2>/dev/null | grep -oE 'src="vendor/us_pop_ts\.js\?v=[a-f0-9]+"' | head -1 | sed -E 's/^src="//; s/"$//' || true)"
 note "首页解析到的引用: ${POPREF:-（空）}"
 # 3a) 该引用应带 ?v=（证明部署的是新版 A2 构建，而非旧的裸 URL）
 check "us_pop_ts.js 引用带 ?v= 内容指纹" "printf '%s' '$POPREF' | grep -q '?v='"

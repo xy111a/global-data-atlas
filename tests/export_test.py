@@ -71,6 +71,25 @@ try{
     out.pngPrefix = u.slice(0,22);
     out.pngLen = u.length;
   }catch(e){ out.pngPrefix='ERR:'+e.message; out.pngLen=0; }
+  // ===== C2 全量导出探针（当前层 world, metric gdp：区域×年份长表）=====
+  metric='gdp'; rankMode='value';
+  try{
+    out.fnBuildFull = (typeof buildFullExport==='function');
+    out.fnLevelRegs = (typeof atlasLevelRegs==='function');
+    out.hasFullCsvBtn = !!document.getElementById('fullCsvBtn');
+    out.hasFullJsonBtn = !!document.getElementById('fullJsonBtn');
+    var bf=buildFullExport();
+    out.full_rows = bf?bf.rows:0;
+    out.full_regions = bf?bf.regions:0;
+    out.full_head = bf?bf.csv.split('\n')[0]:null;
+    out.full_line1= bf?bf.csv.split('\n')[1]:null;
+    out.full_csvname = bf?bf.csvFilename:null;
+    out.full_bom = !!(bf && bf.csvText.charCodeAt(0)===0xFEFF && bf.csv.indexOf('\ufeff')!==0);
+    out.full_json_ok = !!(bf && (function(){try{var j=JSON.parse(bf.json); return j.level==='world' && j.metric==='gdp' && j.regions.length>100 && j.regions[0].series['2023']!=null;}catch(e){return false;}})());
+    out.full_ycount = (function(){ if(!bf) return 0; try{var j=JSON.parse(bf.json); return j.regions.filter(function(x){return Object.keys(x.series).length>=20;}).length;}catch(e){return 0;} })();
+    try{ exportFullCsv(); out.callFullCsvOk=true; }catch(e){ out.callFullCsvOk='ERR:'+e.message; }
+  }catch(e){ out.full_err=''+e.message; }
+
   rankMode='value'; metric='gdp'; renderRank();   // 复位
   out.err=null;
 }catch(e){ out.err=''+e.message; }
@@ -136,6 +155,20 @@ print("— 地图 PNG —")
 check("getDataURL 返回 PNG data URL", (out.get("pngPrefix") or "").startswith("data:image/png;base64,"),
       f"({out.get('pngPrefix')})")
 check("PNG 数据非空（>20KB，说明画布已渲染）", (out.get("pngLen") or 0) > 20000, f"({out.get('pngLen')} 字符)")
+
+print("— C2 全量导出（区域×年份 长表）—")
+check("C2 探针无异常", not out.get("full_err"), f"({out.get('full_err')})")
+check("C2 buildFullExport / atlasLevelRegs 已定义", out.get("fnBuildFull") is True and out.get("fnLevelRegs") is True)
+check("C2 全量导出按钮存在", out.get("hasFullCsvBtn") is True and out.get("hasFullJsonBtn") is True)
+check("C2 全量 CSV 行数 ≥ 3000（214 国 × 多年）", (out.get("full_rows") or 0) >= 3000, f"({out.get('full_rows')} 行)")
+check("C2 区域数 ≥ 150", (out.get("full_regions") or 0) >= 150, f"({out.get('full_regions')} 区域)")
+check("C2 表头正确", (out.get("full_head") or "") == "层级,区域,键,指标,单位,年份,数值", f"({out.get('full_head')})")
+check("C2 首行 7 列", len((out.get("full_line1") or "").split(",")) == 7, f"({out.get('full_line1')})")
+check("C2 CSV 带 BOM(正文不含)", out.get("full_bom") is True)
+check("C2 文件名 atlas-world-gdp-allyears.csv", out.get("full_csvname") == "atlas-world-gdp-allyears.csv", f"({out.get('full_csvname')})")
+check("C2 JSON 结构正确(level/metric/regions/2023)", out.get("full_json_ok") is True)
+check("C2 ≥100 国有 ≥20 年序列", (out.get("full_ycount") or 0) >= 100, f"({out.get('full_ycount')} 国)")
+check("C2 调用全量 CSV 导出未抛异常", out.get("callFullCsvOk") is True, f"({out.get('callFullCsvOk')})")
 
 print(f"\n导出回归: {ok}/{total} 通过")
 sys.exit(0 if ok == total else 1)

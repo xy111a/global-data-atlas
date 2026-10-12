@@ -332,7 +332,7 @@
     transition:border-color var(--t-fast),color var(--t-fast);}
   .rank-export button:hover{color:var(--cyan);border-color:var(--cyan);}
   .rank-export button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px;}
-  html.embed #pngBtn{display:none;}   /* 嵌入模式下不暴露导出，由父页自行实现 */
+  html.embed #pngBtn,html.embed #fullCsvBtn,html.embed #fullJsonBtn{display:none;}   /* 嵌入模式下不暴露导出，由父页自行实现 */
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
     cursor:pointer;font-size:13px;transition:background var(--t-fast);}
   .rank-item:hover{background:var(--hover);}
@@ -397,6 +397,8 @@
         <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
         <button class="btn" id="scaleBtn" aria-label="切换配色刻度（线性/对数）" title="配色刻度：线性 ↔ 对数（GDP 等长尾分布建议用对数）">🎨 线性</button>
         <button class="btn" id="pngBtn" aria-label="把当前地图导出为 PNG" title="把当前地图存为 PNG（2 倍像素，含图例）">📷 PNG</button>
+        <button class="btn" id="fullCsvBtn" aria-label="导出本层全量数据为 CSV" title="当前层级 × 当前指标 × 所有可得年份 → 长表 CSV">⬇ 全量CSV</button>
+        <button class="btn" id="fullJsonBtn" aria-label="导出本层全量数据为 JSON" title="当前层级 × 当前指标 × 所有可得年份 → JSON（含元信息）">⬇ JSON</button>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
@@ -437,7 +439,7 @@
 <script src="vendor/countries_wb.js?v=4e3c1aff"></script>
 <script src="vendor/fxrate.js?v=8b2fad9c"></script>
 <script src="vendor/meta.js?v=fd772b8c"></script>
-<script src="vendor/app-core.js?v=70064bed"></script>
+<script>window.VHASH={"vendor/app-core.js":"70064bed","vendor/japan.js":"d3fca8c1","vendor/fxrate.js":"8b2fad9c","vendor/countries_wb.js":"4e3c1aff","vendor/ext_indicators.js":"97ffd903","vendor/us_states_bea.js":"ba2e22b5","vendor/world.js":"36a090dd","vendor/us_pop_ts.js":"1778d891","vendor/cn_prov_ts.js":"6cd33f04","vendor/meta.js":"fd772b8c","vendor/jp_ts.js":"cebc4186","vendor/us-states.js":"db63472a","vendor/jp_metrics.js":"aa4f0a57","vendor/echarts.min.js":"c23e4a44","vendor/cn/340000.js":"48ab6f4c","vendor/cn/450000.js":"a787025f","vendor/cn/100000.js":"1523ea2d","vendor/cn/610000.js":"37512d18","vendor/cn/city_metrics.js":"4c542222","vendor/cn/820000.js":"66cad42b","vendor/cn/360000.js":"5650fb2a","vendor/cn/630000.js":"876668b8","vendor/cn/120000.js":"5bdce18e","vendor/cn/510000.js":"a246ef26","vendor/cn/320000.js":"afb76247","vendor/cn/430000.js":"43ceb3ad","vendor/cn/650000.js":"de290795","vendor/cn/140000.js":"7decd937","vendor/cn/220000.js":"ca3e715d","vendor/cn/410000.js":"27d7c679","vendor/cn/530000.js":"5589a7a6","vendor/cn/810000.js":"bf0061d6","vendor/cn/110000.js":"23215666","vendor/cn/350000.js":"ef8403ff","vendor/cn/440000.js":"8cb82520","vendor/cn/620000.js":"c77e4419","vendor/cn/130000.js":"7537a840","vendor/cn/460000.js":"e5f44169","vendor/cn/370000.js":"47247e8c","vendor/cn/540000.js":"0bfb8bd1","vendor/cn/330000.js":"5bd0a1f5","vendor/cn/500000.js":"86df15e2","vendor/cn/210000.js":"0f524841","vendor/cn/420000.js":"be5dd5ef","vendor/cn/city_index.js":"554cb1ca","vendor/cn/230000.js":"0b7c4c0a","vendor/cn/520000.js":"b483f6fb","vendor/cn/310000.js":"4fd5a5ee","vendor/cn/640000.js":"c319f699","vendor/cn/city_ts.js":"b5c6334f","vendor/cn/150000.js":"ebccb108","vendor/eu/pt.js":"ffb5659d","vendor/eu/lv.js":"7a3e1ed2","vendor/eu/pl.js":"0c27c923","vendor/eu/el.js":"1015ac8f","vendor/eu/hr.js":"4e4606dc","vendor/eu/at.js":"938a7ded","vendor/eu/fi.js":"ea0e8d28","vendor/eu/si.js":"9c68e161","vendor/eu/ie.js":"9fb9e5f2","vendor/eu/bg.js":"e0d0baf3","vendor/eu/cz.js":"0ea226fe","vendor/eu/cy.js":"c0e8dee8","vendor/eu/be.js":"7ccc2a95","vendor/eu/eu_metrics.js":"caee3369","vendor/eu/ee.js":"bed11139","vendor/eu/se.js":"22b1f36a","vendor/eu/de.js":"6dcb9074","vendor/eu/fr.js":"5ce11db1","vendor/eu/nl.js":"d34953db","vendor/eu/hu.js":"d220709c","vendor/eu/mt.js":"cb21a866","vendor/eu/lt.js":"e5be0fef","vendor/eu/dk.js":"754c9487","vendor/eu/lu.js":"1826b047","vendor/eu/sk.js":"e9068ca7","vendor/eu/it.js":"440022b5","vendor/eu/es.js":"7374af0f","vendor/eu/ro.js":"64ee9344"};</script><script src="vendor/app-core.js?v=70064bed"></script>
 <!-- 层级专属数据集：首屏（世界地图）不需要，延迟到 HTML 解析后执行（defer），
      不再阻塞解析器；进入对应层级时数据已就绪（defer 脚本在 DOMContentLoaded 前按序执行完毕）。
      这 8 个脚本合计约 150KB+，从首屏同步路径移出，降低首屏阻塞。 -->
@@ -934,7 +936,11 @@ async function loadChina(){
 
 /* E1: 按层懒加载脚本（避免首屏 7MB 同步阻塞；重复调用只加载一次） */
 const __scripts={};
-function loadScript(src){
+function loadScript(raw){
+  /* 动态资源指纹（#4, 2026-10-12）：ext_indicators/japan/us-states/cn·eu 边界等走 loadScript，
+     URL 恒定 → 内容刷新后旧边缘对象会滞留。build.sh 内联注入 window.VHASH{路径:md5}，
+     内容变→?v变→新URL→边缘/浏览器/SW 即时失效（与静态 <script src> 的 ?v 同一机制）。 */
+  const src = (window.VHASH && window.VHASH[raw]) ? raw + "?v=" + window.VHASH[raw] : raw;
   return new Promise((res,rej)=>{
     if(__scripts[src]){ res(); return; }
     const s=document.createElement("script");
@@ -946,7 +952,8 @@ function loadCnProvGeo(adcode){
   return new Promise((resolve,reject)=>{
     if(window.CN_PROV && window.CN_PROV[adcode]){ resolve(window.CN_PROV[adcode]); return; }
     const s=document.createElement("script");
-    s.src=`vendor/cn/${adcode}.js`;
+    const _p=`vendor/cn/${adcode}.js`;
+    s.src = (window.VHASH && window.VHASH[_p]) ? _p+"?v="+window.VHASH[_p] : _p;   // #4 动态边界同样注指纹
     s.onload=()=>{ const g=window.CN_PROV && window.CN_PROV[adcode]; g?resolve(g):reject(new Error("边界未注册 "+adcode)); };
     s.onerror=()=>reject(new Error("加载边界失败 "+adcode));
     document.head.appendChild(s);
@@ -1448,6 +1455,64 @@ function exportMapPng(){
   }catch(e){ showBanner("PNG 导出失败："+((e&&e.message)||e)); }
 }
 window.exportRankCsv = exportRankCsv;
+/* ===== C2 全量导出（2026-10-12）：当前层 × 当前指标 × 所有可得年份，长表 CSV + 同结构 JSON =====
+   与「当前排行单年 CSV」互补：这份是「区域×年份」全序列，供二次分析。访问方式与各层 rank 源码一致。 */
+function atlasLevelRegs(){
+  const out=[];
+  if(currentLevel==="world"){ COUNTRIES.forEach(c=>{ const r=regCountry(c[2]); if(r) out.push({name:c[0],key:c[2],reg:r}); }); }
+  else if(currentLevel==="china"){ Object.keys(CN).forEach(k=>{ const r=regProv(k); if(r) out.push({name:k,key:k,reg:r}); }); }
+  else if(currentLevel==="province"){ (typeof currentProvData!=="undefined"?currentProvData:[]).filter(d=>d.cm).forEach(d=>{ const r=regCity(d.cm,d.adcode); if(r) out.push({name:d.name,key:d.adcode,reg:r}); }); }
+  else if(currentLevel==="us"){ Object.keys(US_STATES_GDP).forEach(k=>{ const r=regUSState(k); if(r) out.push({name:k,key:k,reg:r}); }); }
+  else if(currentLevel==="japan"){ Object.keys(window.JP_METRICS||{}).forEach(k=>{ const r=regJapanPref(k); if(r) out.push({name:k,key:k,reg:r}); }); }
+  else if(currentLevel==="nuts"){ Object.keys(window.EU_METRICS||{}).filter(k=>(window.EU_METRICS[k]||{}).cc===currentNUTS).forEach(k=>{ const r=regNUTS(k); if(r) out.push({name:r.name||k,key:k,reg:r}); }); }
+  return out;
+}
+function _fullMetricYears(reg,m){
+  if(METRICS[m]&&METRICS[m].scope==="world"){                 // 扩展指标：仅国家层，用其实际 EXT 年份键
+    const d=window.EXT&&reg&&reg.iso2&&window.EXT[reg.iso2]&&window.EXT[reg.iso2][m];
+    return d?Object.keys(d).sort():[];
+  }
+  return (reg&&reg.years)?reg.years().map(String).sort():[];  // 基础/派生：区域自身可得年份
+}
+function buildFullExport(){
+  const regs=atlasLevelRegs();
+  if(!regs.length) return null;
+  const M=METRICS[metric]||{}, label=metricLabel(metric), unit=M.unit||"", lvlName=currentLevel||"world";
+  const rows=[], regions=[];
+  regs.forEach(o=>{
+    const ser={};
+    _fullMetricYears(o.reg,metric).forEach(y=>{
+      let v=(M.near&&o.reg)?M.near(o.reg,(+y)):null;
+      if(v==null||isNaN(v)) return;
+      v=(typeof v==="number")?Math.round(v*10000)/10000:v;
+      rows.push([lvlName,o.name,o.key,label,unit,y,v]);
+      ser[y]=v;
+    });
+    if(Object.keys(ser).length) regions.push({name:o.name,key:o.key,series:ser});
+  });
+  if(!rows.length) return null;
+  let csv="层级,区域,键,指标,单位,年份,数值\n";
+  rows.forEach(r=>{ csv+=r.map(atlasCsvCell).join(",")+"\n"; });
+  const obj={generated:new Date().toISOString(), level:lvlName, metric:metric, metricLabel:label, unit:unit,
+             source:"World Bank / 国家统计局·维基 / BEA+Census / 日本内阁府ESRI / Eurostat / 公开整理（详见页面来源标签）",
+             regions:regions};
+  const tag=lvlName+"-"+metric+"-allyears";
+  return {csv:csv, rows:rows.length, regions:regions.length, csvText:"\ufeff"+csv, json:JSON.stringify(obj,null,2),
+          csvFilename:"atlas-"+tag+".csv", jsonFilename:"atlas-"+tag+".json"};
+}
+function exportFullCsv(){
+  const b=buildFullExport();
+  if(!b){ showBanner("当前层级没有可导出的数据"); return; }
+  atlasDownload(new Blob([b.csvText],{type:"text/csv;charset=utf-8"}), b.csvFilename);
+  showBanner("已导出全量 "+b.rows+" 行 CSV（"+b.regions+" 区域 × 当前指标 × 可得年份）");
+}
+function exportFullJson(){
+  const b=buildFullExport();
+  if(!b){ showBanner("当前层级没有可导出的数据"); return; }
+  atlasDownload(new Blob([b.json],{type:"application/json;charset=utf-8"}), b.jsonFilename);
+  showBanner("已导出 JSON（"+b.regions+" 区域）");
+}
+window.atlasLevelRegs=atlasLevelRegs; window.buildFullExport=buildFullExport; window.exportFullCsv=exportFullCsv;
 window.exportMapPng  = exportMapPng;
 
 function renderRank(){
@@ -1622,6 +1687,8 @@ window.addEventListener("load", ()=>{
 
   /* 地图 PNG 导出 */
   document.getElementById("pngBtn").addEventListener("click", ()=>exportMapPng());
+  document.getElementById("fullCsvBtn").addEventListener("click", ()=>exportFullCsv());
+  document.getElementById("fullJsonBtn").addEventListener("click", ()=>exportFullJson());
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){
