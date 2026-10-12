@@ -10,6 +10,15 @@
 <meta property="og:description" content="交互式全球行政区划数据地图：多层级下钻与经济数据对比，GDP 统一以美元计价。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://atlas.huajun.wang/" />
+<!-- 社交分享卡片（2026-10-12）：此前无 og:image / twitter:card，X 等平台分享只出裸链接 -->
+<meta property="og:image" content="https://atlas.huajun.wang/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="全球数据地图 · Global Data Atlas：多层级下钻与经济数据对比" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="全球数据地图 · Global Data Atlas" />
+<meta name="twitter:description" content="交互式全球行政区划数据地图：多层级下钻与经济数据对比，GDP 统一以美元计价。" />
+<meta name="twitter:image" content="https://atlas.huajun.wang/og-image.png" />
 <!-- T9/SEO：schema.org 结构化数据，帮助搜索引擎/AI 抓取理解本站性质、覆盖时空范围与数据来源 -->
 <script type="application/ld+json">
 {
@@ -316,6 +325,14 @@
   .rank-toggle button:hover{color:var(--text);border-color:var(--cyan);}
   .rank-toggle button.on{color:var(--cyan);border-color:var(--cyan);background:var(--hover);font-weight:600;}
   .rank-toggle button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px;}
+  /* 导出（2026-10-12）：排行 CSV + 地图 PNG */
+  .rank-export{margin:6px 0 4px;}
+  .rank-export button{width:100%;padding:5px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;
+    background:transparent;border:1px dashed var(--line);color:var(--muted);font-family:inherit;
+    transition:border-color var(--t-fast),color var(--t-fast);}
+  .rank-export button:hover{color:var(--cyan);border-color:var(--cyan);}
+  .rank-export button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px;}
+  html.embed #pngBtn{display:none;}   /* 嵌入模式下不暴露导出，由父页自行实现 */
   .rank-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
     cursor:pointer;font-size:13px;transition:background var(--t-fast);}
   .rank-item:hover{background:var(--hover);}
@@ -379,6 +396,7 @@
         <button class="btn" id="playBtn" aria-label="播放年份动画" title="逐年自动播放（再次点击暂停）">▶ 播放</button>
         <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
         <button class="btn" id="scaleBtn" aria-label="切换配色刻度（线性/对数）" title="配色刻度：线性 ↔ 对数（GDP 等长尾分布建议用对数）">🎨 线性</button>
+        <button class="btn" id="pngBtn" aria-label="把当前地图导出为 PNG" title="把当前地图存为 PNG（2 倍像素，含图例）">📷 PNG</button>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
@@ -413,20 +431,24 @@
   </footer>
 </div>
 
+<!-- 首屏关键资源（地图首屏渲染必需）：同步加载，保证首屏不闪、不依赖额外回合 -->
 <script src="vendor/echarts.min.js"></script>
 <script src="vendor/world.js"></script>
-<script src="vendor/jp_metrics.js"></script>
-<script src="vendor/jp_ts.js"></script>
-<script src="vendor/us_states_bea.js"></script>
-<script src="vendor/us_pop_ts.js"></script>
-<script src="vendor/cn/city_metrics.js"></script>
-<script src="vendor/cn/city_index.js"></script>
-<script src="vendor/cn/city_ts.js"></script>
 <script src="vendor/countries_wb.js"></script>
 <script src="vendor/fxrate.js"></script>
-<script src="vendor/meta.js"></script>
-<script src="vendor/app-core.js?v=a39d23d5"></script>
-<script src="vendor/cn_prov_ts.js"></script>
+<script src="vendor/meta.js?v=676fb63a"></script>
+<script src="vendor/app-core.js?v=401c01a1"></script>
+<!-- 层级专属数据集：首屏（世界地图）不需要，延迟到 HTML 解析后执行（defer），
+     不再阻塞解析器；进入对应层级时数据已就绪（defer 脚本在 DOMContentLoaded 前按序执行完毕）。
+     这 8 个脚本合计约 150KB+，从首屏同步路径移出，降低首屏阻塞。 -->
+<script defer src="vendor/jp_metrics.js"></script>
+<script defer src="vendor/jp_ts.js"></script>
+<script defer src="vendor/us_states_bea.js"></script>
+<script defer src="vendor/us_pop_ts.js"></script>
+<script defer src="vendor/cn/city_metrics.js"></script>
+<script defer src="vendor/cn/city_index.js"></script>
+<script defer src="vendor/cn/city_ts.js"></script>
+<script defer src="vendor/cn_prov_ts.js"></script>
 <script>
 /* 轻量错误收集：仅 console，便于审计/调试（P3） */
 window.addEventListener("error", e=>{ console.error("[atlas]", e.message); });
@@ -532,7 +554,7 @@ function buildColorScale(data){
 function rankBaseYear(){ return Math.max(2000, (+dataYear||2025) - 5); }
 /* 取某区域在指定模式下的排行值：value→当前年数值；growth→较 rankBaseYear 的名义增长 */
 function rankVal(reg, mode){
-  if(mode==="growth"){ const g = reg && reg.growth ? reg.growth(metric, rankBaseYear()) : null; return (g!=null && isFinite(g)) ? g : null; }
+  if(mode==="growth"){ return regGrowth(reg, metric, rankBaseYear()); }   // 走注册表：派生指标(gdppc/gdpden)也能参与增长排行
   return reg ? regGet(reg, metric, dataYear) : null;
 }
 let currentProvName="", currentProvAdcode="", currentProvData=[];
@@ -624,7 +646,7 @@ function showCountry(c){
   const econRows=[
     {label:"GDP 较2000 实际增长（不变价）", val:gKd},
     {label:"GDP 较2000 实际增长（PPP）", val:gPp},
-    {label:"人均GDP 较2000 增长", val:reg.growth("gdpcap",2000)},
+    {label:"人均GDP 较2000 增长", val:regGrowth(reg,"gdpcap",2000)},
     {label:"人口 较2000 增长", val:cGrowth(iso2,2000,"pop")}
   ];
   const pushEcon=(rows, excludePpp)=>{
@@ -640,7 +662,7 @@ function showCountry(c){
     const mv=regGet(reg,metric,y);
     const ey=reg.extYear?reg.extYear(metric,y):null;
     const label = metricScope(metric)==="world" && ey && ey!==+y ? `${metricLabel(metric)} (${ey})` : metricLabel(metric);
-    const mg=reg.growth(metric,2000);
+    const mg=regGrowth(reg,metric,2000);
     const card={label, value:metricFmt(metric,mv), delta:mg!=null?delta(mg,v=>fmtGrowthFor(metric,v)):null};
     const others=stats.filter(s=>s.label!==label);   // 当前维度卡替换/去重，避免重复
     stats=[card, ...others];
@@ -797,7 +819,7 @@ function renderWorld2D(){
   chart.setOption({
     backgroundColor:"#05060a",
     tooltip:{trigger:"item", formatter:p=>{ const c=p.data&&p.data.cn, reg=p.data&&p.data.reg; if(!c)return p.name+"<br/><span style='color:#7f93a8'>暂无数据（未纳入 World Bank 序列）</span>";
-      const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=reg.growth(metric,2000);
+      const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=regGrowth(reg,metric,2000);
       const grFmt = metric==="gdp" ? ("较2000年实际增长 <b style=\"color:"+((gr||0)>=0?'#00F0FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
         : (`较2000年${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
       const cy=cYear(c[2]); const cyTag=(String(cy)===String(dataYear))?String(cy):("≈"+cy);   // T8：回退年显式标记
@@ -813,7 +835,7 @@ function renderWorld2D(){
   renderOverviewMetrics();
   renderRank();
   /* 洞察：各国较2000年增长/变化对比（跟随当前维度） */
-  const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?r.growth(metric,2000):null};}).filter(e=>e.val!=null);
+  const comp=COUNTRIES.map(c=>{const r=regCountry(c[2]); return {name:c[0], val:r?regGrowth(r,metric,2000):null};}).filter(e=>e.val!=null);
   renderTrendCompare(comp, "较2000年 "+(metric==="gdp"?"实际增长":(metric==="life"?"变化":metricLabel(metric)+"增长"))+"", v=>fmtGrowthFor(metric,v));
 }
 
@@ -997,7 +1019,7 @@ function showCityPanel(cityName, adcode, parentAdcode){
   /* vs 2023：同币种比值-1（序列用展示币种，单年用 gdpApply(基准)） */
   const g23 = gdpApply(cm.gdp, "CNY", 2023);
   const gd = hasTS && g23 ? (gv/g23 - 1) : null;
-  const growth = hasTS ? r.growth("gdp", 2009) : null;
+  const growth = hasTS ? regGrowth(r,"gdp",2009) : null;
   const baseStats=[
       {label:"GDP"+(hasTS?" ("+dataYear+")":""), value:fmtGDP(gv), delta:hasTS&&gd!=null?{txt:(gd>=0?"+":"")+(gd*100).toFixed(1)+"% vs 2023",dir:gd>=0?"up":"down"}:null},
       {label:"人口 (2023)", value:fmtPop(cm.pop)},
@@ -1369,6 +1391,65 @@ function renderOverviewMetrics(){
     </div>`;
   document.getElementById("pSub").insertAdjacentHTML("afterend", statsHTML);
 }
+/* ===== 导出（2026-10-12）：排行 CSV + 地图 PNG =====
+   此前导出只存在于 compare.html，主页（排行/地图）拿不到数据，只能手抄。
+   CSV 带 UTF-8 BOM，Excel 直接打开不乱码；文件名为 atlas-<层级>-<指标>-<年>.csv。 */
+function atlasCsvCell(s){
+  return /[",\n\r]/.test(String(s)) ? '"'+String(s).replace(/"/g,'""')+'"' : String(s);
+}
+function atlasDownload(blob, fn){
+  try{
+    const u=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=u; a.download=fn; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u), 2000);
+  }catch(e){ showBanner("导出失败："+((e&&e.message)||e)); }
+}
+/* CSV 文本与文件名单独抽出：既让 exportRankCsv 保持薄，也让测试可以直接断言内容
+   （headless 下无法校验真实下载，只能校验生成的字节）。 */
+function buildRankCsv(){
+  const L=layerGet();
+  if(!L||!L.rank) return null;
+  const items=L.rank(rankMode);
+  if(!items||!items.length) return null;
+  const unit=(METRICS[metric]||{}).unit||"", label=metricLabel(metric);
+  let csv;
+  if(rankMode==="growth"){
+    csv="排名,区域,指标,单位,"+rankBaseYear()+"→"+dataYear+"名义增长\n";
+    items.forEach((it,i)=>{
+      csv+=[i+1, it[0], label, unit, ((it[2]*100).toFixed(2)+"%")].map(atlasCsvCell).join(",")+"\n";
+    });
+  }else{
+    csv="排名,区域,指标,单位,"+dataYear+"年数值\n";
+    items.forEach((it,i)=>{
+      csv+=[i+1, it[0], label, unit, it[2]].map(atlasCsvCell).join(",")+"\n";
+    });
+  }
+  const tag = (rankMode==="growth") ? ("growth-"+rankBaseYear()+"-"+dataYear) : String(dataYear);
+  /* text = 真正写入文件的字节（带 UTF-8 BOM，Excel 直接打开不乱码）；
+     csv  = 去掉 BOM 的纯文本，便于测试断言表头与列。 */
+  return {csv:csv, text:"\ufeff"+csv, rows:items.length, first:items[0][0],
+          filename:"atlas-"+(currentLevel||"world")+"-"+metric+"-"+tag+".csv"};
+}
+function exportRankCsv(){
+  const b=buildRankCsv();
+  if(!b){ showBanner("当前层级没有可导出的排行数据"); return; }
+  atlasDownload(new Blob([b.text],{type:"text/csv;charset=utf-8"}), b.filename);
+  showBanner("已导出 "+b.rows+" 行 CSV");
+}
+window.buildRankCsv = buildRankCsv;
+function exportMapPng(){
+  if(!chart){ showBanner("地图尚未就绪，稍后再试"); return; }
+  try{
+    const url=chart.getDataURL({type:"png", pixelRatio:2, backgroundColor:"#05060a"});
+    const a=document.createElement("a");
+    a.href=url; a.download="atlas-map-"+(currentLevel||"world")+"-"+metric+"-"+dataYear+".png";
+    document.body.appendChild(a); a.click(); a.remove();
+    showBanner("已导出地图 PNG");
+  }catch(e){ showBanner("PNG 导出失败："+((e&&e.message)||e)); }
+}
+window.exportRankCsv = exportRankCsv;
+window.exportMapPng  = exportMapPng;
+
 function renderRank(){
   const box=document.getElementById("rank");
   let items=[], unit=metricLabel(metric);
@@ -1385,6 +1466,8 @@ function renderRank(){
       +`<button type="button" data-mode="value" class="${rankMode==="value"?"on":""}" aria-pressed="${rankMode==="value"}">数值 ${dataYear}</button>`
       +`<button type="button" data-mode="growth" class="${rankMode==="growth"?"on":""}" aria-pressed="${rankMode==="growth"}">增长 ${rankBaseYear()}→${dataYear}</button>`
     +`</div>`
+    +`<div class="rank-export"><button type="button" id="rankCsvBtn" `
+      +`title="导出当前排行为 CSV（含本层全部区域，UTF-8，可直接用 Excel 打开）">⬇ 导出 CSV（${items.length} 行）</button></div>`
     +`<div class="rank-wrap">`+items.map((it,i)=>
     `<div class="rank-item" data-type="${it[3]}" data-key="${esc(it[1])}" tabindex="0" role="button" aria-label="${esc(it[0])} ${esc(fmt(it[2]))}">
        <span class="rk">${i+1}</span><span class="rn">${esc(it[0])}</span><span class="rv">${esc(fmt(it[2]))}</span></div>`).join("")+`</div></details>`;
@@ -1410,6 +1493,8 @@ function renderRank(){
       if(nb) nb.focus({preventScroll:true});
     };
   });
+  const csvBtn=box.querySelector("#rankCsvBtn");
+  if(csvBtn) csvBtn.onclick=()=>exportRankCsv();
 }
 function doSearch(q){
   q=(q||"").trim().toLowerCase(); if(!q) return;
@@ -1534,6 +1619,9 @@ window.addEventListener("load", ()=>{
     renderRank();
     saveState && saveState();
   });
+
+  /* 地图 PNG 导出 */
+  document.getElementById("pngBtn").addEventListener("click", ()=>exportMapPng());
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){
