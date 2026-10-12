@@ -75,6 +75,7 @@
     <select id="yearSel" aria-label="选择年份"></select>
     <button class="btn" id="btnCsv" type="button" title="导出当前对比（CSV）">⬇ CSV</button>
     <button class="btn" id="btnJson" type="button" title="导出当前对比（JSON）">⬇ JSON</button>
+    <button class="btn" id="btnShare" type="button" title="复制可分享的对比链接（含当前区域/指标/年份）">🔗 分享</button>
     <a class="btn" href="index.html">← 返回地图</a>
   </header>
   <div id="main">
@@ -196,6 +197,38 @@ function exportCompare(fmt){
 }
 
 /* ---------- 层级单元选择（按层级浏览添加对比单元） ---------- */
+/* ===== C10 分享：把当前对比集(区域+指标+年份)序列化为可分享 URL 并复制 ===== */
+function buildShareUrl(){
+  const p=new URLSearchParams();
+  cmpList.forEach(it=>p.append("add", unitKey(it.t,it.k,it.pa)));
+  if(metric) p.set("metric", metric);
+  if(dataYear) p.set("year", dataYear);
+  const q=p.toString();
+  return location.origin + location.pathname + (q ? ("?"+q) : "");
+}
+function _shareFeedback(ok){
+  const b=document.getElementById("btnShare"); if(!b) return;
+  const t=b.getAttribute("data-label")||b.textContent;
+  b.setAttribute("data-label", t);
+  b.textContent = ok ? "✓ 已复制" : "复制失败";
+  setTimeout(()=>{ b.textContent=t; }, 1600);
+}
+function _fallbackCopy(url){
+  try{
+    const ta=document.createElement("textarea"); ta.value=url;
+    ta.style.position="fixed"; ta.style.left="-9999px"; document.body.appendChild(ta);
+    ta.select(); const ok=document.execCommand("copy"); ta.remove();
+    if(ok){ _shareFeedback(true); } else { window.prompt("复制此链接分享对比：", url); _shareFeedback(false); }
+  }catch(e){ window.prompt("复制此链接分享对比：", url); _shareFeedback(false); }
+}
+function copyShareLink(){
+  if(!cmpList.length){ alert("请先添加至少一个对比区域再分享"); return; }
+  const url=buildShareUrl();
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>_shareFeedback(true), ()=>_fallbackCopy(url));
+  } else { _fallbackCopy(url); }
+}
+window.buildShareUrl=buildShareUrl; window.copyShareLink=copyShareLink;   // 供测试断言
 function unitKey(t,k,pa){ return pa!=null ? t+":"+k+":"+pa : t+":"+k; }
 function isAdded(t,k){ return cmpList.some(x=>x.t===t&&x.k===k); }
 /* 统一 key 解析：city:adcode:pa → {t,k,pa}；其余 t:k（k 可含冒号时保留整段） */
@@ -303,11 +336,10 @@ function addItem(t,k,pa){
 }
 function parseAddParam(){
   const p=new URLSearchParams(location.search);
-  const adds=p.getAll("add"); if(!adds.length) return;
-  adds.forEach(add=>{
-    const pk=parseAddKey(add);
-    if(pk&&pk.t&&pk.k) addItem(pk.t,pk.k,pk.pa);
-  });
+  p.getAll("add").forEach(add=>{ const pk=parseAddKey(add); if(pk&&pk.t&&pk.k) addItem(pk.t,pk.k,pk.pa); });
+  // C10：回读指标/年份，使分享的链接能还原完整视图（入站此前只还原 add 列表）
+  const mt=p.get("metric"); if(mt&&window.METRICS&&METRICS[mt]){ metric=mt; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===mt)); }
+  const yr=p.get("year"); if(yr&&!isNaN(+yr)){ dataYear=String(yr); const sel=document.getElementById("yearSel"); if(sel) sel.value=dataYear; }
 }
 /* 搜索添加：国家/省/州/县/城市 */
 function doAddSearch(q){
@@ -380,6 +412,7 @@ window.addEventListener("load",()=>{
   initMetrics(); initYear();
   document.getElementById("btnCsv").addEventListener("click",()=>exportCompare("csv"));
   document.getElementById("btnJson").addEventListener("click",()=>exportCompare("json"));
+  document.getElementById("btnShare").addEventListener("click",()=>copyShareLink());
   parseAddParam();
   renderList(); renderChart(); renderUnitList();
   document.getElementById("levelSel").addEventListener("change",()=>{ renderUnitList(); });

@@ -143,5 +143,31 @@ if isinstance(out6, dict):
     )
 check("城市 key 解析", ok_city, f"({str(out6)[:120] if out6 else '未获取'})")
 
+# C10 分享：载入 ?add×2 & metric=pop & year=2023 → 入站还原指标/年份；buildShareUrl 回写完整链接
+html7 = open("compare.html", encoding="utf-8").read()
+inject7 = """<script>window.addEventListener('load',function(){setTimeout(function(){
+try{
+var u=window.buildShareUrl?buildShareUrl():null;
+document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({metric:metric,year:dataYear,n:cmpList.length,url:u,hasBtn:!!document.getElementById('btnShare')})+'</pre>');
+}catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
+},900);});</script>"""
+html7 = html7.replace("</body>", inject7 + "\n</body>")
+p7 = os.path.join("atlas_test", "cmp_share.html")
+open(p7, "w", encoding="utf-8").write(html7)
+dom7 = dump("file://" + os.path.abspath(p7) + "?add=country:CN&add=country:US&metric=pop&year=2023", 12)
+out7 = runtime_out(dom7)
+if isinstance(out7, str):
+    try: out7 = _json.loads(out7)
+    except Exception: out7 = None
+o7 = out7 if isinstance(out7, dict) else {}
+share_url = o7.get("url") or ""
+check("C10 分享按钮存在", o7.get("hasBtn") is True, f"({o7.get('hasBtn')})")
+check("C10 入站还原指标 metric=pop", str(o7.get("metric")) == "pop", f"({o7.get('metric')})")
+check("C10 入站还愿年份 year=2023", str(o7.get("year")) == "2023", f"({o7.get('year')})")
+check("C10 入站还原 2 个区域", o7.get("n") == 2, f"(n={o7.get('n')})")
+check("C10 buildShareUrl 含两个 add + metric + year",
+      share_url.count("add=") == 2 and "metric=pop" in share_url and "year=2023" in share_url,
+      f"({share_url[:120]})")
+
 print(f"\n对比页测试: {ok}/{total} 通过")
 exit(0 if ok == total else 1)
