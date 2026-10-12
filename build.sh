@@ -40,26 +40,31 @@ done
 s=$(HASH global-data-atlas.html); d=$(HASH dist/index.html)
 if [ "$s" = "$d" ]; then echo "  ✓ index.html 一致"; else echo "  ✗ index.html 漂移"; ok=0; fi
 # vendor 关键文件抽查（HTML 按需加载的脚本/数据）
-for f in vendor/app-core.js vendor/eu/eu_metrics.js vendor/world.js; do
+for f in vendor/app-core.js vendor/meta.js vendor/eu/eu_metrics.js vendor/world.js; do
   rel="${f#vendor/}"
   s=$(HASH "$f"); d=$(HASH "dist/vendor/$rel")
   if [ "$s" = "$d" ]; then echo "  ✓ $rel 一致"; else echo "  ✗ $rel 漂移"; ok=0; fi
 done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
-# 缓存失效：给 app-core.js 引用注入内容指纹（?v=md5前8位）——JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存
+# 缓存失效：给 app-core.js / meta.js 的引用注入内容指纹（?v=md5前8位）——
+# JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存。
+# （meta.js 是 2026-10-12 补的：它随数据集最新年/构建日期变化，却没有指纹，
+#   曾导致 atlas.huajun.wang 在部署后 4h 内仍提供旧 meta，about 新鲜度表显示过期年份。）
 # 用 python3 做替换，兼容 toybox / macOS(BSD) / GNU sed 差异（toybox sed 无法正确解析 -i '' -E）
 CORE_HASH=$(HASH vendor/app-core.js | cut -c1-8)
-for f in dist/global-data-atlas.html dist/index.html dist/embed.html dist/compare.html; do
-  python3 - "$f" "$CORE_HASH" <<'PY'
+META_HASH=$(HASH vendor/meta.js | cut -c1-8)
+for f in dist/global-data-atlas.html dist/index.html dist/embed.html dist/compare.html dist/about.html; do
+  python3 - "$f" "$CORE_HASH" "$META_HASH" <<'PYEOF'
 import sys, re
-p, h = sys.argv[1], sys.argv[2]
+p, h, m = sys.argv[1], sys.argv[2], sys.argv[3]
 s = open(p, encoding='utf-8').read()
-s2 = re.sub(r'src="vendor/app-core\.js(\?v=[a-f0-9]+)?"', 'src="vendor/app-core.js?v=' + h + '"', s)
-open(p, 'w', encoding='utf-8').write(s2)
-PY
+s = re.sub(r'src="vendor/app-core\.js(\?v=[a-f0-9]+)?"', 'src="vendor/app-core.js?v=' + h + '"', s)
+s = re.sub(r'src="vendor/meta\.js(\?v=[a-f0-9]+)?"', 'src="vendor/meta.js?v=' + m + '"', s)
+open(p, 'w', encoding='utf-8').write(s)
+PYEOF
 done
-echo "  ↻ app-core.js?v=${CORE_HASH}（缓存指纹已注入）"
+echo "  ↻ app-core.js?v=${CORE_HASH} · meta.js?v=${META_HASH}（缓存指纹已注入）"
 
 if [ "$1" = "--deploy" ]; then
   echo "── 部署 Cloudflare Pages ──"
