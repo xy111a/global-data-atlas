@@ -432,23 +432,23 @@
 </div>
 
 <!-- 首屏关键资源（地图首屏渲染必需）：同步加载，保证首屏不闪、不依赖额外回合 -->
-<script src="vendor/echarts.min.js"></script>
-<script src="vendor/world.js"></script>
-<script src="vendor/countries_wb.js"></script>
-<script src="vendor/fxrate.js"></script>
-<script src="vendor/meta.js?v=86dd1baa"></script>
-<script src="vendor/app-core.js?v=2314f7a7"></script>
+<script src="vendor/echarts.min.js?v=c23e4a44"></script>
+<script src="vendor/world.js?v=36a090dd"></script>
+<script src="vendor/countries_wb.js?v=4e3c1aff"></script>
+<script src="vendor/fxrate.js?v=8b2fad9c"></script>
+<script src="vendor/meta.js?v=fd772b8c"></script>
+<script src="vendor/app-core.js?v=dd07f6f1"></script>
 <!-- 层级专属数据集：首屏（世界地图）不需要，延迟到 HTML 解析后执行（defer），
      不再阻塞解析器；进入对应层级时数据已就绪（defer 脚本在 DOMContentLoaded 前按序执行完毕）。
      这 8 个脚本合计约 150KB+，从首屏同步路径移出，降低首屏阻塞。 -->
-<script defer src="vendor/jp_metrics.js"></script>
-<script defer src="vendor/jp_ts.js"></script>
-<script defer src="vendor/us_states_bea.js"></script>
-<script defer src="vendor/us_pop_ts.js"></script>
-<script defer src="vendor/cn/city_metrics.js"></script>
-<script defer src="vendor/cn/city_index.js"></script>
-<script defer src="vendor/cn/city_ts.js"></script>
-<script defer src="vendor/cn_prov_ts.js"></script>
+<script defer src="vendor/jp_metrics.js?v=aa4f0a57"></script>
+<script defer src="vendor/jp_ts.js?v=cebc4186"></script>
+<script defer src="vendor/us_states_bea.js?v=ba2e22b5"></script>
+<script defer src="vendor/us_pop_ts.js?v=1778d891"></script>
+<script defer src="vendor/cn/city_metrics.js?v=4c542222"></script>
+<script defer src="vendor/cn/city_index.js?v=554cb1ca"></script>
+<script defer src="vendor/cn/city_ts.js?v=b5c6334f"></script>
+<script defer src="vendor/cn_prov_ts.js?v=6cd33f04"></script>
 <script>
 /* 轻量错误收集：仅 console，便于审计/调试（P3） */
 window.addEventListener("error", e=>{ console.error("[atlas]", e.message); });

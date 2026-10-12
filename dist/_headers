@@ -30,9 +30,14 @@
 /sitemap.xml
   Content-Type: application/xml; charset=utf-8
 
-# 静态资产缓存（app-core 等带 ?v= 指纹的引用可随时更新）
+# 静态资产缓存：数据文件（us_pop_ts/jp_ts/countries_wb/ext_indicators/eu/* 等）随刷新变化
+# 但 URL 恒定（只有 app-core/meta 带 ?v= 指纹，动态拼接的 vendor/eu/<cc>.js 也无法加指纹）。
+# 旧值 max-age=14400 会让边缘/浏览器在 4h 内不回源 → 部署后的数据刷新对用户延迟生效
+# （2026-10-12 实测：us_pop_ts.js cf-cache-status:HIT、线上仍是旧稀疏序列）。
+# 改 max-age=0, must-revalidate：每次请求强制回源校验，未变文件走 304（无 body，开销可忽略），
+# 变了立即返回新版 → 连动态加载的 EU 边界也一并覆盖，无需重构加载器。
 /vendor/*
-  Cache-Control: public, max-age=14400, must-revalidate
+  Cache-Control: public, max-age=0, must-revalidate
 
 /favicon.svg
   Cache-Control: public, max-age=86400

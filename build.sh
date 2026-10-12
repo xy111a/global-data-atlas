@@ -6,11 +6,16 @@
 set -e
 cd "$(dirname "$0")"
 
-# 可移植 md5（macOS /sbin/md5、Linux md5sum、通用 shasum）
+# 可移植 md5（macOS /sbin/md5、Linux md5sum、通用 openssl）
+# ⚠️ 2026-10-12：原兜底用 shasum -a 1（SHA1），当构建机既无 md5 也无 md5sum 时，
+#   ?v= 会变成 sha1 前 8 位而非 md5（实测 dist 引用 app-core.js?v=2314f7a7 即 sha1[:8]），
+#   跨机算法漂移。改为优先 openssl dgst -md5，保证 ?v 恒为 md5；shasum 仅作最后兜底。
 if command -v md5 >/dev/null 2>&1; then
   HASH() { md5 -q "$1"; }
 elif command -v md5sum >/dev/null 2>&1; then
   HASH() { md5sum "$1" | awk '{print $1}'; }
+elif command -v openssl >/dev/null 2>&1; then
+  HASH() { openssl dgst -md5 "$1" 2>/dev/null | awk '{print $NF}'; }
 else
   HASH() { shasum -a 1 "$1" | awk '{print $1}'; }
 fi
@@ -47,24 +52,35 @@ for f in vendor/app-core.js vendor/meta.js vendor/eu/eu_metrics.js vendor/world.
 done
 [ "$ok" = 1 ] || { echo "dist 与 source 不一致，中止。"; exit 1; }
 
-# 缓存失效：给 app-core.js / meta.js 的引用注入内容指纹（?v=md5前8位）——
-# JS 内容变化后 URL 变化，绕过浏览器/CDN 4h 缓存。
-# （meta.js 是 2026-10-12 补的：它随数据集最新年/构建日期变化，却没有指纹，
-#   曾导致 atlas.huajun.wang 在部署后 4h 内仍提供旧 meta，about 新鲜度表显示过期年份。）
-# 用 python3 做替换，兼容 toybox / macOS(BSD) / GNU sed 差异（toybox sed 无法正确解析 -i '' -E）
-CORE_HASH=$(HASH vendor/app-core.js | cut -c1-8)
-META_HASH=$(HASH vendor/meta.js | cut -c1-8)
-for f in dist/global-data-atlas.html dist/index.html dist/embed.html dist/compare.html dist/about.html; do
-  python3 - "$f" "$CORE_HASH" "$META_HASH" <<'PYEOF'
-import sys, re
-p, h, m = sys.argv[1], sys.argv[2], sys.argv[3]
-s = open(p, encoding='utf-8').read()
-s = re.sub(r'src="vendor/app-core\.js(\?v=[a-f0-9]+)?"', 'src="vendor/app-core.js?v=' + h + '"', s)
-s = re.sub(r'src="vendor/meta\.js(\?v=[a-f0-9]+)?"', 'src="vendor/meta.js?v=' + m + '"', s)
-open(p, 'w', encoding='utf-8').write(s)
+# 缓存失效（A2, 2026-10-12）：给所有「静态 <script src=vendor/*.js>」引用注入 ?v=<md5前8位>。
+# 内容变→URL变→同时绕过 浏览器强缓存 / CDN(_headers max-age) / Service Worker(cache-first 键含 ?query)。
+# 用 Python hashlib.md5：跨机确定，顺带根治 build 机缺 md5/md5sum 时 ?v 落到 sha1 的漂移（P3）。
+# 动态 loadScript() 拼接的资源(如 vendor/eu/<cc>.js)无法静态改写 → 靠 _headers 的 max-age=0 强制回源兜底。
+# 旧实现只给 app-core/meta 注指纹，导致数据文件刷新后靠 URL 恒定滞留边缘缓存（本次审计 P1/P2 根因）。
+python3 - <<'PYEOF'
+import re, os, hashlib
+def h8(path):
+    return hashlib.md5(open(path, 'rb').read()).hexdigest()[:8]
+targets = ["dist/global-data-atlas.html", "dist/index.html", "dist/embed.html",
+           "dist/compare.html", "dist/about.html"]
+pat = re.compile(r'src="(vendor/[^"?\s]+\.js)"')   # 仅匹配未带 ?query 的静态引用；dist 每次从源码重 cp，无历史 ?v → 幂等
+changed = 0
+for p in targets:
+    if not os.path.exists(p):
+        continue
+    s = open(p, encoding='utf-8').read()
+    def repl(m):
+        rel = m.group(1)
+        fp = os.path.join("dist", rel)
+        if not os.path.exists(fp):
+            return m.group(0)                       # 文件不存在则原样保留，不误伤
+        return 'src="%s?v=%s"' % (rel, h8(fp))
+    new = pat.sub(repl, s)
+    if new != s:
+        open(p, 'w', encoding='utf-8').write(new)
+        changed += 1
+print("  ↻ 已给 %d 个 dist HTML 的全部静态 vendor 引用注入 ?v 指纹" % changed)
 PYEOF
-done
-echo "  ↻ app-core.js?v=${CORE_HASH} · meta.js?v=${META_HASH}（缓存指纹已注入）"
 
 if [ "$1" = "--deploy" ]; then
   echo "── 部署 Cloudflare Pages ──"

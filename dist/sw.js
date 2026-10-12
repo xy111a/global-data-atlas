@@ -13,7 +13,10 @@
  *     2) 同一 pathname 仅保留指纹最新的条目（淘汰旧 ?v= 版本）
  *   同时：HTML 仅在无查询串时才写入缓存，避免 ?embed=1 / ?year=2020 等状态 URL 各存一份。
  */
-const CACHE = 'atlas-v1';
+// atlas-v2 (2026-10-12)：一次性清掉旧 v1 缓存里可能滞留的旧数据文件（如补全前的 us_pop_ts.js）。
+// 配合 _headers 将 /vendor/* 改 max-age=0 后，边缘不再供陈旧副本、SW 后台 revalidate 取到新版，
+// 主失效机制=版本号 bump（activate 删除非当前 CACHE）+ 边缘强制回源。
+const CACHE = 'atlas-v2';
 const VENDOR = '/vendor/';
 
 self.addEventListener('install', () => self.skipWaiting());
