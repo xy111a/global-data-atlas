@@ -458,7 +458,7 @@ function regUSState(nm){
   if(__regCache.us[nm]) return __regCache.us[nm];
   const yl = Object.keys((window.US_TS&&window.US_TS[nm]&&window.US_TS[nm].years)||{}).map(Number).sort((a,b)=>a-b);   // GDP 年份（2000-2024）
   const popTs = (window.US_POP_TS&&window.US_POP_TS[nm])||{};
-  const popYl = Object.keys(popTs).map(Number).sort((a,b)=>a-b);          // 人口年份（2020 普查 + 2025 估算）
+  const popYl = Object.keys(popTs).map(Number).sort((a,b)=>a-b);          // 人口年份（2020-2025 逐年，Census PEP 7月1日估计）
   const r = {
     name:nm, cn:nm,
     years:()=>yl,

@@ -121,6 +121,37 @@ check("加总[50州+DC vs 美国]", 0.85 < st_sum/us_all < 1.15, f"{st_sum/1e6:.
 jp_sum = sum(o['gdp'] for o in JP.values())
 check("加总[47县 vs 日本]", 0.6 < jp_sum/25e12 < 1.4, f"{jp_sum/1e12:.1f} vs ~25 万亿CNY(近似)")
 
+# 2b-2 美国州人口多年序列（US_POP_TS）—— 2026-10-12 换源 Census PEP 后新增
+#  背景：原序列只有 2020 普查 + 2025 估算（维基 section 标记，实测无 2021–2024），
+#        且 Utah 因源模板缺 UT_2025 标记而缺 2025。改用 Census PEP 静态目录（免 key）
+#        后为 2020–2025 逐年 6 个数据点、52 行齐全。下列断言防止退化回稀疏/残缺。
+US_POP_TS = load_js('vendor/us_pop_ts.js', 'US_POP_TS')
+NON_STATES = {'Puerto Rico'}          # 属地：官方 US 合计不含，加总时剔除
+_pop_states = {k: v for k, v in US_POP_TS.items() if k not in NON_STATES}
+check("覆盖[US_POP_TS 州数≥51(含DC)]", len(_pop_states) >= 51, f"{len(_pop_states)} 州/DC")
+_popyears = sorted({y for v in US_POP_TS.values() for y in v})
+check("覆盖[US_POP_TS 逐年 2020–2025]",
+      _popyears == ['2020', '2021', '2022', '2023', '2024', '2025'], f"{_popyears}")
+# 每州 6 年齐全（Utah 曾缺 2025 → 防回归）
+_incomplete = {k: sorted(v) for k, v in US_POP_TS.items() if len(v) != 6}
+check("覆盖[US_POP_TS 每州 6 年齐全]", not _incomplete,
+      f"不全的州：{list(_incomplete)[:5]}" if _incomplete else "52 行 × 6 年")
+# 加总：50 州+DC 之和 ≈ 官方 US 人口（2025 ≈ 3.418 亿，容差 ±0.5%）
+_p25 = sum(v['2025'] for v in _pop_states.values() if '2025' in v)
+check("加总[50州+DC人口 vs 美国]", abs(_p25 - 341784857) / 341784857 < 0.005, f"{_p25:,}")
+# 单点量级（防止列错位/单位错）
+check("量级[California 2025 人口]", 38e6 < US_POP_TS.get('California', {}).get('2025', 0) < 41e6,
+      f"{US_POP_TS.get('California', {}).get('2025')}")
+check("量级[Texas 2025 人口]", 29e6 < US_POP_TS.get('Texas', {}).get('2025', 0) < 33e6,
+      f"{US_POP_TS.get('Texas', {}).get('2025')}")
+# 增长方向性：美国总人口 2020→2025 应为正增长（Census 331.6M→341.8M ≈ +3.1%）；
+#   加州因 2020 疫情后净流出 2020→2022 应先降后升（方向性防回归）。
+_us_g = _p25 / sum(v['2020'] for v in _pop_states.values() if '2020' in v) - 1
+check("方向[美国人口 2020→2025 正增长]", _us_g > 0.01, f"{_us_g:+.2%}")
+_ca = US_POP_TS.get('California', {})
+check("方向[加州 2020→2022 下降后回升]", _ca.get('2022', 0) < _ca.get('2020', 0) and _ca.get('2025', 0) > _ca.get('2022', 0),
+      f"2020={_ca.get('2020')} 2022={_ca.get('2022')} 2025={_ca.get('2025')}")
+
 # 2c-2 日本多年序列（JP_TS）口径校验 —— 2026-10-12 审计新增
 #  背景：旧实现用「固定 JPY→CNY=0.05」折全部年份再按年度 USD/CNY 折算，等价于假设日/中汇率恒定，
 #        导致 2011 年美元值低估约 38%，且 2011→2022 增长方向失真（北海道显示 +8.1% vs 真实 -31.6%）。
