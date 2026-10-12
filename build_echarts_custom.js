@@ -11,7 +11,7 @@ const OUT = path.join(__dirname, 'echarts-custom.min.js');
 
 fs.writeFileSync(ENTRY, `
 import * as echarts from 'echarts/core';
-import { LineChart, BarChart, MapChart } from 'echarts/charts';
+import { LineChart, BarChart, MapChart, ScatterChart } from 'echarts/charts';
 import {
   GridComponent, TooltipComponent, LegendComponent,
   TitleComponent, AxisPointerComponent, DataZoomComponent,
@@ -23,7 +23,7 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 echarts.use([
-  LineChart, BarChart, MapChart,
+  LineChart, BarChart, MapChart, ScatterChart,
   GridComponent, TooltipComponent, LegendComponent,
   TitleComponent, AxisPointerComponent, DataZoomComponent,
   VisualMapComponent, VisualMapPiecewiseComponent,

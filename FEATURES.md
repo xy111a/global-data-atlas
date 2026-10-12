@@ -30,7 +30,7 @@
 
 ---
 
-## 2. 指标体系（13 项，METRICS 注册表）
+## 2. 指标体系（15 项，METRICS 注册表）
 
 | 指标 | 单位 | 适用层级 | 类型 |
 |---|---|---|---|
@@ -47,6 +47,8 @@
 | 失业率 | % 劳动力 | 国家层 | EXT |
 | 互联网普及 | % 人口 | 国家层 | EXT |
 | 军费 | % GDP | 国家层 | EXT |
+| 城镇化率 | % 城镇人口 | 国家层 | EXT（2026-10-12 B4） |
+| 通胀率 | % CPI/年(可负) | 国家层 | EXT（2026-10-12 B4） |
 
 - 地图热力、排行、面板、对比、趋势**全部跟随当前指标**切换
 - 派生指标（人均/地均）在**全部 6 层**生效（旧版人均GDP 仅 World Bank 国家层，导致省/州/县/市有人口却看不到人均——已修正）
@@ -112,6 +114,8 @@
 |---|---|
 | **主页导出 CSV** | 排行榜一键导出当前层/指标/年份结果（UTF-8 BOM，Excel 直开） |
 | **主页导出 PNG** | 地图一键导出 2x 高清图（backgroundColor 含主题底色） |
+| **全量导出 CSV/JSON**（2026-10-12 C2） | 「⬇ 全量CSV / ⬇ JSON」导出 当前层 × 当前指标 × 所有可得年份 的长表（BOM CSV + 带元信息 JSON），供二次分析 |
+| **关系散点 · Gapminder**（2026-10-12 P3·C1） | 「🔵 散点」浮层：国家×当前年，X/Y 任意指标（默认 人均GDP↔预期寿命）、气泡=人口、长尾指标对数轴、跟随年份下拉重绘；echarts 定制构建新增 `ScatterChart` |
 | **社交分享卡片** | OG image（1200×630）+ `twitter:card=summary_large_image`，X/微信等分享不再出裸链接 |
 | **结构化数据** | JSON-LD（Dataset + WebApplication）+ about「数据新鲜度」表，利于搜索引擎/AI 抓取 |
 | **嵌入模式 `?embed=1`** | 精简外壳 + postMessage 桥（ping / setYear / setMetric / search / setColorScale / atlas:state），跨域需 `?allowOrigin=` 白名单 |
@@ -127,7 +131,7 @@
 | **移动端** | 响应式（≤1600/1200/1024/768/480 断点），指标横向滚动、面板堆叠 |
 | **无障碍** | combobox/listbox 搜索、aria-label、tabindex/role、焦点环、ESC 返回、aria-activedescendant |
 | **构建链** | 12+ 个数据构建脚本（WB/维基/BEA/日本/Eurostat/汇率/中文名/城市索引） |
-| **门禁** | `run_all_tests.sh` **23/23**：语法 / 数据自洽 / 增长口径(P0护栏) / meta 新鲜度 / 回归截图 / 对比 / EXT / 四维洞察 / 欧盟下钻 / URL 持久化 / 固定美元 / 深度断言 / 性能实测 / 视觉回归 / 搜索ESC / 排行切换 / 配色刻度 / 新鲜度标注 / SEO结构化 / 键盘可达 / 嵌入模式 / 欧盟多年序列 / 导出 |
+| **门禁** | `run_all_tests.sh` **24/24**：语法 / 数据自洽 / 增长口径(P0护栏) / meta 新鲜度 / 回归截图 / 对比 / EXT / 四维洞察 / 欧盟下钻 / URL 持久化 / 固定美元 / 深度断言 / 性能实测 / 视觉回归 / 搜索ESC / 排行切换 / 配色刻度 / 新鲜度标注 / SEO结构化 / 键盘可达 / 嵌入模式 / 欧盟多年序列 / 导出 / 关系散点渲染 |
 | **部署** | Cloudflare Pages；huajun.wang + www + pages.dev 三域同步；`build.sh --deploy` 同步 dist + 注入 `?v=` 内容指纹绕过 CDN 4h 缓存 |
 
 ---

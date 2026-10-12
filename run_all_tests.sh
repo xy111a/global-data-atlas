@@ -130,5 +130,10 @@ step "L3s 主页导出 CSV/PNG（export_test）"
 "$PY" tests/export_test.py > /tmp/export.log 2>&1 && tail -1 /tmp/export.log || { echo "  ✗ 导出失败:"; grep '❌' /tmp/export.log | head -8; exit 1; }
 echo "  ✓ L3s 通过"; PASS=$((PASS+1))
 
+step "L3t 关系散点渲染（scatter_test，P3·C1）"
+# 断言 ScatterChart 组件模型真创建 + 点进数据模型（吸取 visualMap「配置≠渲染」教训）
+"$PY" tests/scatter_test.py > /tmp/scatter.log 2>&1 && tail -1 /tmp/scatter.log || { echo "  ✗ 散点失败:"; grep '❌' /tmp/scatter.log | head -8; exit 1; }
+echo "  ✓ L3t 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

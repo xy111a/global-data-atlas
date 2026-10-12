@@ -376,6 +376,18 @@
   html.embed #app{height:100vh;display:flex;flex-direction:column;}
   html.embed #main{flex:1 1 auto;min-height:0;}
   html.embed #chart, html.embed #panel{min-height:0;}
+  /* P3·C1 关系散点浮层 */
+  #scatterOverlay{position:fixed;inset:0;background:rgba(3,5,10,.86);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);z-index:80;display:none;align-items:center;justify-content:center;padding:16px;}
+  #scatterOverlay.open{display:flex;}
+  #scatterBox{background:#0b1220;border:1px solid #1d2b3a;border-radius:12px;width:min(94vw,1080px);height:min(86vh,680px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  #scatterHead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);}
+  #scatterHead b{font-size:14px;letter-spacing:.4px;color:#e6f2ff;}
+  #scatterHead label{font-size:12px;color:#9fb3c8;display:inline-flex;align-items:center;gap:6px;}
+  #scatterHead select{appearance:none;background:rgba(255,255,255,.06);color:#e6f2ff;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 8px;font-size:12px;}
+  #scYear{font-size:12px;color:#7f93a8;}
+  #scatterHead .sp{flex:1;}
+  #scatterChart{flex:1;min-height:0;width:100%;}
+  #scatterClose{cursor:pointer;background:none;border:1px solid rgba(255,255,255,.18);color:#e6f2ff;border-radius:8px;padding:6px 10px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -399,6 +411,7 @@
         <button class="btn" id="pngBtn" aria-label="把当前地图导出为 PNG" title="把当前地图存为 PNG（2 倍像素，含图例）">📷 PNG</button>
         <button class="btn" id="fullCsvBtn" aria-label="导出本层全量数据为 CSV" title="当前层级 × 当前指标 × 所有可得年份 → 长表 CSV">⬇ 全量CSV</button>
         <button class="btn" id="fullJsonBtn" aria-label="导出本层全量数据为 JSON" title="当前层级 × 当前指标 × 所有可得年份 → JSON（含元信息）">⬇ JSON</button>
+        <button class="btn" id="scatterBtn" aria-label="打开关系散点洞察" title="国家关系散点（Gapminder）：X/Y 选指标、气泡=人口、跟随年份">🔵 散点</button>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
@@ -406,6 +419,19 @@
   </header>
   <main id="main">
     <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
+    <div id="scatterOverlay" role="dialog" aria-modal="true" aria-label="关系散点洞察">
+      <div id="scatterBox">
+        <div id="scatterHead">
+          <b>关系散点 · Gapminder</b>
+          <label>X <select id="scX" aria-label="选择横轴指标"></select></label>
+          <label>Y <select id="scY" aria-label="选择纵轴指标"></select></label>
+          <span id="scYear"></span>
+          <span class="sp"></span>
+          <button id="scatterClose" aria-label="关闭散点图">✕ 关闭</button>
+        </div>
+        <div id="scatterChart"></div>
+      </div>
+    </div>
     <!-- I5: 缩放已锁死（roam:false），无需恢复视图按钮 -->
     <div id="panel">
       <button id="panelFold" title="收起面板" aria-label="收起数据面板">▸</button>
@@ -1513,6 +1539,89 @@ function exportFullJson(){
   showBanner("已导出 JSON（"+b.regions+" 区域）");
 }
 window.atlasLevelRegs=atlasLevelRegs; window.buildFullExport=buildFullExport; window.exportFullCsv=exportFullCsv;
+/* ===== P3·C1 关系散点（Gapminder）：国家 × 当前年份，X/Y 可选指标、气泡=人口 =====
+   取数全部走统一 reg/METRICS：扩展指标经 r.ext(最近年)、基础/派生经 METRICS[m].near。
+   断言落在真实渲染(见 tests/scatter_test.py)，不只查 option 配置——吸取 visualMap 教训。 */
+window.__scatterOpen=false;
+var __scatterChart=null, __scatterResizeBound=false;
+function _scVal(c, m, y){                 // c=COUNTRIES 条目 [cn,en,iso2,lng,lat]
+  const r=regCountry(c[2]); if(!r) return null;
+  let v;
+  if(METRICS[m] && METRICS[m].scope==="world") v=r.ext(m, +y);          // 扩展指标：最近年
+  else v=(METRICS[m]&&METRICS[m].near)?METRICS[m].near(r,+y):null;      // gdp/pop/area/派生
+  return (v==null||isNaN(v))?null:v;
+}
+function _scYear(c, m, y){ const r=regCountry(c[2]); if(!r) return null;
+  if(METRICS[m]&&METRICS[m].scope==="world") return r.extYear(m,+y); return null; }
+function _scFmtN(v){ return v>=1e9?(v/1e9).toFixed(1)+"B": v>=1e6?(v/1e6).toFixed(1)+"M": v>=1e3?(v/1e3).toFixed(0)+"k": (Math.round(v*10)/10); }
+function renderScatter(){
+  if(!window.__scatterOpen) return;
+  const el=document.getElementById("scatterChart"); if(!el||!window.echarts) return;
+  const xm=(document.getElementById("scX")||{}).value||"gdppc";
+  const ym=(document.getElementById("scY")||{}).value||"life";
+  const y=(+dataYear)||2024;
+  const useLogX=(xm==="gdppc"||xm==="gdp"||xm==="gdpden"||xm==="area");
+  if(__scatterChart){ try{echarts.dispose(__scatterChart);}catch(e){} __scatterChart=null; }
+  __scatterChart=echarts.init(el);
+  const data=[];
+  COUNTRIES.forEach(c=>{
+    const vx=_scVal(c,xm,y), vy=_scVal(c,ym,y);
+    if(vx==null||vy==null) return;
+    if(useLogX && vx<=0) return;
+    const pop=_scVal(c,"pop",y)||0;
+    data.push({name:c[0], value:[vx,vy,pop], _iso:c[2]});
+  });
+  const maxPop=Math.max(1,...data.map(d=>d.value[2]));
+  const xL=metricLabel(xm), yL=metricLabel(ym);
+  __scatterChart.setOption({
+    backgroundColor:"transparent",
+    grid:{left:76,right:30,top:24,bottom:60},
+    tooltip:{trigger:"item", confine:true,
+      formatter:p=>{ const d=p.data, ax=_scYear(d,_xKey(),y), ay=_scYear(d,_yKey(),y);
+        return "<b>"+esc(d.name)+"</b><br/>"+esc(_xL())+"："+esc(metricFmt(_xKey(),d.value[0]))+(ax&&ax!==y?"（"+ax+"年）":"")
+          +"<br/>"+esc(_yL())+"："+esc(metricFmt(_yKey(),d.value[1]))+(ay&&ay!==y?"（"+ay+"年）":"")
+          +"<br/>人口："+esc(fmtPop(d.value[2])); }},
+    xAxis:{type:useLogX?"log":"value", name:xL, nameLocation:"middle", nameGap:34,
+      axisLabel:{color:"#9fb3c8",formatter:_scFmtN}, nameTextStyle:{color:"#cfe6ff"},
+      splitLine:{lineStyle:{color:"rgba(255,255,255,.06)"}}, axisLine:{lineStyle:{color:"#24344a"}}},
+    yAxis:{type:"value", name:yL, nameLocation:"middle", nameGap:52,
+      axisLabel:{color:"#9fb3c8",formatter:_scFmtN}, nameTextStyle:{color:"#cfe6ff"},
+      splitLine:{lineStyle:{color:"rgba(255,255,255,.06)"}}, axisLine:{lineStyle:{color:"#24344a"}}},
+    series:[{type:"scatter", data:data,
+      symbolSize:function(val){ return Math.max(6, Math.sqrt(val[2]/maxPop)*54); },
+      itemStyle:{color:"#00F0FF", opacity:.72, borderColor:"#0b1220", borderWidth:.5},
+      emphasis:{focus:"series", label:{show:true, formatter:p=>p.data.name, color:"#e6f2ff", position:"top"}}}]
+  });
+  window._scCur={xm,ym,y};
+  const yy=document.getElementById("scYear"); if(yy) yy.textContent="年份 "+y+" · "+data.length+" 国";
+}
+function _xKey(){ return (window._scCur&&window._scCur.xm)||(document.getElementById("scX")||{}).value||"gdppc"; }
+function _yKey(){ return (window._scCur&&window._scCur.ym)||(document.getElementById("scY")||{}).value||"life"; }
+function _xL(){ return metricLabel(_xKey()); }
+function _yL(){ return metricLabel(_yKey()); }
+function openScatter(){
+  window.__scatterOpen=true;
+  const ov=document.getElementById("scatterOverlay"); if(ov) ov.classList.add("open");
+  const xs=document.getElementById("scX"), ys=document.getElementById("scY");
+  if(xs && !xs.dataset.init){
+    const keys=Object.keys(METRICS);
+    xs.innerHTML=keys.map(k=>'<option value="'+k+'"'+(k==="gdppc"?" selected":"")+'>'+esc(METRICS[k].label)+'</option>').join("");
+    ys.innerHTML=keys.map(k=>'<option value="'+k+'"'+(k==="life"?" selected":"")+'>'+esc(METRICS[k].label)+'</option>').join("");
+    xs.dataset.init="1"; ys.dataset.init="1";
+    xs.addEventListener("change",renderScatter); ys.addEventListener("change",renderScatter);
+    document.getElementById("scatterClose").addEventListener("click",closeScatter);
+    ov.addEventListener("click",e=>{ if(e.target===ov) closeScatter(); });
+    document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&window.__scatterOpen) closeScatter(); });
+    if(!__scatterResizeBound){ window.addEventListener("resize",()=>{ if(__scatterChart) __scatterChart.resize(); }); __scatterResizeBound=true; }
+  }
+  renderScatter();
+}
+function closeScatter(){
+  window.__scatterOpen=false;
+  const ov=document.getElementById("scatterOverlay"); if(ov) ov.classList.remove("open");
+  if(__scatterChart){ try{echarts.dispose(__scatterChart);}catch(e){} __scatterChart=null; }
+}
+window.openScatter=openScatter; window.closeScatter=closeScatter; window.renderScatter=renderScatter;
 window.exportMapPng  = exportMapPng;
 
 function renderRank(){
@@ -1689,6 +1798,7 @@ window.addEventListener("load", ()=>{
   document.getElementById("pngBtn").addEventListener("click", ()=>exportMapPng());
   document.getElementById("fullCsvBtn").addEventListener("click", ()=>exportFullCsv());
   document.getElementById("fullJsonBtn").addEventListener("click", ()=>exportFullJson());
+  document.getElementById("scatterBtn").addEventListener("click", ()=>openScatter());
 
   /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
   (function(){
@@ -1740,6 +1850,7 @@ window.addEventListener("load", ()=>{
     redrawByYear();
     saveState();   // 优化3：年份变化保存 URL 状态
     if(window.atlasPostSoon) window.atlasPostSoon(500);   // T11：年份变化向父页同步
+    if(window.__scatterOpen && window.renderScatter) window.renderScatter();   // P3·C1：散点开时跟随年份重绘
   });
   /* 年份播放动画（B4）：从当前年份逐年推进，复用 redrawByYear 单点重绘 */
   let playTimer=null, playYears=[], playIdx=0;
