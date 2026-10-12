@@ -3,20 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>关于 · 数据来源 · Global Data Atlas</title>
+<title>关于与数据来源 · 全球数据地图 · huajun.wang</title>
 <meta name="description" content="Global Data Atlas 数据来源、口径与诚实性说明：World Bank、维基、BEA、Eurostat 等公开权威源。" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <style>
   :root{
     --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
-    --cyan:#00F0FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
-    --hover:rgba(0,240,255,.06);
+    --cyan:#6A90FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
+    --hover:rgba(106,144,255,.06);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
     line-height:1.75;}
-  body{background:radial-gradient(1100px 700px at 12% -8%, rgba(0,240,255,.05), transparent 60%),
+  body{background:radial-gradient(1100px 700px at 12% -8%, rgba(106,144,255,.05), transparent 60%),
     radial-gradient(900px 600px at 108% 112%, rgba(255,46,147,.04), transparent 60%), var(--bg);}
   .wrap{max-width:860px;margin:0 auto;padding:32px 24px 60px;}
   header{display:flex;align-items:center;gap:14px;margin-bottom:28px;flex-wrap:wrap;}
@@ -36,25 +36,42 @@
   .tag{display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;border:1px solid var(--line);color:var(--muted);margin-right:6px;}
   .note{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding:8px 14px;margin:12px 0;
     background:rgba(10,16,26,.4);border-radius:0 8px 8px 0;}
+
+/* ===== huajun.wang 品牌一体性（A 层识别 + B 层令牌） ===== */
+.site-brand{display:inline-flex;align-items:center;gap:8px;text-decoration:none;flex:none;}
+.site-logo{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#4361ee;color:#fff;font-size:13px;font-weight:700;line-height:1;}
+.site-name{font-size:13px;color:var(--muted);letter-spacing:.02em;transition:color .14s ease;}
+.site-brand:hover .site-name{color:var(--text);}
+.site-brand:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:4px;}
+.brand-sep{color:var(--line);flex:none;}
+@media(max-width:768px){.site-name,.brand-sep{display:none;}}
+
+.origin{border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:0 0 26px;background:var(--panel);}
+.origin p{margin:0;font-size:14px;}
+.origin a{color:var(--cyan);text-decoration:none;}
+.origin a:hover{text-decoration:underline;}
+
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
+  <a class="site-brand" href="https://huajun.wang" title="返回 huajun.wang 主站"><span class="site-logo" aria-hidden="true">h</span><span class="site-name">huajun.wang</span></a>
     <h1>关于 · 数据来源<span class="en">ABOUT &amp; DATA SOURCES</span></h1>
     <div class="nav">
       <a class="btn" href="index.html">← 数据地图</a>
       <a class="btn" href="compare.html">对比页</a>
     </div>
   </header>
+  <section class="origin"><p><strong>全球数据地图</strong>是 <a href="https://huajun.wang">huajun.wang</a> 智能硬件知识体系的宏观市场模块——品类调研回答「什么产品值得做」，本站回答「卖到哪里去」。<a href="https://huajun.wang">← 返回主站</a></p></section>
 
   <h2>项目简介</h2>
-  <p>全球数据图谱（Global Data Atlas）是一个交互式全球行政区划数据地图：按行政层级下钻（世界 → 国家 → 中国省/市 · 美国州 · 日本县 · 欧盟 NUTS2），挂载公开经济数据（GDP / 人口 / 面积 + 8 项扩展指标），支持年份切换、指标切换与多区域对比。数据全部来自公开权威源，本页说明各数据来源、口径与诚实性处理。</p>
+  <p>全球数据图谱（Global Data Atlas）是一个交互式全球行政区划数据地图：按行政层级下钻（世界 → 国家 → 中国省/市 · 美国州 · 日本县 · 欧盟 NUTS2），挂载公开经济数据（GDP / 人口 / 面积 / 人均GDP 等 5 项基础指标 + 10 项扩展指标），支持年份切换、指标切换与多区域对比。数据全部来自公开权威源，本页说明各数据来源、口径与诚实性处理。</p>
 
   <h2>数据来源</h2>
   <table>
     <tr><th>层级</th><th>数据源</th><th>内容</th><th>更新</th></tr>
-    <tr><td>国家（214）</td><td>世界银行 World Bank</td><td>GDP/人口/面积 + 8 项扩展指标（贸易/医疗/教育/寿命/人均GDP/失业/互联网/军费）</td><td>2000–2024 逐年</td></tr>
+    <tr><td>国家（214）</td><td>世界银行 World Bank</td><td>GDP/人口/面积 + 10 项扩展指标（贸易/医疗/教育/寿命/人均GDP/失业/互联网/军费/城镇化率/通胀率）</td><td>2000–2024 逐年</td></tr>
     <tr><td>中国省级（31）</td><td>维基百科（官方公报/五经普修订整理）</td><td>GDP 序列 + 人口 + 面积</td><td>2000/2010/2020–2025（2025 初核）</td></tr>
     <tr><td>中国地级市（321）</td><td>公开整理近似值 + 维基</td><td>GDP/人口/面积</td><td>约 2023；46 城多年序列</td></tr>
     <tr><td>美国州（51）</td><td>BEA（经济分析局）+ Census</td><td>GDP 序列 + 人口 + 面积</td><td>GDP 2000–2024；人口 2020 普查 + 2025 估算；面积单年</td></tr>

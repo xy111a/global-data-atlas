@@ -135,5 +135,11 @@ step "L3t 关系散点渲染（scatter_test，P3·C1）"
 "$PY" tests/scatter_test.py > /tmp/scatter.log 2>&1 && tail -1 /tmp/scatter.log || { echo "  ✗ 散点失败:"; grep '❌' /tmp/scatter.log | head -8; exit 1; }
 echo "  ✓ L3t 通过"; PASS=$((PASS+1))
 
+step "L3u 顶栏单行化 + 品牌一体性（header_single_row_test）"
+# 断言：≥1280px 顶栏保持单行（brand/metric-zone/tb-actions 同一行）、无横向溢出、
+# 指标分区（核心 5 在 seg / 扩展 10 在下拉 / 工具 6）、品牌区存在、两个下拉可展开。
+"$PY" tests/header_single_row_test.py > /tmp/header.log 2>&1 && tail -1 /tmp/header.log || { echo "  ✗ 顶栏布局失败:"; grep '❌' /tmp/header.log | head -8; exit 1; }
+echo "  ✓ L3u 通过"; PASS=$((PASS+1))
+
 echo ""
 echo "════ 门禁结果: $PASS/$((PASS+FAIL)) 步通过 ════"

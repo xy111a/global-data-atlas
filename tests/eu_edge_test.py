@@ -39,7 +39,7 @@ TRIGGER1 = """DRILLABLE['DE'].load();
 setTimeout(function(){
 var out=[];
 // 切到 trade（世界层专属指标）—— updateMetricButtons 应禁用
-var tb=document.querySelector('#metricSeg button[data-m="trade"]');
+var tb=document.querySelector('#metricSeg button[data-m="trade"], #metricMoreDropdown button[data-m="trade"]');
 out.push('trade按钮disabled='+ (tb?tb.disabled:'无按钮'));
 // 年份切换（单年数据应无变化但重绘正常）
 var ys=document.getElementById('yearSel'); ys.value='2020'; 

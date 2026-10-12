@@ -42,7 +42,7 @@ try{
       out.growthSelfConsistent = !!((out.growthUSD!=null)&&(g0)&&(Math.abs(out.growthUSD-(g1/g0-1))<1e-9));
       out.pc = r?METRICS.gdppc.near(r,2024):null;
       out.den= r?METRICS.gdpden.near(r,2024):null;
-      var btns=Array.prototype.slice.call(document.querySelectorAll('#metricSeg button'));
+      var btns=Array.prototype.slice.call(document.querySelectorAll('#metricSeg button, #metricMoreDropdown button'));
       out.btnKeys=btns.map(function(b){return b.dataset.m;}).join('|');
       out.disabledInNuts=btns.filter(function(b){return b.disabled;}).map(function(b){return b.dataset.m;}).join('|');
       metric='gdp'; rankMode='growth'; renderRank();

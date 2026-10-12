@@ -23,7 +23,7 @@ var out = [];
 try{
   setTimeout(function(){
     try{
-      var btns = document.querySelectorAll('#metricSeg button');
+      var btns = document.querySelectorAll('#metricSeg button, #metricMoreDropdown button');
       out.push('指标按钮数=' + btns.length);
       out.push('按钮=' + Array.from(btns).map(b=>b.dataset.m+':'+b.textContent).join(','));
       // 先 click 贸易按钮触发懒加载（metricSeg 处理器 async loadScript ext_indicators.js）

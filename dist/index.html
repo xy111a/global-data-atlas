@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>全球数据地图 · Global Data Atlas</title>
+<title>全球数据地图 · huajun.wang</title>
 <meta name="description" content="交互式全球行政区划数据地图：世界→国家→中国省/市、美国州、日本县、欧盟 NUTS2 下钻，GDP/人口/面积与扩展指标，统一以美元计价。" />
 <meta name="theme-color" content="#05060a" />
-<meta property="og:title" content="全球数据地图 · Global Data Atlas" />
+<meta property="og:title" content="全球数据地图 · huajun.wang" />
 <meta property="og:description" content="交互式全球行政区划数据地图：多层级下钻与经济数据对比，GDP 统一以美元计价。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://atlas.huajun.wang/" />
@@ -14,9 +14,9 @@
 <meta property="og:image" content="https://atlas.huajun.wang/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="全球数据地图 · Global Data Atlas：多层级下钻与经济数据对比" />
+<meta property="og:image:alt" content="全球数据地图 · huajun.wang：多层级下钻与经济数据对比" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="全球数据地图 · Global Data Atlas" />
+<meta name="twitter:title" content="全球数据地图 · huajun.wang" />
 <meta name="twitter:description" content="交互式全球行政区划数据地图：多层级下钻与经济数据对比，GDP 统一以美元计价。" />
 <meta name="twitter:image" content="https://atlas.huajun.wang/og-image.png" />
 <!-- T9/SEO：schema.org 结构化数据，帮助搜索引擎/AI 抓取理解本站性质、覆盖时空范围与数据来源 -->
@@ -28,7 +28,7 @@
       "@type": "Dataset",
       "@id": "https://atlas.huajun.wang/#dataset",
       "name": "全球行政区划经济数据集（Global Data Atlas）",
-      "description": "按行政层级下钻的全球经济数据：世界 214 国 + 中国31省/321地级市、美国51州、日本47都道府县、欧盟27国 NUTS2；指标含 GDP、人口、面积及 8 项扩展指标，GDP 统一按逐年汇率折算为美元。",
+      "description": "按行政层级下钻的全球经济数据：世界 214 国 + 中国31省/321地级市、美国51州、日本47都道府县、欧盟27国 NUTS2；指标含 GDP、人口、面积、人均GDP 等 5 项基础指标及 10 项扩展指标，GDP 统一按逐年汇率折算为美元。",
       "url": "https://atlas.huajun.wang/",
       "conditionsOfAccess": "免费公开查询，转载请注明来源",
       "isAccessibleForFree": true,
@@ -47,7 +47,7 @@
     {
       "@type": "WebApplication",
       "@id": "https://atlas.huajun.wang/#app",
-      "name": "全球数据地图 · Global Data Atlas",
+      "name": "全球数据地图 · huajun.wang",
       "url": "https://atlas.huajun.wang/",
       "applicationCategory": "DataVisualization",
       "operatingSystem": "Any",
@@ -105,23 +105,23 @@
   :root{
     /* 品牌令牌（数据语义，沿用） */
     --bg:#05060a; --panel:rgba(12,18,28,0.82); --line:#13314a;
-    --cyan:#00F0FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
+    --cyan:#6A90FF; --pink:#FF2E93; --gold:#FFD166; --muted:#7f93a8; --text:#dfeaf5;
     /* 质感/光效令牌（Open Design 再设计） */
     --panel-solid:#0c121c;                /* 输入框实底（聚焦态） */
     --panel-float:rgba(13,20,31,0.92);    /* 悬浮层（tooltip/banner/dropdown） */
     --line-soft:rgba(19,49,74,.45);       /* 面板内部弱分隔线 */
-    --line-bright:rgba(0,240,255,.35);    /* hover 描边微亮 */
-    --line-top:linear-gradient(90deg,transparent,rgba(0,240,255,.5),rgba(255,46,147,.28),transparent);  /* 顶部发丝高光 */
-    --hover:rgba(0,240,255,.06);          /* hover 遮罩 */
-    --hover-strong:rgba(0,240,255,.10);   /* 选中/更强 hover */
-    --pressed:rgba(0,240,255,.14);        /* active 按压 */
-    --glow-sm:0 0 10px rgba(0,240,255,.14);
-    --glow-md:0 0 22px rgba(0,240,255,.22);
+    --line-bright:rgba(106,144,255,.35);    /* hover 描边微亮 */
+    --line-top:linear-gradient(90deg,transparent,rgba(106,144,255,.5),rgba(255,46,147,.28),transparent);  /* 顶部发丝高光 */
+    --hover:rgba(106,144,255,.06);          /* hover 遮罩 */
+    --hover-strong:rgba(106,144,255,.10);   /* 选中/更强 hover */
+    --pressed:rgba(106,144,255,.14);        /* active 按压 */
+    --glow-sm:0 0 10px rgba(106,144,255,.14);
+    --glow-md:0 0 22px rgba(106,144,255,.22);
     --shadow-panel:0 14px 40px rgba(0,0,0,.45);
     --shadow-float:0 18px 50px rgba(0,0,0,.55);
     /* 结构令牌 */
     --num:tabular-nums;
-    --r-sm:6px; --r-md:10px; --r-lg:14px;
+    --r-sm:8px; --r-md:10px; --r-lg:16px;  /* 对齐主站 10/16px 圆角比例 */
     --t-fast:.14s ease; --t-med:.22s ease;
   }
   *{box-sizing:border-box;}
@@ -129,44 +129,77 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
   body{
     background:
-      radial-gradient(1100px 700px at 12% -8%, rgba(0,240,255,.05), transparent 60%),
+      radial-gradient(1100px 700px at 12% -8%, rgba(106,144,255,.05), transparent 60%),
       radial-gradient(900px 600px at 108% 112%, rgba(255,46,147,.04), transparent 60%),
       var(--bg);
     -webkit-font-smoothing:antialiased;
   }
-  ::selection{background:rgba(0,240,255,.25);}
+  ::selection{background:rgba(106,144,255,.25);}
   :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:4px;}
   *::-webkit-scrollbar{width:8px;height:8px;}
   *::-webkit-scrollbar-thumb{background:rgba(19,49,74,.7);border-radius:4px;}
   *::-webkit-scrollbar-track{background:transparent;}
   button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;}
   #app{display:flex;flex-direction:column;height:100vh;}
-  header{position:relative;z-index:20;display:flex;flex-direction:column;gap:10px;padding:12px 20px;
+  header{position:relative;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 20px;
     border-bottom:1px solid var(--line);
     background:color-mix(in oklab, var(--bg) 72%, transparent);
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
     box-shadow:0 10px 30px rgba(0,0,0,.25);}
   header::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
     background:var(--line-top);opacity:.55;pointer-events:none;}   /* 顶部发丝高光 */
-  .tb-main{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
-  .brand{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .tb-main{display:flex;align-items:center;gap:14px;flex:1;min-width:0;}
+  .brand{display:flex;align-items:center;gap:8px;min-width:0;flex:none;}
   header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.5px;white-space:nowrap;}
   header h1 .en{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px;}
-  .breadcrumb{font-size:13px;color:var(--muted);}
+  .breadcrumb{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .breadcrumb b{color:var(--cyan);font-weight:500;position:relative;}
   .breadcrumb b::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:1px;
     background:var(--cyan);box-shadow:var(--glow-sm);}   /* 当前层级发光下划线 */
-  .tb-actions{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;}
+  /* 指标区：核心指标直接显示，扩展指标收进「更多指标」下拉 */
+  .metric-zone{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
+  /* 下拉通用（更多指标 / 工具） */
+  .drop{position:relative;flex:none;}
+  .drop>button{display:inline-flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    padding:6px 12px;border-radius:var(--r-md);font-size:12.5px;cursor:pointer;white-space:nowrap;
+    transition:color var(--t-fast),background var(--t-fast),border-color var(--t-fast);}
+  .drop>button:hover{color:var(--text);border-color:var(--line-bright);background:var(--hover);}
+  .drop>button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+  .drop.open>button{color:var(--text);border-color:var(--line-bright);background:var(--hover);}
+  .drop>button .arrow{font-size:10px;transition:transform var(--t-fast);}
+  .drop.open>button .arrow{transform:rotate(180deg);}
+  .drop .dropdown{position:absolute;top:calc(100% + 6px);left:0;z-index:30;display:none;
+    background:var(--panel-float);border:1px solid var(--line);border-radius:var(--r-md);
+    box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    padding:6px;min-width:190px;}
+  .drop.drop-right .dropdown{left:auto;right:0;}
+  .drop.open .dropdown{display:block;}
+  .drop .dropdown button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:0;color:var(--muted);
+    padding:8px 12px;font-size:12.5px;cursor:pointer;border-radius:var(--r-sm);white-space:nowrap;
+    transition:color var(--t-fast),background var(--t-fast);}
+  .drop .dropdown button:hover{color:var(--text);background:var(--hover);}
+  .drop .dropdown button.active{color:var(--cyan);font-weight:500;}
+  .drop .dropdown button.disabled{opacity:.3;cursor:not-allowed;pointer-events:none;}
+  .tb-actions{display:flex;align-items:center;gap:10px;flex:none;}
   .seg{display:flex;gap:2px;padding:3px;
     background:rgba(10,16,26,.55);border:1px solid var(--line);border-radius:var(--r-lg);}
   .seg button{position:relative;background:transparent;color:var(--muted);border:0;padding:6px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap;border-radius:var(--r-sm);
     transition:color var(--t-fast),background var(--t-fast);}
   .seg button:hover{color:var(--text);background:var(--hover);}
   .seg button:active{background:var(--pressed);}
-  .seg button.active{color:var(--cyan);font-weight:500;text-shadow:0 0 12px rgba(0,240,255,.35);}
+  .seg button.active{color:var(--cyan);font-weight:500;text-shadow:0 0 12px rgba(106,144,255,.35);}
   .seg button.disabled{opacity:.3;cursor:not-allowed;pointer-events:none;}   /* 当前层级不可用的指标 */
   .seg button.active::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:2px;
-    background:var(--cyan);box-shadow:0 0 8px rgba(0,240,255,.4);}   /* active 发光条 */
+    background:var(--cyan);box-shadow:0 0 8px rgba(106,144,255,.4);}   /* active 发光条 */
+  /* ===== huajun.wang 品牌一体性（A 层识别 + B 层令牌） ===== */
+  .site-brand{display:inline-flex;align-items:center;gap:8px;text-decoration:none;flex:none;}
+  .site-logo{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#4361ee;color:#fff;font-size:13px;font-weight:700;line-height:1;}
+  .site-name{font-size:13px;color:var(--muted);letter-spacing:.02em;transition:color .14s ease;}
+  .site-brand:hover .site-name{color:var(--text);}
+  .site-brand:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:4px;}
+  .brand-sep{color:var(--line);flex:none;}
+  :root{--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .metric .v,.dash-stat .v,.rank-item .rv,.rank-item .rk{font-family:var(--mono);}
   .btn{background:var(--panel);border:1px solid var(--line);color:var(--muted);
     padding:8px 12px;border-radius:var(--r-md);font-size:13px;cursor:pointer;white-space:nowrap;
     display:inline-flex;align-items:center;gap:6px;
@@ -229,7 +262,7 @@
   .metric{margin-bottom:14px;}
   .metric .k{font-size:12px;color:var(--muted);}
   .metric .v{font-size:20px;font-weight:600;color:var(--cyan);font-variant-numeric:var(--num);text-shadow:var(--glow-sm);}
-  .metric .v.growth.pos{color:#00F0FF;}
+  .metric .v.growth.pos{color:#6A90FF;}
   .metric .v.growth.neg{color:var(--gold);}
   .metric .v.growth.muted{color:#7f93a8;}
   .metric .v.muted{color:#8fa2b5;font-size:16px;}  /* 提亮：对比度 3.7→5.5 (L1) */
@@ -263,23 +296,25 @@
   .dash-stat .v.gold{color:var(--gold);}
   .dash-stat .v.pink{color:var(--pink);}
   .dash-stat .d{font-size:11px;color:#7f93a8;font-variant-numeric:var(--num);}
-  .dash-stat .d.up{color:#00F0FF;} .dash-stat .d.down{color:var(--gold);}
+  .dash-stat .d.up{color:#6A90FF;} .dash-stat .d.down{color:var(--gold);}
   .dash-insight{margin-top:14px;border-top:1px dashed var(--line-soft);padding-top:12px;
     display:flex;flex-direction:column;gap:8px;}
   .dash-insight-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);}
   .dash-insight-row b{color:var(--text);font-weight:500;font-variant-numeric:var(--num);}
-  .dash-insight-row b.pos{color:#00F0FF;} .dash-insight-row b.neg{color:var(--gold);}
+  .dash-insight-row b.pos{color:#6A90FF;} .dash-insight-row b.neg{color:var(--gold);}
   .dash-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}   /* 移到标题下方（pHint 后），按钮更显眼 */
 
 /* ===== 响应式断点（排版审计 P1/P2/P3） ===== */
 @media(max-width:1200px){
-  header{flex-wrap:wrap;gap:8px;}
+  header{gap:10px;}
   header h1 .en{display:none;}   /* 隐藏英文副标题节省宽度 */
-  #search{width:150px;}
+  .site-name,.brand-sep{display:none;}   /* 品牌区收成 logo 图标 */
+  #search{width:140px;}
+  .seg button{padding:6px 9px;font-size:12px;}
 }
 @media(max-width:1024px){
-  #metricSeg{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}  /* 指标按钮横向滚动，避免堆多行 */
-  #metricSeg button{flex:none;}
+  .metric-zone{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}  /* 指标区横向滚动，避免堆多行 */
+  .metric-zone .seg button{flex:none;}
   #main{flex-direction:column;}   /* 面板转全宽（原 768 断点提前到 1024） */
   #chart{width:100%;height:55vh;min-height:360px;flex:none;margin:0;border-radius:0;border-left:none;border-right:none;}
   #panel{width:100%;max-width:none;border-left:none;border-top:1px solid var(--line);
@@ -289,6 +324,10 @@
   body{font-size:13px;}
   #app{flex-direction:column; height:auto; min-height:100vh;}
   header{flex-wrap:wrap; gap:6px; padding:8px 10px;}
+  .tb-main{flex-wrap:wrap;}
+  .metric-zone{order:3;width:100%;max-width:100%;}
+  .tb-actions{flex-wrap:wrap;justify-content:flex-end;gap:6px;flex:1 1 auto;min-width:0;}
+  .tb-actions .btn{padding:7px 10px;font-size:12.5px;}
   .tb-main{gap:8px;}
   #panelFold{display:none;}   /* 窄屏面板在下方，无需折叠 */
   #panelFloat{display:none!important;}
@@ -296,8 +335,8 @@
   #chart{width:100%;height:55vh; min-height:360px; flex:none;}
   #panel{width:100%; max-width:none; border-left:none; border-top:1px solid var(--line);
     max-height:45vh; overflow-y:auto;}
-  #metricSeg{flex-wrap:nowrap; overflow-x:auto; max-width:100vw;}   /* 横向滚动单行 */
-  #metricSeg button{padding:5px 10px; font-size:12px; min-height:36px;}
+  .metric-zone{flex-wrap:nowrap; overflow-x:auto; max-width:100vw;}   /* 横向滚动单行 */
+  .metric-zone .seg button{padding:5px 10px; font-size:12px; min-height:36px;}
   #search{max-width:160px; font-size:12px;}
   #crumb{font-size:12px; white-space:normal; word-break:break-word; overflow-wrap:anywhere;}
   .rank-item{padding:6px 10px; font-size:12px;}
@@ -305,9 +344,10 @@
 }
 @media(max-width:480px){
   #chart{height:50vh; min-height:300px;}
-  #metricSeg button{padding:4px 8px; font-size:11px;}
-  #search{max-width:120px;}
+  .metric-zone .seg button{padding:4px 8px; font-size:11px;}
+  #search{max-width:120px;flex:1 1 90px;min-width:0;}
   .tb-actions{width:100%;}   /* P2: 操作栏占满一行，内部换行不裁切 */
+  .sn-drop>summary{padding:7px 9px;font-size:12px;}
   .tb-actions .btn{padding:6px 8px; font-size:12px; flex:0 1 auto; min-width:0;}
   #yearSel{padding:6px 8px; font-size:12px;}
 }
@@ -395,7 +435,16 @@
   <header>
     <div class="tb-main">
       <div class="brand">
+        <a class="site-brand" href="https://huajun.wang" title="返回 huajun.wang 主站"><span class="site-logo" aria-hidden="true">h</span><span class="site-name">huajun.wang</span></a>
+        <span class="brand-sep" aria-hidden="true">·</span>
         <h1 class="breadcrumb" id="crumb" style="margin:0;font-size:inherit;font-weight:inherit;">世界</h1>
+      </div>
+      <div class="metric-zone">
+        <div class="seg" id="metricSeg" role="group" aria-label="选择指标"></div>
+        <div class="drop" id="metricMore">
+          <button type="button" id="metricMoreBtn" aria-haspopup="true" aria-expanded="false">更多指标 <span class="arrow">▾</span></button>
+          <div class="dropdown" id="metricMoreDropdown" role="menu" aria-label="更多指标"></div>
+        </div>
       </div>
       <div class="tb-actions">
         <details class="sn-drop"><summary>兄弟站</summary><div class="sn-menu" role="menu"><a href="https://intel.huajun.wang" role="menuitem"><span class="name">intel</span><span class="desc">每日情报</span></a><a href="https://research.huajun.wang" role="menuitem"><span class="name">research</span><span class="desc">品类看板</span></a><a href="https://gtm.huajun.wang" role="menuitem"><span class="name">gtm</span><span class="desc">GTM 知识库</span></a><a href="https://huajun.wang" role="menuitem"><span class="name">home</span><span class="desc">门户</span><span class="badge">独立</span></a></div></details>
@@ -405,17 +454,21 @@
           <option value="2024">2024</option>
           <option value="2023">2023</option>
         </select>
-        <button class="btn" id="playBtn" aria-label="播放年份动画" title="逐年自动播放（再次点击暂停）">▶ 播放</button>
+        <div class="drop drop-right" id="toolMore">
+          <button type="button" id="toolMoreBtn" aria-haspopup="true" aria-expanded="false">工具 <span class="arrow">▾</span></button>
+          <div class="dropdown" id="toolMoreDropdown" role="menu" aria-label="地图工具">
+            <button type="button" id="playBtn" aria-label="播放年份动画" title="逐年自动播放（再次点击暂停）">▶ 播放</button>
+            <button type="button" id="scaleBtn" aria-label="切换配色刻度（线性/对数）" title="配色刻度：线性 ↔ 对数（GDP 等长尾分布建议用对数）">🎨 线性</button>
+            <button type="button" id="pngBtn" aria-label="把当前地图导出为 PNG" title="把当前地图存为 PNG（2 倍像素，含图例）">📷 PNG</button>
+            <button type="button" id="fullCsvBtn" aria-label="导出本层全量数据为 CSV" title="当前层级 × 当前指标 × 所有可得年份 → 长表 CSV">⬇ 全量CSV</button>
+            <button type="button" id="fullJsonBtn" aria-label="导出本层全量数据为 JSON" title="当前层级 × 当前指标 × 所有可得年份 → JSON（含元信息）">⬇ JSON</button>
+            <button type="button" id="scatterBtn" aria-label="打开关系散点洞察" title="国家关系散点（Gapminder）：X/Y 选指标、气泡=人口、跟随年份">🔵 散点</button>
+          </div>
+        </div>
         <a class="btn" id="cmpBtn" href="compare.html" title="打开独立对比页（多区域并排分析）">📊 对比</a>
-        <button class="btn" id="scaleBtn" aria-label="切换配色刻度（线性/对数）" title="配色刻度：线性 ↔ 对数（GDP 等长尾分布建议用对数）">🎨 线性</button>
-        <button class="btn" id="pngBtn" aria-label="把当前地图导出为 PNG" title="把当前地图存为 PNG（2 倍像素，含图例）">📷 PNG</button>
-        <button class="btn" id="fullCsvBtn" aria-label="导出本层全量数据为 CSV" title="当前层级 × 当前指标 × 所有可得年份 → 长表 CSV">⬇ 全量CSV</button>
-        <button class="btn" id="fullJsonBtn" aria-label="导出本层全量数据为 JSON" title="当前层级 × 当前指标 × 所有可得年份 → JSON（含元信息）">⬇ JSON</button>
-        <button class="btn" id="scatterBtn" aria-label="打开关系散点洞察" title="国家关系散点（Gapminder）：X/Y 选指标、气泡=人口、跟随年份">🔵 散点</button>
         <button class="btn" id="backBtn" aria-label="返回上一级">← 返回世界</button>
       </div>
     </div>
-    <div class="seg" id="metricSeg" role="group" aria-label="选择指标"></div>
   </header>
   <main id="main">
     <div id="chart" tabindex="0" role="application" aria-label="行政区划地图（双击区域下钻，单击查看数据）"></div>
@@ -624,9 +677,11 @@ function setCrumbPath(paths){
 }
 /* 按当前层级刷新指标按钮可用性：scope=world 的指标仅在 world 层可用，其余层禁用弱化 */
 function updateMetricButtons(){
-  const seg=document.getElementById("metricSeg"); if(!seg) return;
+  const seg=document.getElementById("metricSeg");
+  const dropdown=document.getElementById("metricMoreDropdown");
   const worldOnly = currentLevel!=="world" && currentLevel!=="";
-  seg.querySelectorAll("button").forEach(b=>{
+  // 更新核心指标按钮（seg）
+  if(seg) seg.querySelectorAll("button").forEach(b=>{
     const m=b.dataset.m;
     const unusable = worldOnly && metricScope(m)==="world";
     b.disabled = unusable;
@@ -640,6 +695,31 @@ function updateMetricButtons(){
       const L=LAYERS[level]; if(L){ L.render(); L.restore(); }   // M3: 自动切回 gdp 后恢复面板（统一走 LAYERS）
     }
   });
+  // 更新下拉里的扩展指标按钮
+  if(dropdown) dropdown.querySelectorAll("button").forEach(b=>{
+    const m=b.dataset.m;
+    const unusable = worldOnly && metricScope(m)==="world";
+    b.disabled = unusable;
+    b.classList.toggle("disabled", unusable);
+    if(unusable && b.classList.contains("active")){
+      metric="gdp"; b.classList.remove("active");
+      const level=currentLevel;
+      const L=LAYERS[level]; if(L){ L.render(); L.restore(); }
+    }
+  });
+  syncMetricActive();
+}
+/* 指标 active 状态同步到 seg 与「更多指标」下拉两侧 */
+function syncMetricActive(){
+  const seg=document.getElementById("metricSeg");
+  const dropdown=document.getElementById("metricMoreDropdown");
+  if(seg) seg.querySelectorAll("button").forEach(b=>{ b.classList.toggle("active", b.dataset.m===metric); });
+  if(dropdown) dropdown.querySelectorAll("button").forEach(b=>{ b.classList.toggle("active", b.dataset.m===metric); });
+}
+/* 收起顶栏下拉（更多指标 / 工具） */
+function closeDrop(wrap, btn){
+  if(wrap) wrap.classList.remove("open");
+  if(btn) btn.setAttribute("aria-expanded","false");
 }
 /* 返回按钮动态文字：显示上一级名称 */
 function updateBackBtn(){
@@ -736,8 +816,8 @@ function renderTrendChart(series, fmt){
     yAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:10,formatter:v=>fmt?fmt(v).replace(/[¥$]/,""):v},
       splitLine:{lineStyle:{color:"#0e2233"}}},
     series:series.map(s=>({name:s.name,type:"line",smooth:true,showSymbol:false,
-      data:s.values,lineStyle:{width:2,color:"#00F0FF"},itemStyle:{color:"#00F0FF"},
-      areaStyle:{color:"rgba(0,240,255,0.08)"}}))
+      data:s.values,lineStyle:{width:2,color:"#6A90FF"},itemStyle:{color:"#6A90FF"},
+      areaStyle:{color:"rgba(106,144,255,0.08)"}}))
   });
   tc.on("click",()=>{});
   window.__trendChart=tc;
@@ -768,7 +848,7 @@ function renderTrendCompare(entries, title, fmt){
     grid:{left:10,right:60,top:8,bottom:8,containLabel:true},
     xAxis:{type:"value",axisLabel:{color:"#7f93a8",fontSize:11,formatter:isGrowth?v=>(v>0?"+":"")+v+"%":v=>fmt(v)}},
     yAxis:{type:"category",inverse:true,data:sorted.map(e=>e.name),axisLabel:{color:"#7f93a8",fontSize:11}},   // inverse:第一名在顶部，滚轮向下看后续排名
-    series:[{type:"bar",data:sorted.map(e=>({value:isGrowth?+(e.val*100).toFixed(1):e.val,itemStyle:{color:e.val>=0?"#00F0FF":"var(--gold)"}})),
+    series:[{type:"bar",data:sorted.map(e=>({value:isGrowth?+(e.val*100).toFixed(1):e.val,itemStyle:{color:e.val>=0?"#6A90FF":"var(--gold)"}})),
       label:{show:true,position:"right",color:"#9fb3c8",fontSize:11,formatter:p=>fmtV(p.value)} }]
   });
   window.__trendChart=tc;
@@ -848,11 +928,11 @@ function renderWorld2D(){
     backgroundColor:"#05060a",
     tooltip:{trigger:"item", formatter:p=>{ const c=p.data&&p.data.cn, reg=p.data&&p.data.reg; if(!c)return p.name+"<br/><span style='color:#7f93a8'>暂无数据（未纳入 World Bank 序列）</span>";
       const g=regGet(reg,"gdp",dataYear), gp=regGet(reg,"pop",dataYear), ga=regGet(reg,"area",dataYear), gr=regGrowth(reg,metric,2000);
-      const grFmt = metric==="gdp" ? ("较2000年实际增长 <b style=\"color:"+((gr||0)>=0?'#00F0FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
-        : (`较2000年${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#00F0FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
+      const grFmt = metric==="gdp" ? ("较2000年实际增长 <b style=\"color:"+((gr||0)>=0?'#6A90FF':'var(--gold)')+"\">"+fmtGrowth(gr)+"</b>")
+        : (`较2000年${metric==="pop"?"增长":(metric==="life"?"变化":"增长")} <b style="color:${(gr||0)>=0?'#6A90FF':'var(--gold)'}">${fmtGrowthFor(metric,gr)}</b>`);
       const cy=cYear(c[2]); const cyTag=(String(cy)===String(dataYear))?String(cy):("≈"+cy);   // T8：回退年显式标记
       return `<b>${c[0]}</b> ${c[1]} · <span style="color:#7f93a8" title="该数值的实际数据年份（≈ 表示最近可得年）">${cyTag}</span><br/>GDP ${fmtGDP(g)}<br/>人口 ${fmtPop(gp)}<br/>面积 ${fmtArea(ga)}<br/>${grFmt}`;}},
-    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年"+cs.note,inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+    visualMap:vals.length?{min,max,left:20,bottom:30,calculable:true,title:metricLabel(metric)+" · 最近可得年"+cs.note,inRange:{color:["#0a3a4a","#6A90FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"},text:["高","低"],formatter:cs.fmtv}:{show:false},
     series:[{type:"map",map:"world",roam:false,data:cs.data,
       label:{show:false},emphasis:{label:{show:true,color:"#fff"},itemStyle:{areaColor:"#FF2E93"}}}]
@@ -919,7 +999,7 @@ function paintGeoMap(mapName, data, opts){
     visualMap: vals.length ? {
       min,max,left:20,bottom:30,calculable:true,
       title: metricLabel(metric)+" · "+opts.titleText+cs.note,
-      inRange:{color:["#0a3a4a","#00F0FF","#FF2E93"]},
+      inRange:{color:["#0a3a4a","#6A90FF","#FF2E93"]},
       textStyle:{color:"#9fb3c8"}, text:["高","低"], formatter:cs.fmtv
     } : {show:false},
     series:[{type:"map", map:mapName, roam:false, data:cs.data, label:{show:false},
@@ -1333,7 +1413,7 @@ async function restoreState(){
   const h=location.hash.slice(1); if(!h) return false;
   const p=new URLSearchParams(h);
   const lvl=p.get("level"), m=p.get("metric"), yr=p.get("year");
-  if(m&&METRICS[m]){ metric=m; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===m)); }
+  if(m&&METRICS[m]){ metric=m; syncMetricActive(); }
   if(yr&&!isNaN(+yr)) dataYear=yr;
   if(!(lvl&&LAYERS[lvl])) return false;
   try{ await LAYERS[lvl].render(); }catch(e){ return false; }
@@ -1589,7 +1669,7 @@ function renderScatter(){
       splitLine:{lineStyle:{color:"rgba(255,255,255,.06)"}}, axisLine:{lineStyle:{color:"#24344a"}}},
     series:[{type:"scatter", data:data,
       symbolSize:function(val){ return Math.max(6, Math.sqrt(val[2]/maxPop)*54); },
-      itemStyle:{color:"#00F0FF", opacity:.72, borderColor:"#0b1220", borderWidth:.5},
+      itemStyle:{color:"#6A90FF", opacity:.72, borderColor:"#0b1220", borderWidth:.5},
       emphasis:{focus:"series", label:{show:true, formatter:p=>p.data.name, color:"#e6f2ff", position:"top"}}}]
   });
   window._scCur={xm,ym,y};
@@ -1800,15 +1880,57 @@ window.addEventListener("load", ()=>{
   document.getElementById("fullJsonBtn").addEventListener("click", ()=>exportFullJson());
   document.getElementById("scatterBtn").addEventListener("click", ()=>openScatter());
 
-  /* 指标按钮由 METRICS 注册表动态生成：加新维度只需在 METRICS 注册，按钮自动出现 */
+  /* 指标按钮由 METRICS 注册表动态生成：核心指标直接显示，扩展指标收进「更多指标」下拉 */
   (function(){
     const seg=document.getElementById("metricSeg");
+    const dropdown=document.getElementById("metricMoreDropdown");
+    const moreBtn=document.getElementById("metricMoreBtn");
+    const moreWrap=document.getElementById("metricMore");
     let first=true;
     Object.keys(METRICS).forEach(m=>{
-      const b=document.createElement("button");
-      b.dataset.m=m; b.className=first?"active":""; b.textContent=METRICS[m].label;
-      seg.appendChild(b); first=false;
+      const isCore = !METRICS[m].scope || METRICS[m].scope!=="world";
+      if(isCore){
+        const b=document.createElement("button");
+        b.dataset.m=m; b.className=first?"active":""; b.textContent=METRICS[m].label;
+        seg.appendChild(b); first=false;
+      }else{
+        const db=document.createElement("button");
+        db.type="button"; db.dataset.m=m; db.textContent=METRICS[m].label;
+        db.addEventListener("click", async ()=>{
+          if(db.disabled) return;
+          if(metricScope(m)==="world" && !window.EXT){ try{ await loadScript("vendor/ext_indicators.js"); }catch(e){ showBanner("扩展指标数据加载失败"); return; } }
+          metric=m; syncMetricActive();
+          const L=layerGet(); if(L){ L.render(); L.restore(); }
+          renderRank();
+          saveState();
+          closeDrop(moreWrap, moreBtn);
+        });
+        dropdown.appendChild(db);
+      }
     });
+    // 下拉展开/收起
+    moreBtn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const open=moreWrap.classList.toggle("open");
+      moreBtn.setAttribute("aria-expanded", open?"true":"false");
+    });
+    document.addEventListener("click",(e)=>{ if(!moreWrap.contains(e.target)) closeDrop(moreWrap, moreBtn); });
+  })();
+
+  /* 工具下拉（播放/配色/导出/散点）展开收起 */
+  (function(){
+    const wrap=document.getElementById("toolMore");
+    const btn=document.getElementById("toolMoreBtn");
+    if(!wrap||!btn) return;
+    btn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const open=wrap.classList.toggle("open");
+      btn.setAttribute("aria-expanded", open?"true":"false");
+    });
+    wrap.querySelectorAll(".dropdown button").forEach(b=>{
+      b.addEventListener("click",()=>closeDrop(wrap,btn));
+    });
+    document.addEventListener("click",(e)=>{ if(!wrap.contains(e.target)) closeDrop(wrap,btn); });
   })();
 
   const gj = window.WORLD_GEO;
@@ -1823,7 +1945,7 @@ window.addEventListener("load", ()=>{
     const m=b.dataset.m;
     // E2: EXT 扩展指标（scope=world）按需加载 ext_indicators.js（首屏省 669KB）
     if(metricScope(m)==="world" && !window.EXT){ try{ await loadScript("vendor/ext_indicators.js"); }catch(e){ showBanner("扩展指标数据加载失败"); return; } }
-    metric=m; [...e.currentTarget.children].forEach(x=>x.classList.toggle("active",x===b));
+    metric=m; syncMetricActive();
     const L=layerGet(); if(L){ L.render(); L.restore(); }   // 切维度：重绘当前层 + 恢复面板区域并跟随刷新（统一走 LAYERS）
     renderRank();
     saveState();   // 优化3：指标变化保存 URL 状态
@@ -2033,7 +2155,7 @@ window.addEventListener("message", e=>{
     if(cmd==="setMetric" && d.metric){
       /* 不拼接选择器（避免选择器注入）：遍历按钮比对 data-m */
       const want=String(d.metric);
-      const btns=document.querySelectorAll('#metricSeg button[data-m]');
+      const btns=document.querySelectorAll('#metricSeg button[data-m], #metricMoreDropdown button[data-m]');
       let hit=null;
       for(const b of btns){ if(b.getAttribute("data-m")===want){ hit=b; break; } }
       if(hit) hit.click();
