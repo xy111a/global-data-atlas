@@ -116,6 +116,25 @@ for p in targets:
 print("  ↻ 已给 %d 个 dist HTML 的全部静态 vendor 引用注入 ?v 指纹" % changed)
 PYEOF
 
+# SW 注册版本指纹（2026-10-24）：自定义域会把 /sw.js 覆盖成 max-age=14400，
+# 新 SW 最多延迟 4h。给注册 URL 加内容指纹，部署后立即触发更新检查。
+python3 - <<'PYEOF'
+import hashlib, os
+h = hashlib.md5(open('dist/sw.js', 'rb').read()).hexdigest()[:8]
+n = 0
+for p in ["dist/global-data-atlas.html", "dist/index.html", "dist/embed.html", "dist/compare.html"]:
+    if not os.path.exists(p):
+        continue
+    s = open(p, encoding='utf-8').read()
+    old = s
+    s = s.replace("register('sw.js')", "register('sw.js?v=%s')" % h)
+    s = s.replace('register("sw.js")', 'register("sw.js?v=%s")' % h)
+    if s != old:
+        open(p, 'w', encoding='utf-8').write(s)
+        n += 1
+print("  ↻ SW 注册指纹 ?v=%s（%d 个页面）" % (h, n))
+PYEOF
+
 if [ "$1" = "--deploy" ]; then
   echo "── 部署 Cloudflare Pages ──"
   # 绕过系统代理（本机代理会导致 fetch failed）

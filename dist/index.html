@@ -547,7 +547,7 @@ window.addEventListener("unhandledrejection", e=>{ console.error("[atlas] reject
 <script>
 /* PWA：注册 Service Worker（缓存 vendor，回访秒开） */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js?v=2923ceaa').catch(() => {}); });
 }
 </script>
 <script>
