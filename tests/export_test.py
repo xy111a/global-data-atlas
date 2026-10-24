@@ -137,7 +137,7 @@ check("数值模式 CSV 行数 ≥ 150（世界层 214 国）", (out.get("v_rows
 check("写入字节以 UTF-8 BOM 开头（csv 正文不含 BOM）", out.get("v_bomOk") is True)
 check("表头含「排名,区域,指标,单位」", (out.get("v_head") or "").startswith("排名,区域,指标,单位,"),
       f"({out.get('v_head')})")
-check("首行数据完整（5 列）", len((out.get("v_line1") or "").split(",")) == 5, f"({out.get('v_line1')})")
+check("首行数据完整（6 列，含实际数据年）", len((out.get("v_line1") or "").split(",")) == 6, f"({out.get('v_line1')})")
 check("文件名含层级/指标/年份", re.match(r"^atlas-[a-z]+-[a-z]+-\d{4}\.csv$", out.get("v_file") or "") is not None,
       f"({out.get('v_file')})")
 check("派生指标 gdppc 也能导出", (out.get("pc_rows") or 0) >= 150, f"({out.get('pc_rows')} 行 · {out.get('pc_file')})")

@@ -39,11 +39,14 @@ function canvasPainted(){ var cs=document.querySelectorAll('canvas'); for(var i=
 m.canvasPainted=canvasPainted();
 m.domNodes=document.getElementsByTagName('*').length;
 m.scripts=document.getElementsByTagName('script').length;
-// FPS: 1s 内 rAF 计数
+// FPS: 1s 内 rAF 计数（仅作信息；headless 虚拟时钟下 rAF 可能只触发一次）
 var fps=0, start=performance.now();
-function loop(){ fps++; if(performance.now()-start<1000) requestAnimationFrame(loop); else { m.fps=fps; finish(); } }
+function loop(){ fps++; if(performance.now()-start<1000) requestAnimationFrame(loop); }
+try{ requestAnimationFrame(loop); }catch(e){}
 function finish(){ document.body.insertAdjacentHTML('beforeend','<pre id=\"ck\">R'+JSON.stringify(m)+'</pre>'); }
-requestAnimationFrame(loop);
+/* 2026-10-24 审计：finish 不能挂在 rAF 循环里——headless 下 rAF 只触发一次，
+   原实现永远不会 finish，perf_report.json 恒为 {}，门禁却打印 "?" 并判定通过。 */
+setTimeout(function(){ m.fps=fps; finish(); }, 1500);
 }catch(e){ document.body.insertAdjacentHTML('beforeend','<pre id=\"ck\">R'+JSON.stringify({err:e.message})+'</pre>'); }
 },1200);});</script>"""
 html = html.replace("</body>", inject + "\n</body>")
@@ -74,13 +77,17 @@ print(f"  JS Heap:           {m.get('heapUsedMB','?')}/{m.get('heapLimitMB','?')
 print(f"  Canvas painted:    {m.get('canvasPainted','?')}")
 print(f"  DOM nodes:         {m.get('domNodes','?')}  scripts: {m.get('scripts','?')}")
 
-# 门禁
+# 门禁（2026-10-24：指标缺失必须失败，不能空跑通过）
 hard = []
+missing = [k for k in ("domLoad","fullLoad","canvasPainted","domNodes","scripts") if k not in m]
+if missing:
+    hard.append("缺少关键指标: " + ",".join(missing))
 if m.get("canvasPainted") is False:
     hard.append("canvas 未绘制")
+if m.get("fullLoad") is not None and m["fullLoad"] <= 0:
+    hard.append(f"fullLoad 非正数: {m['fullLoad']}")
 soft = []
-if m.get("fps") is not None and m["fps"] < 30:
-    soft.append(f"FPS {m['fps']} (headless 虚拟时钟下仅触发一次 rAF，非真实交互帧率，仅供参考)")
+# FPS 仅信息输出：headless 虚拟时钟下 rAF 不推进，不能作为门禁依据
 if m.get("domLoad") and m["domLoad"] > 5000: soft.append(f"domLoad {m['domLoad']}ms>5s")
 if m.get("fullLoad") and m["fullLoad"] > 8000: soft.append(f"fullLoad {m['fullLoad']}ms>8s")
 if m.get("heapUsedMB") and m["heapUsedMB"] > 120: soft.append(f"heap {m['heapUsedMB']}MB>120MB")

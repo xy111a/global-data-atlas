@@ -22,12 +22,13 @@ robots = open(os.path.join(root, "robots.txt"), encoding="utf-8").read()
 check("og:image 存在且指向绝对 URL", 'property="og:image" content="https://' in main)
 check("og:image 尺寸声明 1200x630", 'property="og:image:width" content="1200"' in main
       and 'property="og:image:height" content="630"' in main)
-check("og:image 文件已入库", os.path.exists(os.path.join(root, "og-image.png")))
+check("og:image 文件已入库", any(os.path.exists(os.path.join(root, "og-image." + e)) for e in ("png", "jpg")))
 check("twitter:card = summary_large_image", 'name="twitter:card" content="summary_large_image"' in main)
 check("twitter:image 存在", 'name="twitter:image" content="https://' in main)
 _ogimg = re.search(r'property="og:image" content="([^"]+)"', main)
+_ogfile = _ogimg.group(1).rstrip("/").split("/")[-1] if _ogimg else ""
 check("og:image 指向与入库文件一致",
-      _ogimg is not None and _ogimg.group(1).rstrip("/").endswith("/og-image.png"),
+      bool(_ogfile) and os.path.exists(os.path.join(root, _ogfile)),
       f"({_ogimg.group(1) if _ogimg else None})")
 
 # 1. JSON-LD 存在且合法

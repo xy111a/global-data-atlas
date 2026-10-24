@@ -21,6 +21,10 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Python test dependencies
+        # 2026-10-24 审计：此前漏装 Pillow，L3j 在 CI 必失败，最近 30 次运行 27 次红
+        run: pip install -r tests/requirements.txt
+
       - name: Install headless Chrome
         run: |
           # ubuntu-latest 自带 google-chrome-stable，若缺失则安装 chromium

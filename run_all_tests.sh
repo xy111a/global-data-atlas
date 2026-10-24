@@ -5,12 +5,17 @@
 #       本机受管 venv 已装；无 websocket-client 时移动端溢出断言降级跳过（不误报）
 set -e
 cd "$(dirname "$0")"
-# 选取一个能 import PIL 的 python（L3j 需要）；优先 PYTHON 环境变量，其次受管 venv，兜底 python3
+# 选取能 import PIL + websocket 的 python（L3j 视觉/移动端真机模拟需要）；
+# 2026-10-24 审计：此前只测 PIL，系统 python3 命中后跳过了带 websocket 的受管 venv，
+# 导致 375 视口断言被软跳过（实际在 500 宽下测）。
 PY="${PYTHON:-python3}"
-if ! "$PY" -c "import PIL" 2>/dev/null; then
+if ! "$PY" -c "import PIL, websocket" 2>/dev/null; then
   for cand in /Users/huajun/.workbuddy/binaries/python/envs/default/bin/python python3; do
-    if [ -x "$cand" ] && "$cand" -c "import PIL" 2>/dev/null; then PY="$cand"; break; fi
+    if [ -x "$cand" ] && "$cand" -c "import PIL, websocket" 2>/dev/null; then PY="$cand"; break; fi
   done
+fi
+if ! "$PY" -c "import PIL, websocket" 2>/dev/null; then
+  echo "⚠ 未找到同时具备 Pillow + websocket-client 的 Python，L3j 移动端断言将降级（建议 pip install -r tests/requirements.txt）"
 fi
 PASS=0; FAIL=0
 step() { echo ""; echo "════ $1 ════"; }
@@ -60,6 +65,10 @@ step "L3b 对比模式（cmp_test）"
 "$PY" tests/test_compare.py > /tmp/cmp.log 2>&1 && tail -2 /tmp/cmp.log || { echo "  ✗ 对比失败:"; tail -5 /tmp/cmp.log; exit 1; }
 echo "  ✓ L3b 通过"; PASS=$((PASS+1))
 
+step "L3b2 对比页数据口径（compare_data_test，2026-10-24 P1 回归）"
+"$PY" tests/compare_data_test.py > /tmp/cmpdata.log 2>&1 && tail -1 /tmp/cmpdata.log || { echo "  ✗ 对比页数据口径失败:"; tail -20 /tmp/cmpdata.log; exit 1; }
+echo "  ✓ L3b2 通过"; PASS=$((PASS+1))
+
 step "L3c 扩展指标（ext_test）"
 "$PY" tests/ext_test.py > /tmp/ext.log 2>&1 && tail -2 /tmp/ext.log || { echo "  ✗ EXT 失败:"; tail -5 /tmp/ext.log; exit 1; }
 echo "  ✓ L3c 通过"; PASS=$((PASS+1))
@@ -75,6 +84,11 @@ echo "  ✓ L3e 通过"; PASS=$((PASS+1))
 step "L3f URL 状态持久化（url_state_test）"
 "$PY" tests/url_state_test.py > /tmp/url.log 2>&1 && grep -q "restore: OK" /tmp/url.log || { echo "  ✗ URL 持久化失败:"; tail -8 /tmp/url.log; exit 1; }
 echo "  ✓ L3f 通过"; PASS=$((PASS+1))
+
+step "L3f2 深层 URL 恢复（url_restore_deep_test，省/市分享链接）"
+"$PY" tests/url_restore_deep_test.py > /tmp/urldeep.log 2>&1 && tail -1 /tmp/urldeep.log || { echo "  ✗ 深层 URL 恢复失败:"; tail -12 /tmp/urldeep.log; exit 1; }
+echo "  ✓ L3f2 通过"; PASS=$((PASS+1))
+
 step "L3g 固定美元（cur_test）"
 "$PY" tests/cur_test.py > /tmp/cur.log 2>&1 && tail -1 /tmp/cur.log || { echo "  ✗ 固定美元失败:"; tail -5 /tmp/cur.log; exit 1; }
 echo "  ✓ L3g 通过"; PASS=$((PASS+1))
@@ -114,6 +128,10 @@ echo "  ✓ L3o 通过"; PASS=$((PASS+1))
 step "L3p 搜索键盘可达性（a11y_search_test，T10）"
 "$PY" tests/a11y_search_test.py > /tmp/a11y.log 2>&1 && tail -3 /tmp/a11y.log || { echo "  ✗ 键盘可达性失败:"; tail -12 /tmp/a11y.log; exit 1; }
 echo "  ✓ L3p 通过"; PASS=$((PASS+1))
+
+step "L3v 年份标签/增长窗口（year_label_test，2026-10-24 P1 回归）"
+"$PY" tests/year_label_test.py > /tmp/yearlabel.log 2>&1 && tail -1 /tmp/yearlabel.log || { echo "  ✗ 年份标签失败:"; tail -14 /tmp/yearlabel.log; exit 1; }
+echo "  ✓ L3v 通过"; PASS=$((PASS+1))
 
 step "L3u 顶栏单行化 + 品牌一体性（header_single_row_test）"
 # 断言：≥1280px 顶栏保持单行（brand/metric-zone/tb-actions 同一行）、无横向溢出、

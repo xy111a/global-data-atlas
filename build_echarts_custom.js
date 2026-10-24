@@ -51,7 +51,7 @@ async function main() {
   const minified = await minify(withLicense, {
     compress: true,
     mangle: true,
-    format: { comments: false },
+    format: { comments: /Licensed to the Apache Software Foundation|Apache ECharts/ },
   });
   fs.writeFileSync(OUT, minified.code);
   console.log('echarts-custom.min.js:', (minified.code.length / 1024).toFixed(0), 'KB');

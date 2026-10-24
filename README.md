@@ -16,17 +16,21 @@ python3 -m http.server 8000   # 访问 http://localhost:8000
 
 ## 技术栈
 
-- 单 HTML 入口 + 本地 vendored 脚本（零构建，无打包步骤）：逻辑收敛在 `vendor/app-core.js`（~25KB），HTML 仅做 markup 并外链脚本与数据文件，离线 `file://` 可用
+- 单 HTML 入口 + 本地 vendored 脚本（零构建，无打包步骤）：逻辑收敛在 `vendor/app-core.js`（~40KB），HTML 仅做 markup 并外链脚本与数据文件，离线 `file://` 可用
+- 图表库：`vendor/echarts.min.js` 为 Apache ECharts **5.6.1** 定制子集（Line/Bar/Map/Scatter + CanvasRenderer）；许可 banner 已保留
 - 数据文件在 `vendor/`：World Bank（国家）、维基（中国省/市）、BEA（美国州）、日本内阁府（都道府县）、DataV GeoAtlas（中国边界）
-- 首屏同步 JS 约 **1.58MB**（+ HTML ~80KB，压缩前）；懒加载另计
+- 首屏同步 JS 约 **1.65MB**（+ HTML ~130KB，压缩前；brotli 后约 550KB）；懒加载另计
 - 懒加载：`vendor/japan.js` / `us-states.js` / `cn/{adcode}.js` / `eu/*` / `ext_indicators.js` 按需或后台预加载
 
 ## 测试（门禁）
 
 ```bash
-./run_all_tests.sh    # 13 步：L1 语法 / L2 数据自洽 / L3a 回归 / L3b 对比 / L3c EXT / L3d 四维洞察 / L3e 欧盟 / L3f URL / L3g 固定美元 / L3h 深度断言 / L3i 性能 / L3j 视觉回归 / L3k 搜索与 ESC
+./run_all_tests.sh    # 28 步：语法 / 数据自洽 / 增长口径 / meta 新鲜度 / 回归 / 对比 / 对比数据口径 / EXT / 四维洞察 / 欧盟 / URL / 深层URL / 固定美元 / 深度断言 / 性能 / 视觉回归 / 搜索ESC / 排行 / 配色 / 新鲜度 / SEO / 键盘 / 年份标签 / 顶栏 / 嵌入 / 欧盟多年 / 导出 / 散点
 # 补充（按需）：tests/eu_edge_test.py 欧盟边界行为、tests/econ_insight_check.py 四维洞察
 # 对比页专项：tests/test_compare.py（?add / 搜索添加 / 删除 / 轨迹图 / 层级点选 / 城市 key）
+# 数据口径：tests/compare_data_test.py（NUTS 数值/城市名/年份）、tests/year_label_test.py（回退年标签）
+# 分享链接：tests/url_restore_deep_test.py（level=province + city）
+# 依赖：pip install -r tests/requirements.txt（Pillow + websocket-client，L3j 移动端真机模拟必需）
 # 搜索/ESC：tests/search_esc_test.py
 # 面板结构盘点：tests/audit_all.py（各层仪表盘块 + 面板残留组件）
 ```
@@ -63,6 +67,8 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u ALL_PROXY -u al
 
 - 自定义域：`atlas.huajun.wang` → Pages 项目 `global-data-atlas`（另有 `global-data-atlas.pages.dev`）
 - 配置：`wrangler.toml`（`pages_build_output_dir = "./dist"`）
+- 缓存：`pages.dev` 上 `/vendor/*` 为 `max-age=0, must-revalidate`；若自定义域仍是 4h，需在 Cloudflare 区域
+  检查 Browser Cache TTL / Cache Rules 并改为 Respect Existing Headers（2026-10-24 实测自定义域被覆盖）
 
 ## 文档
 
@@ -73,5 +79,5 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u ALL_PROXY -u al
 
 ## 已知限制
 
-- 地图下钻依赖鼠标双击（ECharts canvas），**暂不支持键盘下钻**；键盘可操作范围：排行项 Enter/Space、ESC 返回、搜索 Enter
+- 地图本身（ECharts canvas）不支持键盘直接下钻；键盘路径为「排行/搜索选中 → 面板「下钻」按钮」，或 Enter/Space 激活排行项。ESC 返回上一级（表单控件与散点浮层除外）。
 - 数据源为公开整理近似值，GDP 统一以美元（USD）计价，口径详见「关于」页

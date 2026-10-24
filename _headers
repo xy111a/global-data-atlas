@@ -17,12 +17,18 @@
 # 若要限定来源，把 frame-ancestors * 改为具体域名，如 frame-ancestors https://a.com https://b.com
 /embed.html
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *
+  # 嵌入页与首页同内容，避免被搜索引擎当成重复页面收录
+  X-Robots-Tag: noindex, nofollow
 
 # ⚠️ Cloudflare Pages 会把 /embed.html 308 重定向到 /embed（去 .html 后缀），
 #    最终 200 响应落在 /embed 路径上，因此必须为无后缀路径再写一条规则，
 #    否则放开只会作用在 308 上，实际页面仍是 frame-ancestors 'self'（2026-10-12 实测踩坑）。
 /embed
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://geo.datav.aliyun.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *
+  X-Robots-Tag: noindex, nofollow
+
+/sw.js
+  Cache-Control: no-cache
 
 /robots.txt
   Content-Type: text/plain; charset=utf-8

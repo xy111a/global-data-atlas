@@ -21,7 +21,7 @@ else
 fi
 
 echo "── 同步 source → dist ──"
-for f in global-data-atlas.html compare.html about.html 404.html robots.txt sitemap.xml favicon.svg favicon.ico _headers sw.js og-image.png; do
+for f in global-data-atlas.html compare.html about.html 404.html robots.txt sitemap.xml favicon.svg favicon.ico _headers sw.js og-image.png og-image.jpg; do
   if [ -f "$f" ]; then cp "$f" "dist/$f"; fi
 done
 cp global-data-atlas.html dist/index.html
@@ -37,7 +37,7 @@ rm -f dist/vendor/world.json
 
 echo "── md5 校验 ──"
 ok=1
-for f in global-data-atlas.html compare.html about.html 404.html robots.txt sitemap.xml favicon.svg favicon.ico _headers sw.js og-image.png; do
+for f in global-data-atlas.html compare.html about.html 404.html robots.txt sitemap.xml favicon.svg favicon.ico _headers sw.js og-image.png og-image.jpg; do
   [ -f "$f" ] || continue
   s=$(HASH "$f"); d=$(HASH "dist/$f")
   if [ "$s" = "$d" ]; then echo "  ✓ $f 一致"; else echo "  ✗ $f 漂移"; ok=0; fi

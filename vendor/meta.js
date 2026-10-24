@@ -13,7 +13,7 @@ window.ATLAS_META = {
     "china": { "latest": 2025, "src": "国家统计局 / 维基",   "span": "2000–2025 逐年", "desc": "31 省 GDP 序列（2025 初核）+ 人口 + 面积" },
     "us":    { "latest": 2024, "src": "BEA / Census",      "span": "2000–2024 逐年", "desc": "51 州 GDP 序列(至2024)；人口 2020–2025 逐年(Census PEP)" },
     "eu":    { "latest": 2024, "src": "Eurostat",          "span": "2000–2024 逐年", "desc": "27 国 242 个 NUTS2 大区 GDP 序列 + 人口 1990–2025" },
-    "japan": { "latest": 2022, "src": "日本内阁府（ESRI）",  "span": "2011–2022 逐年", "desc": "47 都道府县 GDP 序列（JPY→USD 逐年）；人口/面积 2021" },
+    "japan": { "latest": 2022, "src": "日本内阁府（ESRI）",  "span": "2011–2022 逐年", "desc": "47 都道府县 GDP 序列（JPY→USD 逐年）；人口 2023 / 面积单年" },
     "city":  { "latest": 2023, "src": "维基 / 公开整理",     "span": "2023 单年",      "desc": "321 地级市快照；其中 46 城另有 2009–2020 序列" }
   }
 };

@@ -16,29 +16,29 @@
 // atlas-v2 (2026-10-12)：一次性清掉旧 v1 缓存里可能滞留的旧数据文件（如补全前的 us_pop_ts.js）。
 // 配合 _headers 将 /vendor/* 改 max-age=0 后，边缘不再供陈旧副本、SW 后台 revalidate 取到新版，
 // 主失效机制=版本号 bump（activate 删除非当前 CACHE）+ 边缘强制回源。
-const CACHE = 'atlas-v2';
+const CACHE = 'atlas-v3';
 const VENDOR = '/vendor/';
 
 self.addEventListener('install', () => self.skipWaiting());
 
+/* 2026-10-24 审计修复：
+   - 旧实现只在 activate 时按 pathname 淘汰，且把 md5 字符串字典序当“最新”；
+     两次 SW 版本之间每次部署都会新增一批 ?v 条目，旧条目永久滞留（可达 13MB/次）。
+   - 现改为每次写入 vendor 缓存后立即淘汰同 pathname 的旧条目，缓存与当前引用一致；
+     activate 只负责清跨版本 cache（保留离线能力）。 */
+async function putAndPrune(cache, req, res){
+  await cache.put(req, res);
+  const path = new URL(req.url).pathname;
+  const keys = await cache.keys();
+  await Promise.all(keys
+    .filter(k => k.url !== req.url && new URL(k.url).pathname === path)
+    .map(k => cache.delete(k)));
+}
+
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    // 1) 跨版本：删除不属于当前版本号的 cache
     const names = await caches.keys();
     await Promise.all(names.filter((n) => n !== CACHE).map((n) => caches.delete(n)));
-
-    // 2) 同版本内：同一 pathname 只保留最新指纹条目
-    const cache = await caches.open(CACHE);
-    const reqs = await cache.keys();
-    const score = (r) => new URL(r.url).searchParams.get('v') || '';   // 无指纹视为最旧
-    const keep = new Map();                                            // pathname -> request
-    for (const r of reqs) {
-      const p = new URL(r.url).pathname;
-      const prev = keep.get(p);
-      if (!prev) { keep.set(p, r); continue; }
-      if (score(r) > score(prev)) { await cache.delete(prev); keep.set(p, r); }
-      else { await cache.delete(r); }
-    }
     await self.clients.claim();
   })());
 });
@@ -54,8 +54,8 @@ self.addEventListener('fetch', (e) => {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE);
       const cached = await cache.match(req);
-      const network = fetch(req).then((r) => {
-        if (r && r.ok) cache.put(req, r.clone());
+      const network = fetch(req).then(async (r) => {
+        if (r && r.ok) { try{ await putAndPrune(cache, req, r.clone()); }catch(_){} }
         return r;
       }).catch(() => cached);
       return cached || network;

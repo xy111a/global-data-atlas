@@ -118,5 +118,43 @@ for (const iso of ['CN', 'US']) {
      `不变价=${fx(g * 100)} · 现价=${fx(nominal * 100)}`);
 }
 
+console.log('\n── 6. 终点跟随所选年 + 窗口与实际取数一致（2026-10-24 P1 回归）──');
+{
+  const cases = [
+    ['省 广东', () => regProv('广东')],
+    ['州 California', () => regUSState('California')],
+    ['县 北海道', () => regJapanPref('北海道')],
+    ['NUTS AT11', () => regNUTS('AT11')],
+    ['市 深圳', () => regCity(CITY_METRICS['440300'], '440300')],
+  ];
+  for (const dy of [2015, 2020, 2025]) {
+    global.dataYear = dy;
+    for (const [label, mk] of cases) {
+      const base = Math.max(2000, dy - 5);
+      const r = mk();
+      const w = r.growthWindow('gdp', base, dy);
+      const vy = r.valueYear('gdp', dy);
+      const g = r.growth('gdp', base, dy);
+      const v0 = w && w.from != null ? regGet(r, 'gdp', w.from) : null;
+      const v1 = w && w.to != null ? regGet(r, 'gdp', w.to) : null;
+      const exp = (v0 && v1) ? v1 / v0 - 1 : null;
+      ck(`${label} ${dy} 窗口终点=实际取数年`,
+         !!w && w.to === vy,
+         `window=${w ? w.from + '→' + w.to : 'null'} valueYear=${vy}`);
+      const noSpan = !w || w.to == null || w.from == null || w.to <= w.from;
+      ck(`${label} ${dy} growth=窗口端点之比`,
+         noSpan ? (g == null) : (g != null && exp != null && Math.abs(g - exp) < 1e-9),
+         `g=${fx(g * 100)} exp=${exp != null ? fx(exp * 100) : 'null'}`);
+    }
+  }
+  global.dataYear = 2015;
+  const c = regCity(CITY_METRICS['440300'], '440300');
+  const g15 = c.growth('gdp', 2010, 2015);
+  const g25 = c.growth('gdp', 2010, 2025);
+  ck('城市增长不再固定到序列最后一年', g15 != null && g25 != null && Math.abs(g15 - g25) > 1e-6,
+     `2015=${fx(g15 * 100)} · 2025=${fx(g25 * 100)}`);
+  global.dataYear = 2025;
+}
+
 console.log('\n' + (fail ? `✗ ${pass} 通过 / ${fail} 失败` : `✓ 全部通过（${pass} 项断言）`));
 process.exit(fail ? 1 : 0);

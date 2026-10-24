@@ -60,6 +60,14 @@ def run_iframe_roundtrip(parent_url, wait_ms=45000):
             b.close()
         return {"n": len(data), "msgs": data}
     except Exception as e:
+        # playwright 已安装但浏览器未下载时，不要让整步失败：回退 headless dump
+        try:
+            r = out_of(dump(parent_url, 60))
+            if r is not None:
+                print(f"  ⚠ playwright 不可用（{str(e).splitlines()[0][:80]}），已回退 headless")
+                return r
+        except Exception:
+            pass
         return {"err": f"playwright-fail:{e}"}
 
 ok = 0; total = 0

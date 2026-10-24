@@ -6,6 +6,19 @@
 <title>区域对比 · 全球数据地图 · huajun.wang</title>
 <meta name="description" content="多区域经济数据并排对比：国家/省/州/县/城市多年轨迹，GDP 统一以美元计价。" />
 <meta name="theme-color" content="#05060a" />
+<link rel="canonical" href="https://atlas.huajun.wang/compare" />
+<meta property="og:site_name" content="Global Data Atlas" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://atlas.huajun.wang/compare" />
+<meta property="og:title" content="区域对比 · 全球数据地图" />
+<meta property="og:description" content="国家/省/州/县/城市多年轨迹并排对比，GDP 统一以美元计价。" />
+<meta property="og:image" content="https://atlas.huajun.wang/og-image.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="区域对比 · 全球数据地图" />
+<meta name="twitter:description" content="国家/省/州/县/城市多年轨迹并排对比，GDP 统一以美元计价。" />
+<meta name="twitter:image" content="https://atlas.huajun.wang/og-image.jpg" />
 <link rel="icon" href="favicon.svg?v=brand1" type="image/svg+xml" />
 <style>
   :root{
@@ -73,6 +86,9 @@
 @media(max-width:768px){.site-name,.brand-sep{display:none;}}
 :root{--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;}
 .cmp-item .val,.unit .uval{font-family:var(--mono);}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;}
+  }
 </style>
 </head>
 <body>
@@ -121,16 +137,16 @@
 <script src="vendor/echarts.min.js"></script>
 <script src="vendor/countries_wb.js"></script>
 <script src="vendor/fxrate.js"></script>
-<script src="vendor/ext_indicators.js"></script>
 <script src="vendor/cn_prov_ts.js"></script>
 <script src="vendor/cn/city_metrics.js"></script>
+<script src="vendor/cn/city_index.js"></script>
 <script src="vendor/cn/city_ts.js"></script>
 <script src="vendor/us_states_bea.js"></script>
 <script src="vendor/us_pop_ts.js"></script>
 <script src="vendor/jp_metrics.js"></script>
 <script src="vendor/jp_ts.js"></script>
-<script src="vendor/eu/eu_metrics.js"></script>
 <script src="vendor/app-core.js"></script>
+<!-- 2026-10-24：EXT（367KB br）与 EU（102KB br）改为按需加载，对比页首屏减重；城市层级补 index -->
 <script>
 /* PWA：注册 Service Worker（缓存 vendor，回访秒开） */
 if ('serviceWorker' in navigator) {
@@ -144,25 +160,40 @@ let cmpList = [];        // [{t,name,k,pa}]
 let metric = "gdp";
 let dataYear = "2023";
 
+/* ---------- 按需加载（EXT / EU） ---------- */
+let __euPromise=null, __extPromise=null;
+function loadScript(raw){
+  const src=(window.VHASH&&window.VHASH[raw])?raw+"?v="+window.VHASH[raw]:raw;
+  return new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src=src; s.onload=()=>res(); s.onerror=()=>rej(new Error("加载失败: "+src));
+    document.head.appendChild(s);
+  });
+}
+function ensureEXT(){
+  if(window.EXT) return Promise.resolve();
+  if(__extPromise) return __extPromise;
+  __extPromise=loadScript("vendor/ext_indicators.js").then(()=>{ __extPromise=null; });
+  return __extPromise;
+}
+function ensureEU(){
+  if(window.EU_METRICS) return Promise.resolve();
+  if(__euPromise) return __euPromise;
+  __euPromise=loadScript("vendor/eu/eu_metrics.js").then(()=>{ __euPromise=null; });
+  return __euPromise;
+}
+
 /* ---------- 区域解析（从 key 取显示名） ---------- */
 function resolveName(it){
   if(it.t==="country"){ const o=window.WB&&window.WB[it.k]; return o?o.cn:it.k; }
   if(it.t==="prov") return it.k;
   if(it.t==="usstate") return it.k;
-  if(it.t==="jppref"){ const d=window.JP_METRICS&&window.JP_METRICS[it.k]; return d?it.k:it.k; }
+  if(it.t==="jppref") return it.k;
   if(it.t==="nutspref"){ const d=window.EU_METRICS&&window.EU_METRICS[it.k]; return d?d.name:it.k; }
-  if(it.t==="city"){ const cm=getCityMetric(it.k, it.pa); return cm&&cm.name?cm.name:it.k; }
+  if(it.t==="city") return (typeof cityName==="function"&&cityName(it.k))||it.k;
   return it.k;
 }
-function regFor(it){
-  if(it.t==="country") return regCountry(it.k);
-  if(it.t==="prov") return regProv(it.k);
-  if(it.t==="usstate") return regUSState(it.k);
-  if(it.t==="jppref") return regJapanPref(it.k);
-  if(it.t==="nutspref") return regNUTS(it.k);
-  if(it.t==="city"){ const cm=getCityMetric(it.k, it.pa); return cm?regCity(cm, it.k):null; }
-  return null;
-}
+function regFor(it){ return regForItem(it); }
 function seriesFor(it){
   /* 多年序列（折线）：reg.series(m) 返回 {years, values} 或 null */
   const r = regFor(it);
@@ -186,8 +217,9 @@ function exportCompare(fmt){
     const yrs = (s&&s.years) ? s.years.slice() : [];
     const ser = {};
     if(yrs.length){ s.years.forEach((y,i)=>{ ser[y]=s.values[i]; }); }
-    const cur = (r&&r.get) ? r.get(metric, +dataYear) : null;
-    return { name:it.name, type:it.t, metric, year:+dataYear, current:cur, series:ser, years:yrs };
+    const cur = r ? regGet(r, metric, +dataYear) : null;
+    const curYear = r ? regValueYear(r, metric, +dataYear) : null;
+    return { name:it.name, type:it.t, metric, year:+dataYear, current:cur, currentYear:curYear, series:ser, years:yrs };
   });
   if(fmt==="json"){
     const payload = { metric, unit, year:+dataYear, exportedAt:new Date().toISOString(), count:rows.length, regions:rows };
@@ -195,12 +227,12 @@ function exportCompare(fmt){
                  `atlas-compare-${metric}-${dataYear}.json`);
   } else {
     const allYears = [...new Set(rows.flatMap(r=>r.years))].sort((a,b)=>a-b);
-    let csv = "区域,层级,指标,单位,"+dataYear+"年值";
+    let csv = "区域,层级,指标,单位,"+dataYear+"年值,实际数据年";
     allYears.forEach(y=> csv += ","+y);
     csv += "\n";
     rows.forEach(r=>{
       const cur = (r.current==null)?"":r.current;
-      let line = [csvCell(r.name), csvCell(r.type), csvCell(r.metric), csvCell(unit), csvCell(cur)].join(",");
+      let line = [csvCell(r.name), csvCell(r.type), csvCell(r.metric), csvCell(unit), csvCell(cur), csvCell(r.currentYear==null?"":r.currentYear)].join(",");
       allYears.forEach(y=>{ const v = r.series[y]; line += ","+(v==null?"":v); });
       csv += line + "\n";
     });
@@ -266,9 +298,20 @@ function renderUnitList(){
   } else if(lv==="jppref"){
     items=Object.keys(JP_METRICS).map(k=>[k, unitKey("jppref",k), regGet(regJapanPref(k),metric,dataYear)]);
   } else if(lv==="nutspref"){
+    if(!window.EU_METRICS){
+      box.innerHTML='<div class="empty">正在加载欧盟 NUTS2 数据…</div>';
+      ensureEU().then(renderUnitList).catch(()=>{ box.innerHTML='<div class="empty">欧盟数据加载失败</div>'; });
+      return;
+    }
     items=Object.keys(EU_METRICS).map(k=>[EU_METRICS[k].name, unitKey("nutspref",k), regGet(regNUTS(k),metric,dataYear)]);
   } else if(lv==="city"){
-    items=window.CITY_INDEX.map(x=>[x[0], unitKey("city",x[1],x[2]), (getCityMetric(x[1],x[2])||{}).gdp||null]);
+    /* 城市值必须走 regGet：cm.gdp 是人民币元，直接按 $ 格式化会夸大约 7 倍，
+       且不随指标/年份变化（2026-10-24 审计 P1）。 */
+    items=window.CITY_INDEX.map(x=>{
+      const cm=getCityMetric(x[1],x[2]);
+      const r=cm?regCity(cm,x[1]):null;
+      return [x[0], unitKey("city",x[1],x[2]), r?regGet(r,metric,dataYear):null];
+    });
   }
   if(q) items=items.filter(it=>it[0].toLowerCase().includes(q));
   items.sort((a,b)=>(b[2]||-1)-(a[2]||-1));
@@ -297,9 +340,13 @@ function renderList(){
   document.getElementById("cmpHead").textContent="对比列表（"+cmpList.length+" 项）";
   tip.style.display = cmpList.length ? "none" : "block";
   box.innerHTML = cmpList.map((it,i)=>{
-    const d=cmpGetData(it);
-    const v=d&&d.v!=null?metricFmt(metric,d.v):"—";
-    return `<div class="cmp-item"><button class="del" data-i="${i}" aria-label="移除">×</button>
+    const r=regFor(it);
+    const raw=r?regGet(r,metric,dataYear):null;
+    const vy=r?regValueYear(r,metric,dataYear):null;
+    let v=raw!=null?metricFmt(metric,raw):"—";
+    /* 2026-10-24：回退年必须显式标出（如省级人口只有 2023），不能让它看起来像所选 2015 年 */
+    if(raw!=null && vy!=null && String(vy)!==String(dataYear)) v+=`（${vy}）`;
+    return `<div class="cmp-item" title="实际数据年 ${esc(vy==null?"":vy)}"><button class="del" data-i="${i}" aria-label="移除">×</button>
       <span class="nm">${esc(it.name)}</span><span class="val">${esc(v)}</span></div>`;
   }).join("");
   box.querySelectorAll(".del").forEach(b=>{
@@ -347,17 +394,31 @@ function addItem(t,k,pa){
   cmpList.push({t,name,k,pa});
   renderList(); renderChart();
 }
-function parseAddParam(){
+async function parseAddParam(){
   const p=new URLSearchParams(location.search);
-  p.getAll("add").forEach(add=>{ const pk=parseAddKey(add); if(pk&&pk.t&&pk.k) addItem(pk.t,pk.k,pk.pa); });
+  const adds=p.getAll("add");
+  if(adds.some(a=>a.indexOf("nutspref:")===0) && !window.EU_METRICS){
+    try{ await ensureEU(); }catch(e){}
+  }
+  adds.forEach(add=>{ const pk=parseAddKey(add); if(pk&&pk.t&&pk.k) addItem(pk.t,pk.k,pk.pa); });
   // C10：回读指标/年份，使分享的链接能还原完整视图（入站此前只还原 add 列表）
-  const mt=p.get("metric"); if(mt&&window.METRICS&&METRICS[mt]){ metric=mt; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===mt)); }
+  const mt=p.get("metric");
+  if(mt&&window.METRICS&&METRICS[mt]){
+    if(metricScope(mt)==="world" && !window.EXT){ try{ await ensureEXT(); }catch(e){} }
+    metric=mt; const seg=document.getElementById("metricSeg"); if(seg)[...seg.children].forEach(b=>b.classList.toggle("active",b.dataset.m===mt));
+  }
   const yr=p.get("year"); if(yr&&!isNaN(+yr)){ dataYear=String(yr); const sel=document.getElementById("yearSel"); if(sel) sel.value=dataYear; }
 }
 /* 搜索添加：国家/省/州/县/城市 */
 function doAddSearch(q){
   q=(q||"").trim().toLowerCase(); if(!q) return;
   const box=document.getElementById("addResults");
+  /* EU 指标数据按需加载：首次搜索时后台拉取，完成后自动重跑当前查询 */
+  if(!window.EU_METRICS && !window.__euSearchLoading){
+    window.__euSearchLoading=true;
+    ensureEU().then(()=>{ window.__euSearchLoading=false; const top=document.getElementById("addInputTop"); if(top && top.value.trim().toLowerCase()===q) doAddSearch(q); })
+             .catch(()=>{ window.__euSearchLoading=false; });
+  }
   const hits=[];
   const c=COUNTRIES.find(x=>x[0].toLowerCase().includes(q)||x[1].toLowerCase().includes(q));
   if(c) hits.push(`<div class="cmp-item" data-add="country:${c[2]}"><span class="nm">${esc(c[0])}（国家）</span></div>`);
@@ -402,9 +463,13 @@ function initMetrics(){
     if(m==="gdp") b.classList.add("active");
     seg.appendChild(b);
   });
-  seg.addEventListener("click",e=>{
+  seg.addEventListener("click", async e=>{
     const b=e.target.closest("button"); if(!b) return;
-    metric=b.dataset.m;
+    const m=b.dataset.m;
+    if(metricScope(m)==="world" && !window.EXT){
+      try{ await ensureEXT(); }catch(err){ alert("扩展指标数据加载失败，请检查网络"); return; }
+    }
+    metric=m;
     [...seg.children].forEach(x=>x.classList.toggle("active",x===b));
     renderList(); renderChart(); renderUnitList();
   });
@@ -421,12 +486,12 @@ function initYear(){
   sel.addEventListener("change",e=>{ dataYear=e.target.value; renderList(); renderChart(); });
 }
 
-window.addEventListener("load",()=>{
+window.addEventListener("load",async ()=>{
   initMetrics(); initYear();
   document.getElementById("btnCsv").addEventListener("click",()=>exportCompare("csv"));
   document.getElementById("btnJson").addEventListener("click",()=>exportCompare("json"));
   document.getElementById("btnShare").addEventListener("click",()=>copyShareLink());
-  parseAddParam();
+  await parseAddParam();
   renderList(); renderChart(); renderUnitList();
   document.getElementById("levelSel").addEventListener("change",()=>{ renderUnitList(); });
   document.getElementById("addInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ if(e.target.id==="addInputTop") doAddSearch(e.target.value); else renderUnitList(); } });

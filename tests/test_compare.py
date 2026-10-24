@@ -119,7 +119,7 @@ var d=it?cmpGetData(it):null;
 document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({
   h:document.getElementById('cmpHead').textContent,
   t:it&&it.t, k:it&&it.k, pa:it&&it.pa,
-  g:d&&d.g, hasCity:!!(it&&it.t==='city'&&String(it.k)==='440300')
+  g:d&&(d.v!=null?d.v:d.g), hasCity:!!(it&&it.t==='city'&&String(it.k)==='440300')
 })+'</pre>');
 }catch(e){document.body.insertAdjacentHTML('beforeend','<pre id="ck">R'+JSON.stringify({err:e.message})+'</pre>')}
 },900);});</script>"""
